@@ -1,0 +1,84 @@
+{% extends 'index.html' %}
+{% block index_content %} 
+{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Lista de proveedores</h1>
+<div class="mt-3 mb-3 text-end">
+    {% if perms.gerenteApp.add_proveedor %}
+    <a href="{% url 'crearProveedor' %}" class="btn btn-outline-primary">Crear proveedor</a>
+    {% endif %}
+</div>
+<form method="post">
+    {% csrf_token %}
+    <div class="input-group mt-3 mb-3">
+        <span class="input-group-text">Nombre</span>
+        {{ form.texto }}
+        <input type="submit" value="Buscar" class="btn btn-primary" />
+    </div>
+</form>
+{% if lista %} 
+<div class="table-responsive mt-3">
+    <table class="table table-bordered table-hover">
+        <thead class="table-primary">
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Persona de contacto</th>
+                <th>Teléfono</th>
+                <th>Correo electrónico</th>
+                <th>Dirección</th>
+                <th>Fecha de creación</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in lista %}
+            <tr>
+                <td>{{ l.proveedor_id }}</td>
+                <td>{{ l.nombre }}</td>
+                <td>{{ l.persona_contacto }}</td>
+                <td>{{ l.telefono }}</td>
+                <td>{{ l.correo }}</td>
+                <td>{{ l.direccion }}</td>
+                <td>{{ l.fecha_creacion }}</td>
+
+{% comment %}                 <td nowrap>
+                    <a href="{% url 'listaralbums' %}" class="btn btn-info">Ver álbumes</a>
+                    <a href="{% url 'listarmiembros' %}" class="btn btn-info">Ver miembros</a>
+                </td> {% endcomment %}
+                <td nowrap>
+                    {% if perms.gerenteApp.change_proveedor %}
+                    <a href="{% url 'editarProveedor' l.proveedor_id %}" class="btn btn-primary">Editar</a>
+                    {% endif %}
+                    {% if perms.gerenteApp.delete_proveedor %}
+                    <a href="#" onclick="eliminar('{{ l.proveedor_id }}')" class="btn btn-danger">Eliminar</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        const eliminar = (id) => {
+            Swal.fire({
+                title: '¿Esta seguro de eliminar el proveedor',
+                text: 'No podrás revertir los cambios',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then((result) => {
+                if(result.isConfirmed)
+                    window.location.href = '/gerencia/proveedores/eliminarproveedor/' + id
+            })
+        }
+    </script>
+</div>
+</div>
+
+{% else %}
+<p class="alert alert-warning display-5">No hay datos de proveedores</p>
+{% endif %}
+{% endblock %}

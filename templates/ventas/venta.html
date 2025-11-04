@@ -1,0 +1,140 @@
+{% extends 'index.html' %}
+{% block index_content %} 
+{% endblock %}
+
+
+{% block contenido %}
+{% load static %}
+<!-- Begin Page Content -->
+<div class="container-fluid">
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Menú de ventas y cotizaciones</h1>
+    </div>
+
+    <!-- Content Row -->
+
+
+    <!-- Content Row -->
+
+    <div class="row">
+
+        <!-- Area Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <!-- Card Header - Dropdown -->
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Venta</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                        </a>
+                    </div>
+                </div>
+                <!-- Card Body -->
+                <div class="container mt-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="form-group"> <input type="text" class="form-control" id="codigoProducto"
+                                    placeholder="Ingrese código del producto">
+                            </div> <button class="btn btn-primary" onclick="buscarProducto()">Buscar
+                                Producto</button> <button class="btn btn-success" id="btnAgregarProducto">Agregar
+                                Producto</button>
+                            <div class="table-responsive mt-4">
+                                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Cantidad</th>
+                                            <th>Código</th>
+                                            <th>Nombre</th>
+                                            <th>Precio</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="productoList"> </tbody>
+                                </table>
+                            </div>
+                            <div class="row mt-4">
+                                <div class="col-sm-12 col-md-5">
+                                    <h3>Total <span id="total">$0</span></h3>
+                                </div>
+                                <div class="col-sm-12 col-md-7 text-right"> <a href="#"
+                                        class="btn btn-primary shadow-sm" onclick="modificarParaOferta()"> <i
+                                            class="fas fa-sm text-white-50"></i> Modificar para
+                                        oferta </a> </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Pie Chart -->
+            <div class="col-xl-4 col-lg-5">
+                <div class="card shadow mb-4" id="cardPorcentaje" style="display: none;">
+                    <!-- Card Header - Dropdown -->
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Modificar porcentaje utilidad</h6>
+                        <div class="dropdown no-arrow"> <a class="dropdown-toggle" href="#" role="button"
+                                id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i> </a>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                                aria-labelledby="dropdownMenuLink">
+                                <div class="dropdown-header">Dropdown Header:</div> <a class="dropdown-item"
+                                    href="#">Action</a> <a class="dropdown-item" href="#">Another action</a>
+                                <div class="dropdown-divider"></div> <a class="dropdown-item" href="#">Something else
+                                    here</a>
+                            </div>
+                        </div>
+                    </div> <!-- Card Body -->
+                    <div class="card-body">
+                        <h1 id="porcentajeActual" style="text-align: center;">%0</h1>
+                        <div class="row d-sm-flex align-items-center justify-content-center"> <a href="#"
+                                class="d-none d-sm-inline-block btn btn-lg btn-primary shadow-sm"
+                                onclick="aplicarPorcentaje()"> <i class="fas fa-sm text-white-50"></i>
+                                Aceptar </a> <a href="#"
+                                class="d-none d-sm-inline-block btn btn-lg btn-danger shadow-sm ml-5"
+                                onclick="cancelarPorcentaje()"> <i class="fas fa-sm text-white-50"></i>
+                                Cancelar </a> </div>
+                        <div class="form-group mt-3"> <label for="porcentajeUtilidad">Porcentaje de
+                                Utilidad:</label> <input type="number" class="form-control" id="porcentajeUtilidad"
+                                placeholder="Ingrese porcentaje de utilidad">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Content Row -->
+            <div class="row">
+
+                <!-- Content Column -->
+                <div class="col-xl-8 col-lg-7">
+
+                    <!-- Project Card Example -->
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <div class="d-sm-flex align-items-center justify-content-between"><a href="#"
+                                    onclick="procesarVenta()"
+                                    class="d-none d-sm-inline-block btn btn-lg btn-primary shadow-sm"><i
+                                        class="fas fa-sm text-white-50"></i>
+                                    Realizar venta</a><a href="#" onclick="generarCotizacion()"
+                                    class="d-none d-sm-inline-block btn btn-lg btn-primary shadow-sm"><i
+                                        class="fas fa-sm text-white-50"></i>
+                                    Generar cotización</a></div>
+                            <div><a href="#" onclick="borrarTodo()"
+                                    class="d-none d-sm-inline-block btn btn-lg btn-danger shadow-sm mt-3"><i
+                                        class="fas fa-sm text-white-50"></i>
+                                    Borrar todo</a></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- End of Main Content -->
+    {% endblock %}

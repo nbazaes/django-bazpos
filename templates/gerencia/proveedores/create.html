@@ -1,0 +1,29 @@
+{% extends 'index.html' %}
+{% load static %}
+{% block index_content %} 
+{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">{{ titulo }}</h1>
+
+{% if messages %}
+{% for msj in messages %}
+<script>
+    Swal.fire('{{ msj }}', '', 'success')
+</script>
+{% endfor %}
+{% endif %}
+<!-- enctype sirve para enviar archvios desde el cliente al servidor -->
+<form method="post" enctype="multipart/form-data">
+    <!-- token que permite verificar que los datos sean enviados de django -->
+    {% csrf_token %}
+    {{ formulario }}
+    <div class="text-center mt-3">
+        <input type="reset" class="btn btn-outline-info w-25" value="Limpiar">
+        <input type="submit" class="btn btn-primary w-25" value="Guardar">
+    </div>
+</form>
+</div>
+
+{% endblock %}

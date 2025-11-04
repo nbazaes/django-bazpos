@@ -1,0 +1,48 @@
+{% extends 'index.html' %}
+{% block index_content %} 
+{% endblock %}
+
+
+{% block contenido %}
+{% load static %}
+
+                <!-- Begin Page Content -->
+                <div class="container-fluid">
+
+                    <!-- Page Heading -->
+                    <h1 class="h3 mb-4 text-gray-800">Calculadora de pedidos</h1>
+
+                    <div class="card shadow mb-4 col-md-6">
+                        <div class="card-body">
+                            <form class="user">
+                                <div class="form-group">
+                                    <input type="number" class="form-control form-control-user" id="costo"
+                                        placeholder="Ingresa el precio de costo">
+                                </div>
+                                <div class="form-group">
+                                    <input type="number" class="form-control form-control-user" id="porcentaje"
+                                        placeholder="Ingrese porcentaje de utilidad">
+                                </div>
+                                <div class="btn btn-primary btn-user btn-block" onclick="calcular()">Calcular</div>
+                                <div class="card border-left-primary shadow h-100 py-2 mt-4">
+                                    <div class="card-body">
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2 py-2">
+                                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                                    Precio de venta al público:</div>
+                                                <div class="h5 mb-1 font-weight-bold text-gray-800" id="resultado"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+                </div>
+                <!-- /.container-fluid -->
+            <!-- End of Main Content -->
+
+            <script src="{% static 'js/calculo_pedidos.js' %}"></script>
+{% endblock %}

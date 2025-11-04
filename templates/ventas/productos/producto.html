@@ -1,0 +1,96 @@
+{% extends 'index.html' %}
+{% block index_content %} 
+{% endblock %}
+
+{% block contenido %}
+{% load static %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Lista de productos</h1>
+<div class="mt-3 mb-3 text-end">
+    {% if perms.vendedorApp.add_producto %}
+    <a href="{% url 'crearproducto' %}" class="btn btn-outline-primary">Crear producto</a>
+    {% endif %}
+</div>
+<form method="post">
+    {% csrf_token %}
+    <div class="input-group mt-3 mb-3">
+        <span class="input-group-text">Proveedor</span>
+        {{ form.proveedores }}
+        <span class="input-group-text">Nombre/Código</span>
+        {{ form.texto }}
+        <input type="submit" value="Buscar" class="btn btn-primary" />
+    </div>
+</form>
+{% if lista %} 
+<div class="table-responsive mt-3">
+    <table class="table table-bordered table-hover">
+        <thead class="table-primary">
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Precio</th>
+                <th>Precio costo</th>
+                <th>Stock mín.</th>
+                <th>Stock máx.</th>
+                <th>Stock actual</th>
+                <th>% utilidad</th>
+                <th>Proveedor</th>
+{% comment %}                 <th></th> {% endcomment %}
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in lista %}
+            <tr>
+                <td>{{ l.producto_id }}</td>
+                <td>{{ l.nombre }}</td>
+                <td>{{ l.codigo }}</td>
+                <td>{{ l.descripcion }}</td>
+                <td>${{ l.precio }}</td>
+                <td>${{ l.precio_costo }}</td>
+                <td>{{ l.stock_minimo }}</td>
+                <td>{{ l.stock_maximo }}</td>
+                <td>{{ l.stock_actual }}</td>
+                <td>{{ l.margen_utilidad }}%</td>
+                <td>{{ l.proveedor }}</td>
+
+{% comment %}                 <td nowrap>
+                    <a href="{% url 'listaralbums' %}" class="btn btn-info">Ver álbumes</a>
+                    <a href="{% url 'listarmiembros' %}" class="btn btn-info">Ver miembros</a>
+                </td> {% endcomment %}
+                <td nowrap>
+                    {% if perms.vendedorApp.change_producto %}
+                    <a href="{% url 'editarproducto' l.producto_id %}" class="btn btn-primary">Editar</a>
+                    {% endif %}
+                    {% if perms.vendedorApp.delete_producto %}
+                    <a href="#" onclick="eliminar('{{ l.producto_id }}')" class="btn btn-danger">Eliminar</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        const eliminar = (id) => {
+            Swal.fire({
+                title: '¿Esta seguro de eliminar el producto',
+                text: 'No podrás revertir los cambios',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then((result) => {
+                if(result.isConfirmed)
+                    window.location.href = '/ventas/productos/eliminarproducto/' + id
+            })
+        }
+    </script>
+</div>
+</div>
+
+{% else %}
+<p class="alert alert-warning display-5">No hay datos de productos</p>
+{% endif %}
+{% endblock %}

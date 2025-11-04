@@ -1,0 +1,49 @@
+{% extends 'index.html' %}
+{% load static %}
+{% block index_content %} 
+{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">{{ titulo }}</h1>
+
+    {% if messages %}
+    {% for msj in messages %}
+    <script>
+        Swal.fire('{{ msj }}', '', 'success')
+    </script>
+    {% endfor %}
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ formulario.username.id_for_label }}">Nombre de usuario:</label>
+            {{ formulario.username }}
+        </div>
+        <div class="form-group">
+            <label for="{{ formulario.first_name.id_for_label }}">Nombre:</label>
+            {{ formulario.first_name }}
+        </div>
+        <div class="form-group">
+            <label for="{{ formulario.last_name.id_for_label }}">Apellido:</label>
+            {{ formulario.last_name }}
+        </div>
+        <div class="form-group">
+            <label for="{{ formulario.password.id_for_label }}">Contraseña (déjalo en blanco si no quieres cambiarla):</label>
+            {{ formulario.password }}
+        </div>
+        <div class="form-group">
+            <label for="group">Grupo:</label>
+            <select id="group" name="group" class="form-control">
+                {% for group in groups %}
+                <option value="{{ group.id }}" {% if group == current_group %}selected{% endif %}>{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="text-center mt-3">
+            <input type="reset" class="btn btn-outline-info w-25" value="Limpiar">
+            <input type="submit" class="btn btn-primary w-25" value="Guardar">
+        </div>
+    </form>
+</div>
+{% endblock %}

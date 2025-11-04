@@ -1,0 +1,114 @@
+{% extends 'index.html' %}
+{% block index_content %} 
+{% endblock %}
+
+
+
+{% block contenido %}
+{% load static %}
+
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Módulo de inventario</h1>
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Inventario</h6>
+        </div>
+        {% if perms.vendedorApp.add_producto %}
+        <a href="{% url 'listarProductos' %}" class="ms-auto btn btn-primary">Editar productos</a>
+        {% endif %}
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered display" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Precio</th>
+                            <th>Precio costo</th>
+                            <th>Stock mín.</th>
+                            <th>Stock máx.</th>
+                            <th>Stock actual</th>
+                            <th>Margen utilidad</th>
+                            <th>ID proveedor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Page level plugins -->
+<!-- jQuery -->
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<!-- Bootstrap core JavaScript -->
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+<!-- Comenta o elimina esta línea si no necesitas este archivo -->
+<!-- <script src="{% static 'js/demo/datatables-demo.js' %}"></script> -->
+<script>
+    $(document).ready(function() {
+        try {
+            $('#dataTable').DataTable({
+                "ajax": {
+                    "url": "/ventas/api/data/",
+                    "type": "GET",
+                    "dataSrc": "",
+                    "error": function (xhr, error, thrown) {
+                        console.error("DataTables error:", error, thrown);
+                        alert("Error al cargar los datos: " + error);
+                    }
+                },
+                "columns": [
+                    { "data": "producto_id" },
+                    { "data": "nombre" },
+                    { "data": "codigo" },
+                    { "data": "descripcion" },
+                    { "data": "precio" },
+                    { "data": "precio_costo" },
+                    { "data": "stock_minimo" },
+                    { "data": "stock_maximo" },
+                    { "data": "stock_actual" },
+                    { "data": "margen_utilidad" },
+                    { "data": "proveedor__nombre" }
+                ],
+                "language": {
+                    "sProcessing":    "Procesando...",
+                "sLengthMenu":    "Mostrar _MENU_ registros",
+                "sZeroRecords":   "No se encontraron resultados",
+                "sEmptyTable":    "Ningún dato disponible en esta tabla",
+                "sInfo":          "Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros",
+                "sInfoEmpty":     "Mostrando registros del 0 al 0 de un total de 0 registros",
+                "sInfoFiltered":  "(filtrado de un total de _MAX_ registros)",
+                "sInfoPostFix":   "",
+                "sSearch":        "Buscar:",
+                "sUrl":           "",
+                "sInfoThousands":  ",",
+                "sLoadingRecords": "Cargando...",
+                "oPaginate": {
+                    "sFirst":    "Primero",
+                    "sLast":    "Último",
+                    "sNext":    "Siguiente",
+                    "sPrevious": "Anterior"
+                },
+                "oAria": {
+                    "sSortAscending":  ": Activar para ordenar la columna de manera ascendente",
+                    "sSortDescending": ": Activar para ordenar la columna de manera descendente"
+                }
+                }
+            });
+        } catch (e) {
+            console.error("Error initializing DataTable:", e);
+        }
+    });
+</script>
+
+{% endblock %}

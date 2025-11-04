@@ -1,0 +1,78 @@
+# Ignorar archivos comunes para proyectos (ajusta según tu stack)
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Logs y runtime
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+coverage/
+coverage.*
+*.tgz
+
+# Dependencias / paquetes
+node_modules/
+bower_components/
+vendor/
+
+# Salidas de build
+dist/
+build/
+out/
+tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.env.*.local
+venv/
+.venv/
+env/
+ENV/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+*.egg-info/
+
+# IDEs y editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Docker
+docker-compose.override.yml
+Dockerfile.*
+
+# Bases de datos y archivos de datos
+*.sqlite3
+*.db
+*.sql
+*.sqlite
+
+# Certificados / claves privadas
+*.pem
+*.p12
+*.key
+credentials.json
+secrets/
+*.secret
+
+# Otros
+*.swp
+*.lock
+*.tmp
+npm-debug.log*
+yarn-error.log*
