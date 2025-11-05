@@ -83,7 +83,7 @@ WSGI_APPLICATION = "bazpos.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": 'mysql.connector.django',
         "NAME": "bazpos_db",
         "USER": "nicolas",
         "PASSWORD": os.environ.get("DB_PASSWORD"),
