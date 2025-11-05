@@ -27,7 +27,7 @@ MEDIA_DIR = os.path.join(BASE_DIR, "media")
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-default-key-for-dev")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["161.35.231.125", "pos.bazaes.cl", "localhost", "127.0.0.1"]
 
