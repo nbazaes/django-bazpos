@@ -21,7 +21,7 @@ coverage.*
 # Dependencias / paquetes
 node_modules/
 bower_components/
-vendor/
+# vendor/
 
 # Salidas de build
 dist/
