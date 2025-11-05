@@ -1,0 +1,19 @@
+Font Awesome Free
+=================
+
+Component parts and licenses:
+- Icons: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+- Fonts: SIL Open Font License 1.1 (OFL) https://scripts.sil.org/OFL
+  https://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=OFL
+- Code/CSS/JS: MIT License
+  License page: https://fontawesome.com/license/free
+
+Notes:
+- The repository includes font files, CSS and SVG code from Font Awesome Free. Different parts are covered by different licenses as listed above.
+- If you redistribute the fonts or icons, include the appropriate attribution and license texts where required by CC BY 4.0 and SIL OFL.
+
+Links to full texts:
+- CC BY 4.0: https://creativecommons.org/licenses/by/4.0/legalcode
+- SIL OFL 1.1: https://scripts.sil.org/OFL
+- MIT: https://opensource.org/licenses/MIT
