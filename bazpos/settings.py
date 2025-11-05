@@ -27,9 +27,9 @@ MEDIA_DIR = os.path.join(BASE_DIR, "media")
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-default-key-for-dev")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ["161.35.231.125", "pos.bazaes.cl", "localhost"]
+ALLOWED_HOSTS = ["161.35.231.125", "pos.bazaes.cl", "localhost", "127.0.0.1"]
 
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/accounts/login"
@@ -83,7 +83,7 @@ WSGI_APPLICATION = "bazpos.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "mysql.connector.django",
+        "ENGINE": "django.db.backends.mysql",
         "NAME": "bazpos_db",
         "USER": "nicolas",
         "PASSWORD": os.environ.get("DB_PASSWORD"),
@@ -91,7 +91,6 @@ DATABASES = {
         "PORT": "3306",
         "OPTIONS": {
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-            "use_pure": True,
         },
     }
 }

@@ -9,11 +9,14 @@
     <meta name="description" content="">
     <meta name="author" content="">
 
-    <title>Inicio de sesión - Sistema de ventas</title>
+    <title>Inicio de sesión - BazPOS</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'img/bp-black.webp' %}">
 
     <!-- Custom fonts for this template-->
     <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
-    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
+        rel="stylesheet">
 
     <!-- Custom styles for this template-->
     <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
@@ -26,8 +29,9 @@
                 <div class="card o-hidden border-0 shadow-lg my-5">
                     <div class="card-body p-4">
                         <div class="row">
-                            <div class="col-lg-6 d-none d-lg-block bg-login-image">
-                                <img src="{% static 'img/bp-white.webp' %}" alt="" class="img-fluid px-3 px-sm-4 mt-3 mb-4">
+                            <div
+                                class="col-lg-6 d-none bg-login-image d-flex align-items-center justify-content-center">
+                                <img src="{% static 'img/bp-black-blank.svg' %}" alt="" class="img-fluid">
                             </div>
                             <div class="col-lg-6">
                                 <div class="p-5 bg-light">
@@ -39,18 +43,18 @@
                                         {% csrf_token %}
                                         <div data-mdb-input-init class="form-outline form-white mb-4">
                                             <label class="form-label">Ingrese su nombre de usuario:</label>
-                                        <div class="form-group">
-                                            <!-- Cambio: agregar id a los inputs -->
-                                             {{ form.username }}
-                                        </div>
-                                        <div data-mdb-input-init class="form-outline form-white mb-4">
-                                            <label class="form-label">Ingrese su contraseña</label>
-                                        <div class="form-group">
-                                                {{ form.password }}
-                                        </div>
-                                        <button type="submit" class="btn btn-primary btn-user btn-block">
-                                            Ingresar
-                                        </button>
+                                            <div class="form-group">
+                                                <!-- Cambio: agregar id a los inputs -->
+                                                {{ form.username }}
+                                            </div>
+                                            <div data-mdb-input-init class="form-outline form-white mb-4">
+                                                <label class="form-label">Ingrese su contraseña</label>
+                                                <div class="form-group">
+                                                    {{ form.password }}
+                                                </div>
+                                                <button type="submit" class="btn btn-primary btn-user btn-block">
+                                                    Ingresar
+                                                </button>
                                     </form>
                                     <hr>
                                 </div>
@@ -59,23 +63,33 @@
                     </div>
                 </div>
             </div>
+            <!-- Footer -->
+            <footer class="sticky-footer bg-white">
+                <div class="container my-auto">
+                    <div class="copyright text-center my-auto">
+                        <span>Copyright &copy; BazPOS 2025</span>
+                    </div>
+                </div>
+            </footer>
+            <!-- End of Footer -->
         </div>
     </div>
-                                <!-- Bootstrap core JavaScript-->
-                                <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
-                                <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
-    
-                                <!-- Core plugin JavaScript-->
-                                <script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
-    
-                                <!-- Custom scripts for all pages-->
-                                <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
 
-  
+    <!-- Bootstrap core JavaScript-->
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+
+
     <script>
         document.getElementById('id_username').classList.add('form-control')
         document.getElementById('id_password').classList.add('form-control')
-  </script>
+    </script>
 
 </body>
 

@@ -16,7 +16,8 @@ $gray-800: #5a5c69 !default;
 $gray-900: #3a3b45 !default;
 $black: #000 !default;
 
-$blue: #4e73df !default;
+// Override blue to match our new primary color (purple/mauve #43374d)
+$blue: #43374d !default;
 $indigo: #6610f2 !default;
 $purple: #6f42c1 !default;
 $pink: #e83e8c !default;
@@ -28,7 +29,7 @@ $teal: #20c9a6 !default;
 $cyan: #36b9cc !default;
 
 // Project primary color override
-// Changed to #43374d as requested
+// Changed to #43374d as requested (purple/mauve)
 $primary: #43374d !default;
 
 // Custom Colors
