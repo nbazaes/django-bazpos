@@ -1,0 +1,53 @@
+# ==============================================================================
+# BazPOS - Requirements
+# ==============================================================================
+# Django project dependencies for development and production environments
+# Python 3.13+ required
+
+# Core Framework
+# ------------------------------------------------------------------------------
+Django==5.1.2
+asgiref==3.10.0
+sqlparse==0.5.3
+
+# MySQL Database Drivers
+# ------------------------------------------------------------------------------
+# DEVELOPMENT (recommended by Django for Django 5.x):
+# Uses PyMySQL - pure Python implementation, no C dependencies
+PyMySQL==1.1.2
+
+# PRODUCTION (if you prefer the official Oracle connector):
+# Uncomment the line below and comment PyMySQL if using mysql.connector.django
+# Note: mysql-connector-python 9.x may have compatibility issues with Django 5.x
+# mysql-connector-python==9.5.0
+
+# ALTERNATIVE FOR PRODUCTION (best performance):
+# mysqlclient is the recommended C-based driver for production
+# Requires system dependencies: python3-dev, default-libmysqlclient-dev, build-essential
+# Uncomment if you want to use this instead:
+# mysqlclient==2.2.7
+
+# ==============================================================================
+# Installation Instructions
+# ==============================================================================
+# 
+# DEVELOPMENT (local):
+#   pip install -r requirements.txt
+#
+# PRODUCTION (with mysql-connector-python):
+#   1. Comment PyMySQL line above
+#   2. Uncomment mysql-connector-python line
+#   3. Change ENGINE in settings.py to "mysql.connector.django"
+#   4. pip install -r requirements.txt
+#
+# PRODUCTION (with mysqlclient - recommended):
+#   1. Install system dependencies:
+#      Ubuntu/Debian: sudo apt-get install python3-dev default-libmysqlclient-dev build-essential
+#      CentOS/RHEL:   sudo yum install python3-devel mysql-devel gcc
+#      macOS:         brew install mysql-client
+#   2. Comment PyMySQL line above
+#   3. Uncomment mysqlclient line
+#   4. Remove pymysql.install_as_MySQLdb() from bazpos/__init__.py
+#   5. pip install -r requirements.txt
+#
+# ==============================================================================
