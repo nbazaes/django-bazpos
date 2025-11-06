@@ -1,8 +1,7 @@
-{% extends 'index.html' %}
+{% extends 'index.html' %} 
 {% block index_content %} 
-{% endblock %}
-
-{% block contenido %}
+{% endblock %} 
+{% block contenido %} 
 {% load static %}
 
 <div class="container-fluid">
@@ -26,8 +25,7 @@
                             <th>Fecha de creación</th>
                         </tr>
                     </thead>
-                    <tbody>
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -37,11 +35,6 @@
 <!-- jQuery -->
 <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
 <!-- Bootstrap core JavaScript -->
-<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
-<!-- Core plugin JavaScript -->
-<script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
-<!-- Custom scripts for all pages -->
-<script src="{% static 'js/sb-admin-2.min.js' %}"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
@@ -51,55 +44,59 @@
 <!-- Comenta o elimina esta línea si no necesitas este archivo -->
 <!-- <script src="{% static 'js/demo/datatables-demo.js' %}"></script> -->
 <script>
-    $(document).ready(function() {
+    $(document).ready(function () {
         try {
-            $('#proveedores').DataTable({
-                "ajax": {
-                    "url": "/gerencia/api/proveedores/",
-                    "type": "GET",
-                    "dataSrc": "",
-                    "error": function (xhr, error, thrown) {
+            $("#proveedores").DataTable({
+                ajax: {
+                    url: "/gerencia/api/proveedores/",
+                    type: "GET",
+                    dataSrc: "",
+                    error: function (xhr, error, thrown) {
                         console.error("DataTables error:", error, thrown);
                         alert("Error al cargar los datos: " + error);
-                    }
+                    },
                 },
-                "columns": [
-                    { "data": "proveedor_id" },
-                    { "data": "nombre" },
-                    { "data": "persona_contacto" },
-                    { "data": "telefono" },
-                    { "data": "correo" },
-                    { "data": "direccion" },
-                    { "data": "fecha_creacion" }
+                columns: [
+                    { data: "proveedor_id" },
+                    { data: "nombre" },
+                    { data: "persona_contacto" },
+                    { data: "telefono" },
+                    { data: "correo" },
+                    { data: "direccion" },
+                    { data: "fecha_creacion" },
                 ],
-                "language": {
-                    "sProcessing":    "Procesando...",
-                "sLengthMenu":    "Mostrar _MENU_ registros",
-                "sZeroRecords":   "No se encontraron resultados",
-                "sEmptyTable":    "Ningún dato disponible en esta tabla",
-                "sInfo":          "Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros",
-                "sInfoEmpty":     "Mostrando registros del 0 al 0 de un total de 0 registros",
-                "sInfoFiltered":  "(filtrado de un total de _MAX_ registros)",
-                "sInfoPostFix":   "",
-                "sSearch":        "Buscar:",
-                "sUrl":           "",
-                "sInfoThousands":  ",",
-                "sLoadingRecords": "Cargando...",
-                "oPaginate": {
-                    "sFirst":    "Primero",
-                    "sLast":    "Último",
-                    "sNext":    "Siguiente",
-                    "sPrevious": "Anterior"
+                language: {
+                    sProcessing: "Procesando...",
+                    sLengthMenu: "Mostrar _MENU_ registros",
+                    sZeroRecords: "No se encontraron resultados",
+                    sEmptyTable: "Ningún dato disponible en esta tabla",
+                    sInfo: "Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros",
+                    sInfoEmpty:
+                        "Mostrando registros del 0 al 0 de un total de 0 registros",
+                    sInfoFiltered: "(filtrado de un total de _MAX_ registros)",
+                    sInfoPostFix: "",
+                    sSearch: "Buscar:",
+                    sUrl: "",
+                    sInfoThousands: ",",
+                    sLoadingRecords: "Cargando...",
+                    oPaginate: {
+                        sFirst: "Primero",
+                        sLast: "Último",
+                        sNext: "Siguiente",
+                        sPrevious: "Anterior",
+                    },
+                    oAria: {
+                        sSortAscending:
+                            ": Activar para ordenar la columna de manera ascendente",
+                        sSortDescending:
+                            ": Activar para ordenar la columna de manera descendente",
+                    },
                 },
-                "oAria": {
-                    "sSortAscending":  ": Activar para ordenar la columna de manera ascendente",
-                    "sSortDescending": ": Activar para ordenar la columna de manera descendente"
-                }
-                }
             });
         } catch (e) {
             console.error("Error initializing DataTable:", e);
         }
     });
 </script>
+
 {% endblock %}
