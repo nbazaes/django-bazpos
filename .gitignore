@@ -76,3 +76,5 @@ secrets/
 *.tmp
 npm-debug.log*
 yarn-error.log*
+
+tareas.md

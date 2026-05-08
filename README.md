@@ -1,6 +1,20 @@
-# BazPOS - Django Point of Sale System
+# BazPOS - Django API + Vite/React Frontend
 
-Sistema de punto de venta desarrollado con Django 5.1.2.
+Sistema de punto de venta con backend Django (API REST + admin) y frontend separado en Vite/React multipagina.
+
+## Arquitectura actual
+
+- Backend: Django + DRF + JWT en `api/`.
+- Frontend: React (Vite) en `frontend/`, con entradas HTML independientes por modulo.
+- Admin: `admin/` de Django se mantiene activo para backoffice.
+
+## Endpoints principales
+
+- `POST /api/auth/token/`
+- `POST /api/auth/token/refresh/`
+- `GET /api/auth/me/`
+- `GET /api/dashboard/stats/`
+- CRUD: `/api/productos/`, `/api/ventas/`, `/api/proveedores/`, `/api/facturas/`, `/api/usuarios/`
 
 ## Requisitos del Sistema
 
@@ -43,10 +57,19 @@ DB_PASSWORD='tu_password' python manage.py migrate
 DB_PASSWORD='tu_password' python manage.py createsuperuser
 ```
 
-### 7. Ejecutar servidor de desarrollo
+### 7. Ejecutar backend de desarrollo
 ```bash
 DB_PASSWORD='tu_password' python manage.py runserver
 ```
+
+### 8. Ejecutar frontend Vite
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend por defecto: `http://127.0.0.1:5173`
 
 ## Instalación - Producción
 
@@ -132,7 +155,14 @@ Para mejor rendimiento:
    pip install -r requirements.txt
    ```
 
-## Compilar CSS (desarrollo)
+## Build del frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+## Compilar CSS legado (desarrollo)
 
 Si modificas los archivos SCSS:
 

@@ -1,0 +1,57 @@
+import { useEffect, useMemo, useState } from "react";
+import PageCard from "../components/PageCard";
+import Shell from "../components/Shell";
+import { apiRequest } from "../lib/api";
+
+const initialState = {
+  rut: "",
+  nombre: "",
+  persona_contacto: "",
+  telefono: "",
+  correo: "",
+  direccion: "",
+};
+
+export default function ProveedorFormPage() {
+  const id = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
+  const [data, setData] = useState(initialState);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (id) {
+      apiRequest(`/proveedores/${id}/`).then(setData).catch((err) => setError(err.message));
+    }
+  }, [id]);
+
+  async function submit(event) {
+    event.preventDefault();
+    try {
+      await apiRequest(id ? `/proveedores/${id}/` : "/proveedores/", {
+        method: id ? "PUT" : "POST",
+        body: data,
+      });
+      window.location.href = "/gerencia/proveedores/lista_proveedores.html";
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <Shell title={id ? "Editar proveedor" : "Crear proveedor"}>
+      <PageCard title={id ? "Editar proveedor" : "Crear proveedor"}>
+        {error && <div className="alert alert-danger">{error}</div>}
+        <form onSubmit={submit}>
+          <div className="row">
+            <div className="col-md-6 form-group"><label>RUT</label><input className="form-control" value={data.rut} onChange={(e) => setData({ ...data, rut: e.target.value })} required /></div>
+            <div className="col-md-6 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
+            <div className="col-md-6 form-group"><label>Contacto</label><input className="form-control" value={data.persona_contacto || ""} onChange={(e) => setData({ ...data, persona_contacto: e.target.value })} /></div>
+            <div className="col-md-6 form-group"><label>Telefono</label><input className="form-control" value={data.telefono || ""} onChange={(e) => setData({ ...data, telefono: e.target.value })} /></div>
+            <div className="col-md-6 form-group"><label>Correo</label><input className="form-control" value={data.correo || ""} onChange={(e) => setData({ ...data, correo: e.target.value })} /></div>
+            <div className="col-md-6 form-group"><label>Direccion</label><input className="form-control" value={data.direccion || ""} onChange={(e) => setData({ ...data, direccion: e.target.value })} /></div>
+          </div>
+          <button className="btn btn-primary">Guardar</button>
+        </form>
+      </PageCard>
+    </Shell>
+  );
+}
