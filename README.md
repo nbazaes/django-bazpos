@@ -1,226 +1,131 @@
-# BazPOS - Django API + Vite/React Frontend
+# BazPOS - Sistema de Punto de Venta
 
-Sistema de punto de venta con backend Django (API REST + admin) y frontend separado en Vite/React multipagina.
+Sistema POS con backend Django REST + JWT y frontend React (Vite) multipágina.
 
-## Arquitectura actual
+## Arquitectura
 
-- Backend: Django + DRF + JWT en `api/`.
-- Frontend: React (Vite) en `frontend/`, con entradas HTML independientes por modulo.
-- Admin: `admin/` de Django se mantiene activo para backoffice.
+- **Backend:** Django 5 + DRF + SimpleJWT + MySQL/MariaDB en `bazpos/`
+- **Apps:** `gerenteApp` (gestión) y `vendedorApp` (ventas)
+- **Frontend:** React 19 + Vite 8 en `frontend/`, con entradas HTML independientes por módulo
+- **Despliegue:** Docker Compose (MariaDB + Gunicorn + Nginx)
 
-## Endpoints principales
+## Endpoints API
 
-- `POST /api/auth/token/`
-- `POST /api/auth/token/refresh/`
-- `GET /api/auth/me/`
-- `GET /api/dashboard/stats/`
+- `POST /api/auth/token/` — login JWT
+- `POST /api/auth/token/refresh/` — refresh token
+- `GET /api/auth/me/` — usuario actual
+- `GET /api/dashboard/stats/` — estadísticas
 - CRUD: `/api/productos/`, `/api/ventas/`, `/api/proveedores/`, `/api/facturas/`, `/api/usuarios/`
 
-## Requisitos del Sistema
+## Requisitos
 
-- Python 3.13+
-- MySQL 8.0+
-- Node.js/npm (para compilar SCSS)
+- **Python 3.13+**
+- **MySQL 8.0+** o **MariaDB 12+**
+- **Node.js 20+** (frontend)
 
-## Instalación - Desarrollo Local
+## Desarrollo Local
 
-### 1. Clonar el repositorio
+### Backend
+
 ```bash
-git clone <repository-url>
-cd python-bazpos
-```
-
-### 2. Crear entorno virtual
-```bash
-python -m venv .venv
-source .venv/bin/activate  # En Windows: .venv\Scripts\activate
-```
-
-### 3. Instalar dependencias
-```bash
+git clone <repo> && cd bazpos
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env   # editar credenciales
+DB_PASSWORD='...' python manage.py migrate
+DB_PASSWORD='...' python manage.py createsuperuser
+DB_PASSWORD='...' python manage.py runserver
 ```
 
-### 4. Configurar variables de entorno
-```bash
-cp .env.example .env
-# Editar .env con tus credenciales de MySQL
-```
+### Frontend
 
-### 5. Ejecutar migraciones
-```bash
-DB_PASSWORD='tu_password' python manage.py migrate
-```
-
-### 6. Crear superusuario
-```bash
-DB_PASSWORD='tu_password' python manage.py createsuperuser
-```
-
-### 7. Ejecutar backend de desarrollo
-```bash
-DB_PASSWORD='tu_password' python manage.py runserver
-```
-
-### 8. Ejecutar frontend Vite
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev           # http://127.0.0.1:5173
 ```
 
-Frontend por defecto: `http://127.0.0.1:5173`
+El dev server de Vite proxea `/api` y `/static` a `http://127.0.0.1:8000`.
 
-## Instalación - Producción
-
-### Opción 1: Usar mysql-connector-python (Oracle)
-
-Si ya tienes `mysql-connector-python` funcionando en producción:
-
-1. **Editar `requirements.txt`:**
-   ```txt
-   # Comentar PyMySQL
-   # PyMySQL==1.1.2
-   
-   # Descomentar mysql-connector-python
-   mysql-connector-python==9.5.0
-   ```
-
-2. **Editar `bazpos/settings.py`:**
-   ```python
-   DATABASES = {
-       "default": {
-           "ENGINE": "mysql.connector.django",  # Cambiar aquí
-           "NAME": "bazpos_db",
-           # ... resto igual
-       }
-   }
-   ```
-
-3. **Editar `bazpos/__init__.py`:**
-   ```python
-   # Comentar o eliminar el shim de PyMySQL
-   # try:
-   #     import pymysql
-   #     pymysql.install_as_MySQLdb()
-   # except Exception:
-   #     pass
-   ```
-
-4. **Instalar dependencias:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### Opción 2: Usar mysqlclient (Recomendado para producción)
-
-Para mejor rendimiento:
-
-1. **Instalar dependencias del sistema:**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get update
-   sudo apt-get install python3-dev default-libmysqlclient-dev build-essential pkg-config
-   
-   # CentOS/RHEL
-   sudo yum install python3-devel mysql-devel gcc
-   ```
-
-2. **Editar `requirements.txt`:**
-   ```txt
-   # Comentar PyMySQL
-   # PyMySQL==1.1.2
-   
-   # Descomentar mysqlclient
-   mysqlclient==2.2.7
-   ```
-
-3. **Editar `bazpos/__init__.py`:**
-   ```python
-   # Eliminar completamente el contenido (archivo vacío)
-   ```
-
-4. **Mantener en `bazpos/settings.py`:**
-   ```python
-   DATABASES = {
-       "default": {
-           "ENGINE": "django.db.backends.mysql",  # Ya está correcto
-           # ... resto igual
-       }
-   }
-   ```
-
-5. **Instalar dependencias:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Build del frontend
+### Build frontend
 
 ```bash
-cd frontend
-npm run build
+cd frontend && npm run build
 ```
 
-## Compilar CSS legado (desarrollo)
-
-Si modificas los archivos SCSS:
+## Docker (Producción)
 
 ```bash
-# CSS expandido
+docker compose up -d
+```
+
+Esto levanta:
+- **MariaDB 12** (`bazpos_db`)
+- **App Django** con Gunicorn (`bazpos_app`) — migraciones, grupos, superusuario y collectstatic automáticos
+- **Nginx** (`bazpos_nginx`) — sirve en `http://127.0.0.1:80`
+
+### Management commands útiles
+
+- `python manage.py setup_groups` — configura grupos y permisos
+- `python manage.py create_admin` — crea superusuario desde variables de entorno
+- `python manage.py collectstatic` — recolecta estáticos
+
+## SCSS Legacy
+
+```bash
 npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.css --style=expanded --no-source-map
-
-# CSS minificado
 npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.min.css --style=compressed --no-source-map
 ```
 
-## Configuración de Base de Datos
+## Base de Datos
 
-### Crear base de datos en MySQL:
 ```sql
 CREATE DATABASE bazpos_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'tu_usuario'@'localhost' IDENTIFIED BY 'tu_password';
-GRANT ALL PRIVILEGES ON bazpos_db.* TO 'tu_usuario'@'localhost';
+CREATE USER 'bazpos'@'localhost' IDENTIFIED BY 'tu_password';
+GRANT ALL PRIVILEGES ON bazpos_db.* TO 'bazpos'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### Ajustar plugin de autenticación (si es necesario):
-```sql
-ALTER USER 'tu_usuario'@'localhost' IDENTIFIED WITH mysql_native_password BY 'tu_password';
-FLUSH PRIVILEGES;
-```
+## Variables de Entorno (`.env`)
 
-## Variables de Entorno
-
-Configura las siguientes variables (copia `.env.example` a `.env`):
-
-- `DJANGO_SECRET_KEY`: Clave secreta de Django (cambiar en producción)
-- `DJANGO_DEBUG`: True/False (False en producción)
-- `DJANGO_ALLOWED_HOSTS`: Hosts permitidos separados por coma
-- `DB_PASSWORD`: Contraseña de MySQL
+| Variable | Descripción |
+|---|---|
+| `DJANGO_SECRET_KEY` | Clave secreta de Django |
+| `DJANGO_DEBUG` | `True`/`False` |
+| `DJANGO_ALLOWED_HOSTS` | Hosts separados por coma |
+| `DB_PASSWORD` | Contraseña MySQL |
+| `DB_HOST` | Host MySQL (default: `127.0.0.1`) |
+| `DB_USER` | Usuario MySQL (default: `nicolas`) |
+| `DB_NAME` | Nombre BD (default: `bazpos_db`) |
+| `CORS_ALLOWED_ORIGINS` | Orígenes CORS adicionales |
+| `ADMIN_USER` | Superusuario (Docker) |
+| `ADMIN_EMAIL` | Email superusuario (Docker) |
+| `ADMIN_PASS` | Password superusuario (Docker) |
 
 ## Estructura del Proyecto
 
 ```
-biocar/
-├── bazpos/              # Configuración principal del proyecto
-├── gerenteApp/          # App de gestión/gerencia
-├── vendedorApp/         # App de ventas
-├── static/              # Archivos estáticos (CSS, JS, imágenes)
-│   ├── css/            # CSS compilado
-│   ├── scss/           # SCSS fuente
-│   └── vendor/         # Librerías de terceros
-├── templates/          # Templates HTML
-├── licenses/           # Licencias de terceros
-└── requirements.txt    # Dependencias Python
+bazpos/
+├── bazpos/              # Configuración Django (settings, urls, api_urls, wsgi)
+├── gerenteApp/          # App de gestión (modelos, API, admin, vistas)
+├── vendedorApp/         # App de ventas (modelos, API, admin, vistas)
+├── frontend/            # React + Vite (entradas: admin, ventas, gerencia, etc.)
+│   ├── src/            # Componentes React
+│   ├── gerencia/       # HTML: proveedores, usuarios, facturas, ubicaciones
+│   ├── ventas/         # HTML: venta, pedidos, inventario, productos
+│   └── vite.config.js  # Proxy API + rollup entries
+├── static/              # CSS, SCSS, vendor
+│   ├── css/
+│   ├── scss/
+│   └── vendor/
+├── docker/              # Recursos Docker
+├── Dockerfile           # Imagen Python Django
+├── Dockerfile.nginx     # Imagen Nginx personalizada
+├── compose.yaml         # MariaDB + App + Nginx
+├── nginx.conf           # Configuración Nginx
+└── requirements.txt     # Dependencias Python
 ```
 
 ## Licencias
 
-Este proyecto usa componentes de terceros. Ver:
-- `THIRD_PARTY_NOTICES.md` - Lista de componentes
-- `licenses/` - Textos de licencias completos
-
-## Soporte
-
-Para problemas o preguntas, contactar al equipo de desarrollo.
+Ver `THIRD_PARTY_NOTICES.md` y `licenses/`.
