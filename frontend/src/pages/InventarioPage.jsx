@@ -48,13 +48,14 @@ export default function InventarioPage() {
   return (
     <Shell title="Inventario">
       <PageCard title="Inventario actual">
-        <table className="table table-sm table-bordered">
+        <table className="table table-sm table-bordered inv-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Código</th>
               <th>OEM</th>
               <th>Nombre</th>
+              <th>Marca</th>
+              <th>Descripción</th>
               <th>Stock actual</th>
               <th>Ubicación</th>
               <th>Stock min</th>
@@ -64,10 +65,11 @@ export default function InventarioPage() {
           <tbody>
             {productos.map((p) => (
               <tr key={p.producto_id}>
-                <td>{p.producto_id}</td>
                 <td>{p.codigo_producto}</td>
                 <td>{p.oem}</td>
                 <td>{p.nombre}</td>
+                <td>{p.marca}</td>
+                <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.descripcion}</td>
                 <td>{p.stock_actual}</td>
                 <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
                 <td>{p.stock_minimo}</td>
@@ -78,6 +80,11 @@ export default function InventarioPage() {
         </table>
       </PageCard>
       <style>{`
+        .inv-table th, .inv-table td { white-space: nowrap; }
+        .inv-table th:nth-child(1), .inv-table td:nth-child(1) { width: 1px; }
+        .inv-table th:nth-child(2), .inv-table td:nth-child(2) { width: 1px; }
+        .inv-table th:nth-child(6), .inv-table td:nth-child(6) { width: 1px; }
+        .inv-table th:nth-child(9), .inv-table td:nth-child(9) { width: 1px; }
         .ubicacion-mobile { display: none; }
         @media (max-width: 767px) {
           .ubicacion-desktop { display: none; }

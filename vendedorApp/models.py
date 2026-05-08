@@ -8,7 +8,8 @@ from gerenteApp.models import Proveedor
 
 
 class Ubicacion(models.Model):
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, unique=True)
+    marca = models.CharField(max_length=100, blank=True, default="")
     descripcion = models.TextField(blank=True, default="")
 
     class Meta:

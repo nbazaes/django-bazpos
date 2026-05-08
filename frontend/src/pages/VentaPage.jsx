@@ -242,14 +242,16 @@ export default function VentaPage() {
         </div>
         {productosEncontrados.length > 0 && (
           <div className="mt-3">
-            <table className="table table-sm table-bordered">
-              <thead><tr><th>Codigo Producto</th><th>OEM</th><th>Nombre</th><th>Stock</th><th>Precio</th><th></th></tr></thead>
+            <table className="table table-sm table-bordered busqueda-table">
+              <thead><tr><th>Codigo</th><th>OEM</th><th>Nombre</th><th>Marca</th><th>Descripción</th><th>Stock</th><th>Precio</th><th></th></tr></thead>
               <tbody>
                 {productosEncontrados.map((p) => (
                   <tr key={p.producto_id}>
                     <td>{p.codigo_producto}</td>
                     <td>{p.oem}</td>
                     <td>{p.nombre}</td>
+                    <td>{p.marca}</td>
+                    <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.descripcion}</td>
                     <td>
                       {(p.ubicaciones_stock || []).length > 0 ? (
                         <span className="stock-hover">
@@ -285,7 +287,7 @@ export default function VentaPage() {
         )}
       </PageCard>
       <PageCard title="Carrito">
-        <table className="table table-sm table-bordered">
+        <table className="table table-sm table-bordered carrito-table">
           <thead><tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th><th></th></tr></thead>
           <tbody>
             {carro.map((i) => (
@@ -481,6 +483,16 @@ export default function VentaPage() {
         </div>
       )}
       <style>{`
+        .busqueda-table th, .busqueda-table td { white-space: nowrap; }
+        .busqueda-table th:nth-child(1), .busqueda-table td:nth-child(1) { width: 1px; }
+        .busqueda-table th:nth-child(6), .busqueda-table td:nth-child(6) { width: 1px; }
+        .busqueda-table th:nth-child(7), .busqueda-table td:nth-child(7) { width: 1px; }
+        .carrito-table th, .carrito-table td { white-space: nowrap; }
+        .carrito-table th:nth-child(1), .carrito-table td:nth-child(1) { width: 1px; }
+        .carrito-table th:nth-child(4), .carrito-table td:nth-child(4) { width: 1px; }
+        .carrito-table th:nth-child(5), .carrito-table td:nth-child(5) { width: 1px; }
+        .carrito-table th:nth-child(6), .carrito-table td:nth-child(6) { width: 1px; }
+
         .stock-hover {
           position: relative;
           display: inline-block;

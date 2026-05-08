@@ -76,12 +76,13 @@ export default function ProductosPage() {
         <CrudTable
           rows={rows}
           columns={[
-            { key: "producto_id", label: "ID" },
-            { key: "codigo_producto", label: "Codigo Producto" },
-            { key: "oem", label: "Codigo OEM" },
+            { key: "codigo_producto", label: "Codigo", width: "1px" },
+            { key: "oem", label: "OEM" },
             { key: "nombre", label: "Nombre" },
-            { key: "precio", label: "Precio" },
-            { key: "stock_actual", label: "Stock" },
+            { key: "marca", label: "Marca" },
+            { key: "descripcion", label: "Descripción" },
+            { key: "precio", label: "Precio", width: "1px" },
+            { key: "stock_actual", label: "Stock", width: "1px" },
             { key: "ubicaciones_stock", label: "Ubicación", render: renderUbicacion },
           ]}
           onEdit={(row) => {

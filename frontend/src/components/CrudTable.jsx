@@ -5,7 +5,7 @@ export default function CrudTable({ columns, rows, onEdit, onDelete, onView }) {
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key}>{col.label}</th>
+              <th key={col.key} style={col.width ? { width: col.width } : undefined}>{col.label}</th>
             ))}
             {(onView || onEdit || onDelete) && <th>Acciones</th>}
           </tr>

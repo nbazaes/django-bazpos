@@ -26,13 +26,13 @@ export default function UbicacionPage() {
 
   function openCreate() {
     setEditRow(null);
-    setFormData({ nombre: "", descripcion: "" });
+    setFormData({ nombre: "", marca: "", descripcion: "" });
     setShowForm(true);
   }
 
   function openEdit(row) {
     setEditRow(row);
-    setFormData({ nombre: row.nombre, descripcion: row.descripcion || "" });
+    setFormData({ nombre: row.nombre, marca: row.marca || "", descripcion: row.descripcion || "" });
     setShowForm(true);
   }
 
@@ -78,8 +78,8 @@ export default function UbicacionPage() {
         <CrudTable
           rows={rows}
           columns={[
-            { key: "id", label: "ID" },
             { key: "nombre", label: "Nombre" },
+            { key: "marca", label: "Marca" },
             { key: "descripcion", label: "Descripcion" },
           ]}
           onEdit={(row) => openEdit(row)}
@@ -100,6 +100,10 @@ export default function UbicacionPage() {
                   <div className="form-group">
                     <label>Nombre</label>
                     <input className="form-control" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Marca</label>
+                    <input className="form-control" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>Descripcion</label>
