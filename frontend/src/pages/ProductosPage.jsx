@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 function renderUbicacion(row) {
@@ -40,6 +41,8 @@ function renderUbicacion(row) {
 }
 
 export default function ProductosPage() {
+  const navigate = useNavigate();
+  usePageTitle("Productos");
   const [rows, setRows] = useState([]);
   const [texto, setTexto] = useState("");
 
@@ -60,7 +63,6 @@ export default function ProductosPage() {
   }
 
   return (
-    <Shell title="Productos">
       <PageCard title="Listado de productos">
         <div className="page-actions">
           <input
@@ -70,7 +72,7 @@ export default function ProductosPage() {
             onChange={(e) => setTexto(e.target.value)}
           />
           <button className="btn btn-primary" onClick={load}>Buscar</button>
-          <a className="btn btn-success" href="/ventas/productos/create.html">Nuevo producto</a>
+          <Link className="btn btn-success" to="/productos/crear">Nuevo producto</Link>
         </div>
         <CrudTable
           rows={rows}
@@ -85,11 +87,10 @@ export default function ProductosPage() {
             { key: "ubicaciones_stock", label: "Ubicación", render: renderUbicacion },
           ]}
           onEdit={(row) => {
-            window.location.href = `/ventas/productos/create.html?id=${row.producto_id}`;
+            navigate(`/productos/${row.producto_id}/editar`);
           }}
           onDelete={onDelete}
         />
       </PageCard>
-    </Shell>
   );
 }

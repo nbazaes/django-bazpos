@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 export default function PedidosPage() {
+  usePageTitle("Historial de ventas");
   const [ventas, setVentas] = useState([]);
   const [detalleVenta, setDetalleVenta] = useState(null);
 
@@ -17,7 +18,7 @@ export default function PedidosPage() {
   }
 
   return (
-    <Shell title="Pedidos/Ventas registradas">
+    <>
       <PageCard title="Historial de ventas">
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
@@ -76,6 +77,6 @@ export default function PedidosPage() {
           </div>
         </div>
       )}
-    </Shell>
+    </>
   );
 }

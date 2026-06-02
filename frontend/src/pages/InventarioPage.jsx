@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 function UbicacionCell({ ubicaciones }) {
@@ -38,6 +38,7 @@ function UbicacionCell({ ubicaciones }) {
 }
 
 export default function InventarioPage() {
+  usePageTitle("Inventario");
   const [productos, setProductos] = useState([]);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function InventarioPage() {
   }, []);
 
   return (
-    <Shell title="Inventario">
+    <>
       <PageCard title="Inventario actual">
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
@@ -80,6 +81,6 @@ export default function InventarioPage() {
           </table>
         </div>
       </PageCard>
-    </Shell>
+    </>
   );
 }

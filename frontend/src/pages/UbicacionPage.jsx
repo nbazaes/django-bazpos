@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 export default function UbicacionPage() {
+  usePageTitle("Ubicaciones");
   const [rows, setRows] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -69,7 +70,7 @@ export default function UbicacionPage() {
   }
 
   return (
-    <Shell title="Ubicaciones">
+    <>
       {error && <div className="alert alert-danger">{error}</div>}
       <PageCard title="Listado de ubicaciones">
         <div className="page-actions">
@@ -119,6 +120,6 @@ export default function UbicacionPage() {
           </div>
         </div>
       )}
-    </Shell>
+    </>
   );
 }

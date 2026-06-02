@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 export default function UsuariosPage() {
+  const navigate = useNavigate();
+  usePageTitle("Usuarios");
   const [rows, setRows] = useState([]);
 
   async function load() {
@@ -22,10 +25,9 @@ export default function UsuariosPage() {
   }
 
   return (
-    <Shell title="Usuarios">
       <PageCard title="Listado de usuarios">
         <div className="page-actions">
-          <a className="btn btn-success" href="/gerencia/usuarios/create.html">Nuevo usuario</a>
+          <Link className="btn btn-success" to="/usuarios/crear">Nuevo usuario</Link>
         </div>
         <CrudTable
           rows={rows}
@@ -35,10 +37,9 @@ export default function UsuariosPage() {
             { key: "first_name", label: "Nombre" },
             { key: "last_name", label: "Apellido" },
           ]}
-          onEdit={(row) => (window.location.href = `/gerencia/usuarios/editar.html?id=${row.id}`)}
+          onEdit={(row) => navigate(`/usuarios/${row.id}/editar`)}
           onDelete={onDelete}
         />
       </PageCard>
-    </Shell>
   );
 }

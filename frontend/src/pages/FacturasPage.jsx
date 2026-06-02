@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { applyTax, fetchTaxPercent, getTaxPercent } from "../lib/tax";
 
 export default function FacturasPage() {
+  const navigate = useNavigate();
+  usePageTitle("Facturas");
   const [rows, setRows] = useState([]);
   const [detalle, setDetalle] = useState(null);
   const [detalleError, setDetalleError] = useState("");
@@ -37,10 +40,10 @@ export default function FacturasPage() {
   }
 
   return (
-    <Shell title="Facturas">
+    <>
       <PageCard title="Listado de facturas">
         <div className="page-actions">
-          <a className="btn btn-success" href="/gerencia/facturas/create.html">Nueva factura</a>
+          <Link className="btn btn-success" to="/facturas/crear">Nueva factura</Link>
         </div>
         <CrudTable
           rows={rows}
@@ -51,7 +54,7 @@ export default function FacturasPage() {
             { key: "monto_total", label: "Total neto" },
             { key: "monto_total", label: "Total con IVA", render: (row) => applyTax(row.monto_total, taxPercent) },
           ]}
-          onEdit={(row) => (window.location.href = `/gerencia/facturas/create.html?id=${row.numero_factura}`)}
+          onEdit={(row) => navigate(`/facturas/${row.numero_factura}/editar`)}
           onDelete={onDelete}
           onView={onView}
         />
@@ -110,6 +113,6 @@ export default function FacturasPage() {
       )}
 
       {detalleError && <div className="alert alert-danger mt-4">{detalleError}</div>}
-    </Shell>
+    </>
   );
 }

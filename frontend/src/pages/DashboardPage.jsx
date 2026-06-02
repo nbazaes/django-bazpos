@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
+import { getUser } from "../lib/auth";
 
 function StatCard({ title, value, variant }) {
   return (
@@ -12,7 +13,9 @@ function StatCard({ title, value, variant }) {
   );
 }
 
-export default function DashboardPage({ user }) {
+export default function DashboardPage() {
+  const user = getUser();
+  usePageTitle("Dashboard");
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
@@ -23,7 +26,7 @@ export default function DashboardPage({ user }) {
   }, []);
 
   return (
-    <Shell title="Dashboard" user={user}>
+    <>
       {error && <div className="alert alert-danger">{error}</div>}
       {data && (
         <>
@@ -119,6 +122,6 @@ export default function DashboardPage({ user }) {
           )}
         </>
       )}
-    </Shell>
+    </>
   );
 }

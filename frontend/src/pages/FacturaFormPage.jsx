@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { fetchTaxPercent, getTaxPercent } from "../lib/tax";
 
@@ -13,7 +14,9 @@ function todayLocal() {
 }
 
 export default function FacturaFormPage() {
-  const id = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  usePageTitle(id ? "Editar factura" : "Crear factura");
   const [proveedores, setProveedores] = useState([]);
   const [header, setHeader] = useState({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
   const [productoId, setProductoId] = useState("");
@@ -104,7 +107,7 @@ export default function FacturaFormPage() {
     if (header.proveedor_id) params.set("proveedor", String(header.proveedor_id));
     params.set("from_factura", "1");
     params.set("embed", "1");
-    setCreateUrl(`/ventas/productos/create.html?${params.toString()}`);
+    setCreateUrl(`/productos/crear?${params.toString()}`);
     setShowCreatePrompt(false);
     setShowCreateModal(true);
   }
@@ -119,14 +122,14 @@ export default function FacturaFormPage() {
     };
     try {
       await apiRequest(id ? `/facturas/${id}/` : "/facturas/", { method: id ? "PUT" : "POST", body: payload });
-      window.location.href = "/gerencia/facturas/facturas.html";
+      navigate("/facturas");
     } catch (err) {
       setError(err.message);
     }
   }
 
   return (
-    <Shell title={id ? "Editar factura" : "Crear factura"}>
+    <>
       <PageCard title={id ? "Editar factura" : "Crear factura"}>
         {error && <div className="alert alert-danger">{error}</div>}
         <form onSubmit={guardar}>
@@ -218,6 +221,6 @@ export default function FacturaFormPage() {
           </div>
         </div>
       )}
-    </Shell>
+    </>
   );
 }

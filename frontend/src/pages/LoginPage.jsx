@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { login, me } from "../lib/api";
 import { saveUser } from "../lib/auth";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,7 +16,7 @@ export default function LoginPage() {
       await login(username, password);
       const user = await me();
       saveUser(user);
-      window.location.href = "/";
+      navigate("/");
     } catch (err) {
       setError(err.message);
     }

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 const initialState = {
@@ -13,7 +14,9 @@ const initialState = {
 };
 
 export default function ProveedorFormPage() {
-  const id = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
+  const navigate = useNavigate();
+  const { id } = useParams();
+  usePageTitle(id ? "Editar proveedor" : "Crear proveedor");
   const [data, setData] = useState(initialState);
   const [error, setError] = useState("");
 
@@ -30,14 +33,13 @@ export default function ProveedorFormPage() {
         method: id ? "PUT" : "POST",
         body: data,
       });
-      window.location.href = "/gerencia/proveedores/lista_proveedores.html";
+      navigate("/proveedores");
     } catch (err) {
       setError(err.message);
     }
   }
 
   return (
-    <Shell title={id ? "Editar proveedor" : "Crear proveedor"}>
       <PageCard title={id ? "Editar proveedor" : "Crear proveedor"}>
         {error && <div className="alert alert-danger">{error}</div>}
         <form onSubmit={submit}>
@@ -52,6 +54,5 @@ export default function ProveedorFormPage() {
           <button className="btn btn-primary">Guardar</button>
         </form>
       </PageCard>
-    </Shell>
   );
 }

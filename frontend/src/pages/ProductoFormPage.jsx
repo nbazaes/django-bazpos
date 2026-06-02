@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 const initialState = {
@@ -17,11 +18,14 @@ const initialState = {
 };
 
 export default function ProductoFormPage() {
-  const id = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
-  const initialCodigoProducto = useMemo(() => new URLSearchParams(window.location.search).get("codigo_producto") || "", []);
-  const initialProveedor = useMemo(() => new URLSearchParams(window.location.search).get("proveedor") || "", []);
-  const fromFactura = useMemo(() => new URLSearchParams(window.location.search).get("from_factura") === "1", []);
-  const embed = useMemo(() => new URLSearchParams(window.location.search).get("embed") === "1", []);
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const codigo_producto = searchParams.get("codigo_producto") || "";
+  const proveedor = searchParams.get("proveedor") || "";
+  const fromFactura = searchParams.get("from_factura") === "1";
+  const embed = searchParams.get("embed") === "1";
+  usePageTitle(id ? "Editar producto" : "Crear producto");
   const [data, setData] = useState(initialState);
   const [proveedores, setProveedores] = useState([]);
   const [error, setError] = useState("");
@@ -35,11 +39,11 @@ export default function ProductoFormPage() {
     } else {
       setData((prev) => ({
         ...prev,
-        codigo_producto: initialCodigoProducto || prev.codigo_producto,
-        proveedor: initialProveedor || prev.proveedor,
+        codigo_producto: codigo_producto || prev.codigo_producto,
+        proveedor: proveedor || prev.proveedor,
       }));
     }
-  }, [id, initialCodigoProducto, initialProveedor]);
+  }, [id, codigo_producto, proveedor]);
 
   async function submit(event) {
     event.preventDefault();
@@ -69,7 +73,7 @@ export default function ProductoFormPage() {
         }
         return;
       }
-      window.location.href = "/ventas/productos/producto.html";
+      navigate("/productos");
     } catch (err) {
       setError(err.message);
     }
@@ -124,9 +128,5 @@ export default function ProductoFormPage() {
     return <div className="p-3">{content}</div>;
   }
 
-  return (
-    <Shell title={id ? "Editar producto" : "Crear producto"}>
-      {content}
-    </Shell>
-  );
+  return content;
 }

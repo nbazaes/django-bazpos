@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
 
 export default function VentaPage() {
+  usePageTitle("Realizar venta");
   const [oem, setOem] = useState("");
   const [productosEncontrados, setProductosEncontrados] = useState([]);
   const [carro, setCarro] = useState([]);
@@ -224,7 +225,7 @@ export default function VentaPage() {
   }
 
   return (
-    <Shell title="Realizar venta">
+    <>
       {error && <div className="alert alert-danger">{error}</div>}
       <PageCard title="Buscar producto por OEM">
         <div className="row">
@@ -528,6 +529,6 @@ export default function VentaPage() {
           </div>
         </div>
       )}
-    </Shell>
+    </>
   );
 }

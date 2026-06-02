@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 export default function ProveedoresPage() {
+  const navigate = useNavigate();
+  usePageTitle("Proveedores");
   const [rows, setRows] = useState([]);
 
   async function load() {
@@ -22,10 +25,9 @@ export default function ProveedoresPage() {
   }
 
   return (
-    <Shell title="Proveedores">
       <PageCard title="Listado de proveedores">
         <div className="page-actions">
-          <a className="btn btn-success" href="/gerencia/proveedores/create.html">Nuevo proveedor</a>
+          <Link className="btn btn-success" to="/proveedores/crear">Nuevo proveedor</Link>
         </div>
         <CrudTable
           rows={rows}
@@ -35,10 +37,9 @@ export default function ProveedoresPage() {
             { key: "nombre", label: "Nombre" },
             { key: "telefono", label: "Teléfono" },
           ]}
-          onEdit={(row) => (window.location.href = `/gerencia/proveedores/create.html?id=${row.proveedor_id}`)}
+          onEdit={(row) => navigate(`/proveedores/${row.proveedor_id}/editar`)}
           onDelete={onDelete}
         />
       </PageCard>
-    </Shell>
   );
 }

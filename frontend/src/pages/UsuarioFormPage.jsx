@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import Shell from "../components/Shell";
+import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 
 const initial = {
@@ -14,7 +15,9 @@ const initial = {
 };
 
 export default function UsuarioFormPage() {
-  const id = useMemo(() => new URLSearchParams(window.location.search).get("id"), []);
+  const { id } = useParams();
+  const navigate = useNavigate();
+  usePageTitle(id ? "Editar usuario" : "Crear usuario");
   const [data, setData] = useState(initial);
   const [groups, setGroups] = useState([]);
   const [error, setError] = useState("");
@@ -41,15 +44,14 @@ export default function UsuarioFormPage() {
         method: id ? "PUT" : "POST",
         body: payload,
       });
-      window.location.href = "/gerencia/usuarios/usuarios.html";
+      navigate("/usuarios");
     } catch (err) {
       setError(err.message);
     }
   }
 
   return (
-    <Shell title={id ? "Editar usuario" : "Crear usuario"}>
-      <PageCard title={id ? "Editar usuario" : "Crear usuario"}>
+    <PageCard title={id ? "Editar usuario" : "Crear usuario"}>
         {error && <div className="alert alert-danger">{error}</div>}
         <form onSubmit={submit}>
           <div className="row">
@@ -63,6 +65,5 @@ export default function UsuarioFormPage() {
           <button className="btn btn-primary">Guardar</button>
         </form>
       </PageCard>
-    </Shell>
   );
 }
