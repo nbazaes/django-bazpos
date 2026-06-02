@@ -1,0 +1,714 @@
+/* ============================================================
+   BazPOS Admin — Dark Theme
+   Matches frontend design system (design-system.css)
+   ============================================================ */
+
+/* ── Google Fonts ──────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+/* ── CSS Custom Properties ─────────────────────────────── */
+:root {
+  --baz-bg-base: #09090f;
+  --baz-bg-surface: #0e0e1a;
+  --baz-bg-elevated: #151528;
+  --baz-bg-hover: #1d1d38;
+  --baz-bg-input: #111128;
+
+  --baz-border: #24244a;
+  --baz-border-light: #323268;
+
+  --baz-text-primary: #edecf2;
+  --baz-text-secondary: #a8a5c0;
+  --baz-text-muted: #656388;
+
+  --baz-accent: #8b5cf6;
+  --baz-accent-hover: #a78bfa;
+  --baz-accent-soft: rgba(139, 92, 246, 0.12);
+  --baz-accent-glow: rgba(139, 92, 246, 0.22);
+  --baz-purple: #a78bfa;
+
+  --baz-success: #34d399;
+  --baz-success-soft: rgba(52, 211, 153, 0.12);
+  --baz-danger: #f87171;
+  --baz-danger-soft: rgba(248, 113, 113, 0.12);
+  --baz-warning: #fbbf24;
+  --baz-warning-soft: rgba(251, 191, 36, 0.12);
+  --baz-info: #60a5fa;
+  --baz-info-soft: rgba(96, 165, 250, 0.12);
+
+  --baz-radius: 10px;
+  --baz-radius-sm: 6px;
+  --baz-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  --baz-shadow-sm: 0 1px 2px rgba(0,0,0,0.25);
+
+  --baz-font: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --baz-font-display: 'Syne', sans-serif;
+}
+
+/* ── Base ───────────────────────────────────────────── */
+body {
+  background: var(--baz-bg-base) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+  font-size: 14px;
+}
+
+body.login {
+  background: var(--baz-bg-base) !important;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+#header {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-primary) !important;
+  border-bottom: 1px solid var(--baz-border);
+  height: auto;
+  padding: 12px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+#header::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--baz-accent), var(--baz-purple));
+}
+
+#branding h1 {
+  font-family: var(--baz-font-display) !important;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--baz-accent) !important;
+}
+
+#user-tools,
+#user-tools a {
+  color: var(--baz-text-secondary) !important;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+#user-tools a:hover {
+  color: var(--baz-text-primary) !important;
+  border-bottom-color: var(--baz-accent);
+}
+
+/* ── Breadcrumbs ────────────────────────────────────── */
+div.breadcrumbs {
+  background: var(--baz-bg-elevated) !important;
+  border-bottom: 1px solid var(--baz-border);
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: var(--baz-text-muted) !important;
+}
+
+div.breadcrumbs a {
+  color: var(--baz-accent) !important;
+}
+
+div.breadcrumbs a:hover {
+  color: var(--baz-accent-hover) !important;
+}
+
+/* ── Content ────────────────────────────────────────── */
+#content {
+  padding: 24px;
+  background: transparent;
+}
+
+#content h1 {
+  font-family: var(--baz-font);
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--baz-text-primary);
+  margin-bottom: 1rem;
+}
+
+/* ── Modules ────────────────────────────────────────── */
+.module {
+  background: var(--baz-bg-elevated) !important;
+  border: 1px solid var(--baz-border) !important;
+  border-radius: var(--baz-radius) !important;
+  box-shadow: var(--baz-shadow-sm);
+  margin-bottom: 20px;
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--baz-border);
+  border-radius: var(--baz-radius) var(--baz-radius) 0 0 !important;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.module caption {
+  caption-side: top;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+table {
+  border-collapse: collapse;
+}
+
+thead th,
+.module table th {
+  background: transparent !important;
+  color: var(--baz-text-muted) !important;
+  font-size: 0.73rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--baz-border) !important;
+}
+
+.module table td,
+#changelist table tbody td {
+  color: var(--baz-text-secondary) !important;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--baz-border) !important;
+  font-size: 0.88rem;
+}
+
+#changelist table tbody tr:hover td,
+#changelist table tbody tr:hover th {
+  background: var(--baz-bg-hover) !important;
+}
+
+.module table thead th a {
+  color: var(--baz-text-muted) !important;
+}
+
+.module table thead th a:hover {
+  color: var(--baz-accent) !important;
+}
+
+/* ── Links ──────────────────────────────────────────── */
+a:link,
+a:visited {
+  color: var(--baz-accent);
+}
+
+a:hover {
+  color: var(--baz-accent-hover);
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+.object-tools a,
+.object-tools a:link,
+.object-tools a:visited {
+  font-family: var(--baz-font) !important;
+  font-weight: 500;
+  font-size: 0.83rem;
+  padding: 8px 18px;
+  border-radius: var(--baz-radius-sm);
+  border: none;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+.button.default,
+input[type="submit"].default,
+.submit-row input.default {
+  background: var(--baz-accent);
+  color: #fff;
+}
+
+.button.default:hover,
+input[type="submit"].default:hover,
+.submit-row input.default:hover {
+  background: var(--baz-accent-hover);
+  box-shadow: 0 0 12px var(--baz-accent-glow);
+}
+
+.button,
+.button:link,
+.button:visited,
+input[type="submit"],
+input[type="button"],
+.submit-row input {
+  background: var(--baz-bg-elevated);
+  color: var(--baz-text-primary);
+  border: 1px solid var(--baz-border-light);
+}
+
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.submit-row input:hover {
+  background: var(--baz-bg-hover);
+  border-color: var(--baz-accent);
+  color: var(--baz-text-primary);
+}
+
+.object-tools a.addlink,
+.object-tools a:link {
+  background: var(--baz-accent) !important;
+  color: #fff !important;
+  border: none;
+}
+
+.object-tools a:hover {
+  background: var(--baz-accent-hover) !important;
+}
+
+.button[type="submit"].default:active,
+input[type="submit"].default:active {
+  background: var(--baz-accent-hover);
+}
+
+/* ── Danger / Delete buttons ────────────────────────── */
+.deletelink {
+  background: var(--baz-danger) !important;
+}
+
+a.deletelink:link,
+a.deletelink:visited {
+  color: #fff !important;
+}
+
+.button.cancel-link {
+  background: transparent;
+  border: 1px solid var(--baz-border-light);
+  color: var(--baz-text-secondary);
+}
+
+/* ── Forms ──────────────────────────────────────────── */
+.module input[type="text"],
+.module input[type="password"],
+.module input[type="email"],
+.module input[type="number"],
+.module input[type="url"],
+.module input[type="date"],
+.module textarea,
+.module select,
+.form-row input[type="text"],
+.form-row input[type="password"],
+.form-row input[type="email"],
+.form-row input[type="number"],
+.form-row input[type="url"],
+.form-row input[type="date"],
+.form-row textarea,
+.form-row select,
+input.vTextField,
+input.vURLField,
+input.vIntegerField,
+input.vDateField,
+input.vTimeField,
+input.vEmailField,
+textarea.vLargeTextField,
+select,
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+textarea {
+  background: var(--baz-bg-input) !important;
+  border: 1px solid var(--baz-border) !important;
+  border-radius: var(--baz-radius) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+  font-size: 0.88rem;
+  padding: 9px 12px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  box-sizing: border-box;
+}
+
+.module input:focus,
+.module textarea:focus,
+.module select:focus,
+.form-row input:focus,
+.form-row textarea:focus,
+.form-row select:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--baz-accent) !important;
+  box-shadow: 0 0 0 3px var(--baz-accent-soft) !important;
+  outline: none;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a8a5c0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 14px !important;
+  padding-right: 36px !important;
+}
+
+/* ── Form rows ──────────────────────────────────────── */
+.form-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--baz-border);
+  color: var(--baz-text-secondary);
+}
+
+.form-row label {
+  color: var(--baz-text-primary);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+/* ── Fieldsets ──────────────────────────────────────── */
+fieldset.module {
+  border: 1px solid var(--baz-border) !important;
+  border-radius: var(--baz-radius) !important;
+  padding: 0;
+}
+
+fieldset.module h2 {
+  border-radius: var(--baz-radius) var(--baz-radius) 0 0 !important;
+}
+
+/* ── Changelist filters ─────────────────────────────── */
+#changelist-filter {
+  background: var(--baz-bg-elevated);
+  border: 1px solid var(--baz-border);
+  border-radius: var(--baz-radius);
+}
+
+#changelist-filter h2 {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--baz-border);
+  border-radius: var(--baz-radius) var(--baz-radius) 0 0 !important;
+}
+
+#changelist-filter h3 {
+  font-size: 0.78rem;
+  color: var(--baz-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 8px 14px 4px;
+}
+
+#changelist-filter ul {
+  padding: 0 14px 10px;
+}
+
+#changelist-filter li.selected a {
+  color: var(--baz-accent) !important;
+}
+
+#changelist-filter a {
+  color: var(--baz-text-secondary) !important;
+  font-size: 0.83rem;
+}
+
+#changelist-filter a:hover {
+  color: var(--baz-accent-hover) !important;
+}
+
+/* ── Pagination ─────────────────────────────────────── */
+.paginator {
+  background: var(--baz-bg-elevated) !important;
+  border-top: 1px solid var(--baz-border) !important;
+  padding: 12px;
+  font-size: 0.83rem;
+  color: var(--baz-text-muted) !important;
+}
+
+.paginator a {
+  color: var(--baz-accent) !important;
+}
+
+.paginator a:hover {
+  color: var(--baz-accent-hover) !important;
+}
+
+.paginator .this-page {
+  color: var(--baz-accent);
+  font-weight: 600;
+}
+
+/* ── Messages ───────────────────────────────────────── */
+.messagelist {
+  padding: 0;
+}
+
+.messagelist li,
+ul.messagelist li {
+  background: var(--baz-bg-elevated);
+  border: 1px solid var(--baz-border);
+  border-radius: var(--baz-radius-sm);
+  color: var(--baz-text-primary);
+  padding: 12px 16px;
+  font-size: 0.86rem;
+}
+
+.messagelist li.success {
+  border-color: var(--baz-success);
+  background: var(--baz-success-soft);
+  color: var(--baz-success);
+}
+
+.messagelist li.warning {
+  border-color: var(--baz-warning);
+  background: var(--baz-warning-soft);
+  color: var(--baz-warning);
+}
+
+.messagelist li.error {
+  border-color: var(--baz-danger);
+  background: var(--baz-danger-soft);
+  color: var(--baz-danger);
+}
+
+/* ── Login page ─────────────────────────────────────── */
+.login #container {
+  background: var(--baz-bg-elevated);
+  border: 1px solid var(--baz-border);
+  border-radius: var(--baz-radius);
+  box-shadow: var(--baz-shadow);
+  margin-top: 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+.login #container::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--baz-accent), var(--baz-purple));
+}
+
+.login #header {
+  background: transparent !important;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.login #header::after {
+  display: none;
+}
+
+.login #branding h1 {
+  text-align: center;
+  font-size: 1.6rem;
+}
+
+.login .form-row {
+  border-bottom: none;
+}
+
+/* ── Inline groups ──────────────────────────────────── */
+.inline-group {
+  background: transparent;
+  border: none;
+}
+
+.inline-group .module {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.inline-group .module h2 {
+  border-radius: var(--baz-radius-sm) !important;
+}
+
+.inline-group .add-row a {
+  color: var(--baz-accent);
+}
+
+.inline-group .add-row a:hover {
+  color: var(--baz-accent-hover);
+}
+
+.inline-related {
+  margin-bottom: 8px;
+}
+
+.inline-related h3 {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-secondary) !important;
+  font-family: var(--baz-font) !important;
+  font-size: 0.78rem;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--baz-border);
+}
+
+.inline-related h3 span.delete label {
+  color: var(--baz-danger);
+}
+
+/* ── Related widget / selector ──────────────────────── */
+.selector-available h2,
+.selector-chosen h2 {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+  font-size: 0.8rem !important;
+  font-weight: 600;
+}
+
+.selector .selector-filter {
+  background: var(--baz-bg-elevated);
+  border: none;
+}
+
+.selector .selector-filter input {
+  background: var(--baz-bg-input) !important;
+  border: 1px solid var(--baz-border) !important;
+  color: var(--baz-text-primary) !important;
+  font-family: var(--baz-font) !important;
+}
+
+.selector select {
+  background: var(--baz-bg-input) !important;
+  border: 1px solid var(--baz-border) !important;
+  color: var(--baz-text-primary) !important;
+}
+
+.selector-chooseall,
+.selector-clearall {
+  color: var(--baz-accent) !important;
+}
+
+/* ── Date / Time widgets ────────────────────────────── */
+.calendar caption,
+.calendar th {
+  background: var(--baz-bg-surface) !important;
+  color: var(--baz-text-secondary) !important;
+}
+
+.calendar td a {
+  color: var(--baz-accent) !important;
+}
+
+.calendar td a:hover {
+  background: var(--baz-accent-soft) !important;
+}
+
+.calendarbox,
+.clockbox {
+  background: var(--baz-bg-elevated) !important;
+  border: 1px solid var(--baz-border) !important;
+  border-radius: var(--baz-radius) !important;
+  box-shadow: var(--baz-shadow);
+  color: var(--baz-text-primary);
+}
+
+.timelist a {
+  color: var(--baz-text-secondary) !important;
+}
+
+.timelist a:hover {
+  background: var(--baz-bg-hover) !important;
+  color: var(--baz-text-primary) !important;
+}
+
+/* ── Help text ──────────────────────────────────────── */
+.help {
+  color: var(--baz-text-muted) !important;
+  font-size: 0.78rem;
+}
+
+/* ── Error messages ─────────────────────────────────── */
+.errornote {
+  background: var(--baz-danger-soft) !important;
+  border: 1px solid var(--baz-danger) !important;
+  color: var(--baz-danger) !important;
+  border-radius: var(--baz-radius-sm);
+  padding: 10px 16px;
+  font-size: 0.86rem;
+}
+
+.errorlist {
+  color: var(--baz-danger) !important;
+  background: transparent;
+}
+
+.errorlist li {
+  font-size: 0.82rem;
+}
+
+/* ── Autocomplete / dropdowns ───────────────────────── */
+.select2-container--admin-autocomplete .select2-results__option {
+  color: var(--baz-text-primary);
+}
+
+.select2-dropdown {
+  background: var(--baz-bg-elevated) !important;
+  border: 1px solid var(--baz-border) !important;
+}
+
+.select2-results__option--highlighted {
+  background: var(--baz-accent-soft) !important;
+}
+
+/* ── Scrollbar (WebKit) ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--baz-bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--baz-border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--baz-text-muted);
+}
+
+/* ── Submit row ─────────────────────────────────────── */
+.submit-row {
+  background: var(--baz-bg-elevated) !important;
+  border: 1px solid var(--baz-border) !important;
+  border-radius: 0 0 var(--baz-radius) var(--baz-radius) !important;
+  padding: 12px 16px;
+}
+
+.submit-row a.deletelink {
+  background: var(--baz-danger) !important;
+  height: auto;
+  line-height: 1;
+  padding: 10px 16px;
+  border-radius: var(--baz-radius-sm);
+}
+
+/* ── Object tools ───────────────────────────────────── */
+.object-tools {
+  margin-bottom: 12px;
+}
+
+.object-tools li {
+  margin-left: 4px;
+}
+
+/* ── Footer ─────────────────────────────────────────── */
+#footer {
+  padding: 16px 24px;
+  color: var(--baz-text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+  border-top: 1px solid var(--baz-border);
+  background: var(--baz-bg-surface);
+}
