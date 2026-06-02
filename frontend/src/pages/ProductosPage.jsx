@@ -65,8 +65,7 @@ export default function ProductosPage() {
         <div className="page-actions">
           <input
             className="form-control"
-            style={{ maxWidth: 320 }}
-            placeholder="Buscar por nombre o codigo"
+            placeholder="Buscar por nombre o código"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
           />
@@ -76,7 +75,7 @@ export default function ProductosPage() {
         <CrudTable
           rows={rows}
           columns={[
-            { key: "codigo_producto", label: "Codigo", width: "1px" },
+            { key: "codigo_producto", label: "Código", width: "1px" },
             { key: "oem", label: "OEM" },
             { key: "nombre", label: "Nombre" },
             { key: "marca", label: "Marca" },
@@ -91,67 +90,6 @@ export default function ProductosPage() {
           onDelete={onDelete}
         />
       </PageCard>
-      <style>{`
-        .ubicacion-mobile { display: none; }
-        @media (max-width: 767px) {
-          .ubicacion-desktop { display: none; }
-          .ubicacion-mobile { display: inline; }
-        }
-        .stock-hover {
-          position: relative;
-          display: inline-block;
-          cursor: pointer;
-          border-bottom: 1px dashed #999;
-        }
-        .stock-popover {
-          visibility: hidden;
-          opacity: 0;
-          position: absolute;
-          bottom: calc(100% + 8px);
-          left: 50%;
-          transform: translateX(-50%);
-          background: #fff;
-          border: 1px solid #d1d3e2;
-          border-radius: 6px;
-          padding: 8px 12px;
-          white-space: nowrap;
-          z-index: 100;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          transition: opacity 0.15s ease;
-          min-width: 180px;
-        }
-        .stock-popover::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border: 6px solid transparent;
-          border-top-color: #fff;
-        }
-        .stock-popover::before {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border: 7px solid transparent;
-          border-top-color: #d1d3e2;
-        }
-        .stock-hover:hover .stock-popover {
-          visibility: visible;
-          opacity: 1;
-        }
-        .popover-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 16px;
-          padding: 2px 0;
-        }
-        .popover-row + .popover-row {
-          border-top: 1px solid #eaecf4;
-        }
-      `}</style>
     </Shell>
   );
 }

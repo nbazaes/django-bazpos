@@ -1,8 +1,8 @@
 export default function PageCard({ title, children }) {
   return (
-    <div className="card shadow mb-4">
-      <div className="card-header py-3">
-        <h6 className="m-0 font-weight-bold text-primary">{title}</h6>
+    <div className="card">
+      <div className="card-header">
+        <h6 className="card-title">{title}</h6>
       </div>
       <div className="card-body">{children}</div>
     </div>

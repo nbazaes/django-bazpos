@@ -45,7 +45,7 @@ export default function FacturasPage() {
         <CrudTable
           rows={rows}
           columns={[
-            { key: "numero_factura", label: "Numero" },
+            { key: "numero_factura", label: "Número" },
             { key: "proveedor_nombre", label: "Proveedor" },
             { key: "fecha", label: "Fecha" },
             { key: "monto_total", label: "Total neto" },
@@ -58,50 +58,58 @@ export default function FacturasPage() {
       </PageCard>
 
       {detalle && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-xl modal-dialog-centered" style={{ maxWidth: 1000 }}>
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-xl" style={{ maxWidth: 1000 }}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Detalle factura #{detalle.numero_factura}</h5>
-                <button type="button" className="close" onClick={() => setDetalle(null)}>
-                  <span>&times;</span>
-                </button>
+                <button type="button" className="modal-close" onClick={() => setDetalle(null)}>&times;</button>
               </div>
               <div className="modal-body">
-                <div className="row mb-3">
+                <div className="row mb-4">
                   <div className="col-md-4"><strong>Proveedor:</strong> {detalle.proveedor_nombre}</div>
                   <div className="col-md-4"><strong>Fecha:</strong> {detalle.fecha}</div>
-                  <div className="col-md-4 text-md-right">
-                    <strong>Total neto:</strong> ${detalle.monto_total}<br />
-                    <strong>Total con IVA ({taxPercent}%):</strong> ${applyTax(detalle.monto_total, taxPercent)}
+                  <div className="col-md-4 text-right">
+                    <div><strong>Total neto:</strong> ${detalle.monto_total}</div>
+                    <div><strong>Total con IVA ({taxPercent}%):</strong> ${applyTax(detalle.monto_total, taxPercent)}</div>
                   </div>
                 </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead><tr><th>Codigo Producto</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Costo neto</th><th>Costo con IVA</th><th>Subtotal neto</th><th>Subtotal con IVA</th></tr></thead>
+                    <thead>
+                      <tr><th>Código</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Costo neto</th><th>Costo con IVA</th><th>Subtotal neto</th><th>Subtotal con IVA</th></tr>
+                    </thead>
                     <tbody>
-                      {(detalle.detalles || []).map((d) => (
-                        <tr key={d.id}>
-                          <td>{d.codigo_producto}</td>
-                          <td>{d.nombre}</td>
-                          <td>{d.marca || ""}</td>
-                          <td>{d.cantidad}</td>
-                          <td>${d.costo_compra}</td>
-                          <td>${applyTax(d.costo_compra, taxPercent)}</td>
-                          <td>${Number(d.costo_compra || 0) * Number(d.cantidad || 0)}</td>
-                          <td>${applyTax(Number(d.costo_compra || 0) * Number(d.cantidad || 0), taxPercent)}</td>
-                        </tr>
-                      ))}
+                      {(detalle.detalles || []).map((d) => {
+                        const costoConIva = applyTax(d.costo_compra, taxPercent);
+                        const subtotalNeto = d.costo_compra * d.cantidad;
+                        const subtotalConIva = applyTax(subtotalNeto, taxPercent);
+                        return (
+                          <tr key={d.id}>
+                            <td>{d.codigo_producto}</td>
+                            <td>{d.nombre}</td>
+                            <td>{d.marca}</td>
+                            <td>{d.cantidad}</td>
+                            <td>${d.costo_compra}</td>
+                            <td>${costoConIva}</td>
+                            <td>${subtotalNeto}</td>
+                            <td>${subtotalConIva}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setDetalle(null)}>Cerrar</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {detalleError && <div className="alert alert-danger mt-3">{detalleError}</div>}
+      {detalleError && <div className="alert alert-danger mt-4">{detalleError}</div>}
     </Shell>
   );
 }

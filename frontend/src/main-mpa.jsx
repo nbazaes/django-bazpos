@@ -2,13 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./index.css";
+import "./design-system.css";
+import { initTheme } from "./lib/theme";
 
-const sbAdminStyles = document.createElement("link");
-sbAdminStyles.rel = "stylesheet";
-sbAdminStyles.href = "/static/css/sb-admin-2.min.css";
-document.head.appendChild(sbAdminStyles);
+initTheme();
 
-import { isLoggedIn, saveUser, getUser, isGerente } from "./lib/auth";
+import { isLoggedIn, saveUser, isGerente } from "./lib/auth";
 import { me } from "./lib/api";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";

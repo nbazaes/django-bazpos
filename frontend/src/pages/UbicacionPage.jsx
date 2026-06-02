@@ -59,7 +59,7 @@ export default function UbicacionPage() {
   }
 
   async function onDelete(row) {
-    if (!window.confirm(`Eliminar ubicacion "${row.nombre}"?`)) return;
+    if (!window.confirm(`Eliminar ubicación "${row.nombre}"?`)) return;
     try {
       await apiRequest(`/ubicaciones/${row.id}/`, { method: "DELETE" });
       await load();
@@ -73,14 +73,14 @@ export default function UbicacionPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       <PageCard title="Listado de ubicaciones">
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={openCreate}>Nueva ubicacion</button>
+          <button className="btn btn-primary" onClick={openCreate}>Nueva ubicación</button>
         </div>
         <CrudTable
           rows={rows}
           columns={[
             { key: "nombre", label: "Nombre" },
             { key: "marca", label: "Marca" },
-            { key: "descripcion", label: "Descripcion" },
+            { key: "descripcion", label: "Descripción" },
           ]}
           onEdit={(row) => openEdit(row)}
           onDelete={onDelete}
@@ -88,13 +88,13 @@ export default function UbicacionPage() {
       </PageCard>
 
       {showForm && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0,0,0,0.45)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-dialog-centered">
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog">
             <div className="modal-content">
               <form onSubmit={handleSave}>
                 <div className="modal-header">
-                  <h5 className="modal-title">{editRow ? "Editar ubicacion" : "Nueva ubicacion"}</h5>
-                  <button type="button" className="close" onClick={() => setShowForm(false)}>&times;</button>
+                  <h5 className="modal-title">{editRow ? "Editar ubicación" : "Nueva ubicación"}</h5>
+                  <button type="button" className="modal-close" onClick={() => setShowForm(false)}>&times;</button>
                 </div>
                 <div className="modal-body">
                   <div className="form-group">
@@ -106,7 +106,7 @@ export default function UbicacionPage() {
                     <input className="form-control" value={formData.marca} onChange={(e) => setFormData({ ...formData, marca: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label>Descripcion</label>
+                    <label>Descripción</label>
                     <textarea className="form-control" value={formData.descripcion} onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })} />
                   </div>
                 </div>

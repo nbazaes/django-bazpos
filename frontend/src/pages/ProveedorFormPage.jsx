@@ -45,9 +45,9 @@ export default function ProveedorFormPage() {
             <div className="col-md-6 form-group"><label>RUT</label><input className="form-control" value={data.rut} onChange={(e) => setData({ ...data, rut: e.target.value })} required /></div>
             <div className="col-md-6 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
             <div className="col-md-6 form-group"><label>Contacto</label><input className="form-control" value={data.persona_contacto || ""} onChange={(e) => setData({ ...data, persona_contacto: e.target.value })} /></div>
-            <div className="col-md-6 form-group"><label>Telefono</label><input className="form-control" value={data.telefono || ""} onChange={(e) => setData({ ...data, telefono: e.target.value })} /></div>
+            <div className="col-md-6 form-group"><label>Teléfono</label><input className="form-control" value={data.telefono || ""} onChange={(e) => setData({ ...data, telefono: e.target.value })} /></div>
             <div className="col-md-6 form-group"><label>Correo</label><input className="form-control" value={data.correo || ""} onChange={(e) => setData({ ...data, correo: e.target.value })} /></div>
-            <div className="col-md-6 form-group"><label>Direccion</label><input className="form-control" value={data.direccion || ""} onChange={(e) => setData({ ...data, direccion: e.target.value })} /></div>
+            <div className="col-md-6 form-group"><label>Dirección</label><input className="form-control" value={data.direccion || ""} onChange={(e) => setData({ ...data, direccion: e.target.value })} /></div>
           </div>
           <button className="btn btn-primary">Guardar</button>
         </form>

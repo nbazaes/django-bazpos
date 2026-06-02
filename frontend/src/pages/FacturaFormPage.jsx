@@ -23,7 +23,7 @@ export default function FacturaFormPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
   const [createUrl, setCreateUrl] = useState("");
-  const [taxPercent] = useState(getTaxPercent());
+  const [taxPercent, setTaxPercent] = useState(getTaxPercent());
   const totalFactura = items.reduce((sum, it) => sum + Number(it.precio || 0) * Number(it.cantidad || 0), 0);
   const totalFacturaConIva = Math.round(totalFactura * (1 + taxPercent / 100));
 
@@ -131,36 +131,38 @@ export default function FacturaFormPage() {
         {error && <div className="alert alert-danger">{error}</div>}
         <form onSubmit={guardar}>
           <div className="row">
-            <div className="col-md-4 form-group"><label>Numero factura</label><input disabled={Boolean(id)} className="form-control" value={header.numero_factura} onChange={(e) => setHeader({ ...header, numero_factura: e.target.value })} required /></div>
+            <div className="col-md-4 form-group"><label>Número factura</label><input disabled={Boolean(id)} className="form-control" value={header.numero_factura} onChange={(e) => setHeader({ ...header, numero_factura: e.target.value })} required /></div>
             <div className="col-md-4 form-group"><label>Proveedor</label><select className="form-control" value={header.proveedor_id} onChange={(e) => setHeader({ ...header, proveedor_id: e.target.value })} required><option value="">Seleccione</option>{proveedores.map((p) => <option key={p.proveedor_id} value={p.proveedor_id}>{p.nombre}</option>)}</select></div>
             <div className="col-md-4 form-group"><label>Fecha</label><input type="date" className="form-control" value={header.fecha} onChange={(e) => setHeader({ ...header, fecha: e.target.value })} required /></div>
           </div>
 
           <div className="page-actions">
-            <input className="form-control" style={{ maxWidth: 260 }} placeholder="Codigo producto" value={productoId} onChange={(e) => setProductoId(e.target.value)} />
+            <input className="form-control" style={{ maxWidth: 260 }} placeholder="Código producto" value={productoId} onChange={(e) => setProductoId(e.target.value)} />
             <button type="button" className="btn btn-secondary" onClick={buscarProducto}>Agregar producto</button>
           </div>
 
-          <table className="table table-sm table-bordered">
-            <thead><tr><th>Codigo Producto</th><th>Nombre</th><th>Precio costo</th><th>Precio costo con IVA</th><th>Cantidad</th><th></th></tr></thead>
-            <tbody>
-              {items.map((it, idx) => (
-                <tr key={`${it.producto_id}-${idx}`}>
-                  <td>{it.codigo_producto}</td>
-                  <td>{it.nombre}</td>
-                  <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
-                  <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
-                  <td><input className="form-control form-control-sm" type="number" value={it.cantidad} onChange={(e) => { const next = [...items]; next[idx].cantidad = e.target.value; setItems(next); }} /></td>
-                  <td><button type="button" className="btn btn-sm btn-danger" onClick={() => setItems(items.filter((_, i) => i !== idx))}>X</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-responsive">
+            <table className="table table-sm table-bordered">
+              <thead><tr><th>Código</th><th>Nombre</th><th>Precio costo</th><th>Precio con IVA</th><th>Cantidad</th><th></th></tr></thead>
+              <tbody>
+                {items.map((it, idx) => (
+                  <tr key={`${it.producto_id}-${idx}`}>
+                    <td>{it.codigo_producto}</td>
+                    <td>{it.nombre}</td>
+                    <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
+                    <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
+                    <td><input className="form-control form-control-sm" type="number" value={it.cantidad} onChange={(e) => { const next = [...items]; next[idx].cantidad = e.target.value; setItems(next); }} /></td>
+                    <td><button type="button" className="btn btn-sm btn-danger" onClick={() => setItems(items.filter((_, i) => i !== idx))}>X</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-          <div className="d-flex justify-content-end mb-3">
-            <div className="text-right">
-              <h6 className="mb-1">Total neto: ${totalFactura}</h6>
-              <h5 className="mb-0">Total con IVA ({taxPercent}%): ${totalFacturaConIva}</h5>
+          <div className="flex justify-end mb-4 text-right">
+            <div>
+              <div className="text-sm text-secondary mb-1">Total neto: ${totalFactura}</div>
+              <div className="text-xl font-display font-bold">Total con IVA ({taxPercent}%): ${totalFacturaConIva}</div>
             </div>
           </div>
 
@@ -169,22 +171,15 @@ export default function FacturaFormPage() {
       </PageCard>
 
       {showCreatePrompt && (
-        <div
-          className="modal"
-          style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="modal-dialog modal-dialog-centered">
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Producto no encontrado</h5>
-                <button type="button" className="close" onClick={() => setShowCreatePrompt(false)}>
-                  <span>&times;</span>
-                </button>
+                <button type="button" className="modal-close" onClick={() => setShowCreatePrompt(false)}>&times;</button>
               </div>
               <div className="modal-body">
-                <p className="mb-0">No existe ese código. ¿Desea crear un producto ahora?</p>
+                <p className="mb-0 text-secondary">No existe ese código. ¿Desea crear un producto ahora?</p>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreatePrompt(false)}>Cancelar</button>
@@ -196,19 +191,12 @@ export default function FacturaFormPage() {
       )}
 
       {showCreateModal && (
-        <div
-          className="modal"
-          style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="modal-dialog modal-xl modal-dialog-centered" style={{ maxWidth: 1100 }}>
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-xl" style={{ maxWidth: 1100 }}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Crear producto</h5>
-                <button type="button" className="close" onClick={() => setShowCreateModal(false)}>
-                  <span>&times;</span>
-                </button>
+                <button type="button" className="modal-close" onClick={() => setShowCreateModal(false)}>&times;</button>
               </div>
               <div className="modal-body p-0" style={{ height: "75vh" }}>
                 <iframe title="Crear producto" src={createUrl} style={{ width: "100%", height: "100%", border: 0 }} />
@@ -219,16 +207,11 @@ export default function FacturaFormPage() {
       )}
 
       {showCreatedSuccess && (
-        <div
-          className="modal"
-          style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.35)" }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 420 }}>
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
-              <div className="modal-body text-center py-4">
-                <div className="text-success mb-2" style={{ fontSize: 28 }}>✓</div>
+              <div className="modal-body text-center py-5">
+                <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>✓</div>
                 <h5 className="mb-0">Producto creado con éxito</h5>
               </div>
             </div>

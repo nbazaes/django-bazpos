@@ -57,7 +57,7 @@ export default function UsuarioFormPage() {
             <div className="col-md-4 form-group"><label>Nombre</label><input className="form-control" value={data.first_name} onChange={(e) => setData({ ...data, first_name: e.target.value })} /></div>
             <div className="col-md-4 form-group"><label>Apellido</label><input className="form-control" value={data.last_name} onChange={(e) => setData({ ...data, last_name: e.target.value })} /></div>
             <div className="col-md-6 form-group"><label>Email</label><input className="form-control" value={data.email} onChange={(e) => setData({ ...data, email: e.target.value })} /></div>
-            <div className="col-md-6 form-group"><label>Contrasena {id ? "(opcional)" : ""}</label><input type="password" className="form-control" value={data.password} onChange={(e) => setData({ ...data, password: e.target.value })} required={!id} /></div>
+            <div className="col-md-6 form-group"><label>Contraseña {id ? "(opcional)" : ""}</label><input type="password" className="form-control" value={data.password} onChange={(e) => setData({ ...data, password: e.target.value })} required={!id} /></div>
             <div className="col-md-6 form-group"><label>Grupo</label><select className="form-control" value={data.group_id} onChange={(e) => setData({ ...data, group_id: e.target.value })}><option value="">Sin grupo</option>{groups.map((g) => <option value={g.id} key={g.id}>{g.name}</option>)}</select></div>
           </div>
           <button className="btn btn-primary">Guardar</button>

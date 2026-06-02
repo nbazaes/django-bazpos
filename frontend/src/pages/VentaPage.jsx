@@ -228,131 +228,169 @@ export default function VentaPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       <PageCard title="Buscar producto por OEM">
         <div className="row">
-          <div className="col-md-6">
+          <div className="col-md-5">
             <input
               className="form-control"
-              placeholder="Ingrese codigo OEM"
+              placeholder="Ingrese código OEM"
               value={oem}
               onChange={(e) => setOem(e.target.value)}
             />
           </div>
-          <div className="col-md-3">
-            <button className="btn btn-primary btn-block" onClick={() => buscarProducto(oem)}>Buscar</button>
+          <div className="col-md-3" style={{ display: "flex", alignItems: "flex-end" }}>
+            <button className="btn btn-primary" onClick={() => buscarProducto(oem)}>Buscar</button>
           </div>
         </div>
         {productosEncontrados.length > 0 && (
-          <div className="mt-3">
-            <table className="table table-sm table-bordered busqueda-table">
-              <thead><tr><th>Codigo</th><th>OEM</th><th>Nombre</th><th>Marca</th><th>Descripción</th><th>Stock</th><th>Precio</th><th></th></tr></thead>
-              <tbody>
-                {productosEncontrados.map((p) => (
-                  <tr key={p.producto_id}>
-                    <td>{p.codigo_producto}</td>
-                    <td>{p.oem}</td>
-                    <td>{p.nombre}</td>
-                    <td>{p.marca}</td>
-                    <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.descripcion}</td>
-                    <td>
-                      {(p.ubicaciones_stock || []).length > 0 ? (
-                        <span className="stock-hover">
-                          {p.stock_actual}
-                          <span className="stock-popover">
-                            {(p.ubicaciones_stock || []).map((u) => (
-                              <div key={u.nombre} className="popover-row">
-                                <span>{u.nombre}</span>
-                                <strong>{u.cantidad}</strong>
-                              </div>
-                            ))}
-                          </span>
-                        </span>
-                      ) : (
-                        p.stock_actual
-                      )}
-                    </td>
-                    <td>${p.precio}</td>
-                    <td>
-                      <button
-                        className="btn btn-sm btn-success"
-                        onClick={() => agregar(p)}
-                        disabled={(p.stock_actual || 0) <= 0}
-                      >
-                        Agregar
-                      </button>
-                    </td>
+          <div className="mt-4">
+            <div className="table-responsive">
+              <table className="table table-sm table-bordered">
+                <thead>
+                  <tr>
+                    <th style={{ width: "1px" }}>Código</th>
+                    <th style={{ width: "1px" }}>OEM</th>
+                    <th>Nombre</th>
+                    <th>Marca</th>
+                    <th>Descripción</th>
+                    <th style={{ width: "1px" }}>Stock</th>
+                    <th style={{ width: "1px" }}>Precio</th>
+                    <th style={{ width: "1px" }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {productosEncontrados.map((p) => (
+                    <tr key={p.producto_id}>
+                      <td className="text-nowrap">{p.codigo_producto}</td>
+                      <td className="text-nowrap">{p.oem}</td>
+                      <td>{p.nombre}</td>
+                      <td>{p.marca}</td>
+                      <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
+                      <td>
+                        {(p.ubicaciones_stock || []).length > 0 ? (
+                          <span className="stock-hover">
+                            {p.stock_actual}
+                            <span className="stock-popover">
+                              {(p.ubicaciones_stock || []).map((u) => (
+                                <div key={u.nombre} className="popover-row">
+                                  <span>{u.nombre}</span>
+                                  <strong>{u.cantidad}</strong>
+                                </div>
+                              ))}
+                            </span>
+                          </span>
+                        ) : (
+                          p.stock_actual
+                        )}
+                      </td>
+                      <td>${p.precio}</td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-success"
+                          onClick={() => agregar(p)}
+                          disabled={(p.stock_actual || 0) <= 0}
+                        >
+                          Agregar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </PageCard>
       <PageCard title="Carrito">
-        <table className="table table-sm table-bordered carrito-table">
-          <thead><tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th><th></th></tr></thead>
-          <tbody>
-            {carro.map((i) => (
-              <tr key={i.producto_id}>
-                <td>{i.codigo_producto}</td>
-                <td>{i.oem}</td>
-                <td>{i.nombre}</td>
-                <td>
-                  <input
-                    type="number"
-                    className="form-control form-control-sm"
-                    style={{ width: 80 }}
-                    min="1"
-                    max={i.stock_actual}
-                    value={i.cantidad}
-                    onChange={(e) => {
-                      const maxStock = i.stock_actual || 1;
-                      const requested = parseInt(e.target.value, 10) || 1;
-                      const safeCantidad = Math.max(1, Math.min(requested, maxStock));
-                      const next = [...carro];
-                      const idx = next.findIndex((x) => x.producto_id === i.producto_id);
-                      next[idx].cantidad = safeCantidad;
-                      setCarro(next);
-                      if (requested > maxStock) {
-                        setError(`Stock maximo para ${i.nombre}: ${maxStock}`);
-                      } else {
-                        setError("");
-                      }
-                    }}
-                  />
-                </td>
-                <td>${netoFromBruto(i.precio * i.cantidad)}</td>
-                <td>${i.precio * i.cantidad}</td>
-                <td><button className="btn btn-sm btn-danger" onClick={() => setCarro(carro.filter((x) => x.producto_id !== i.producto_id))}>X</button></td>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th style={{ width: "1px" }}>Código</th>
+                <th style={{ width: "1px" }}>OEM</th>
+                <th>Nombre</th>
+                <th style={{ width: "1px" }}>Cantidad</th>
+                <th style={{ width: "1px" }}>Subtotal neto</th>
+                <th style={{ width: "1px" }}>Subtotal</th>
+                <th style={{ width: "1px" }}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="d-flex justify-content-end mb-3 text-right">
+            </thead>
+            <tbody>
+              {carro.map((i) => (
+                <tr key={i.producto_id}>
+                  <td className="text-nowrap">{i.codigo_producto}</td>
+                  <td className="text-nowrap">{i.oem}</td>
+                  <td>{i.nombre}</td>
+                  <td>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm"
+                      style={{ width: 80 }}
+                      min="1"
+                      max={i.stock_actual}
+                      value={i.cantidad}
+                      onChange={(e) => {
+                        const maxStock = i.stock_actual || 1;
+                        const requested = parseInt(e.target.value, 10) || 1;
+                        const safeCantidad = Math.max(1, Math.min(requested, maxStock));
+                        const next = [...carro];
+                        const idx = next.findIndex((x) => x.producto_id === i.producto_id);
+                        next[idx].cantidad = safeCantidad;
+                        setCarro(next);
+                        if (requested > maxStock) {
+                          setError(`Stock maximo para ${i.nombre}: ${maxStock}`);
+                        } else {
+                          setError("");
+                        }
+                      }}
+                    />
+                  </td>
+                  <td>${netoFromBruto(i.precio * i.cantidad)}</td>
+                  <td>${i.precio * i.cantidad}</td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => setCarro(carro.filter((x) => x.producto_id !== i.producto_id))}
+                    >
+                      X
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end mb-4 text-right">
           <div>
-            <h6 className="mb-1">Total neto: ${totalNetoCarro}</h6>
-            <h5 className="mb-0">Total: ${totalCarro}</h5>
+            <div className="text-sm text-secondary mb-1">Total neto: ${totalNetoCarro}</div>
+            <div className="text-xl font-display font-bold">Total: ${totalCarro}</div>
           </div>
         </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-success mr-2" disabled={!carro.length} onClick={() => setShowConfirmVenta(true)}>Confirmar venta</button>
-          <button className="btn btn-outline-primary" disabled={!carro.length} onClick={() => guardar("CO")}>Generar cotizacion</button>
+        <div className="btn-group">
+          <button className="btn btn-success" disabled={!carro.length} onClick={() => setShowConfirmVenta(true)}>
+            Confirmar venta
+          </button>
+          <button className="btn btn-outline" disabled={!carro.length} onClick={() => guardar("CO")}>
+            Generar cotización
+          </button>
         </div>
       </PageCard>
 
       {showConfirmVenta && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Confirmar venta</h5>
-                <button type="button" className="close" onClick={() => setShowConfirmVenta(false)}>
-                  <span>&times;</span>
+                <button type="button" className="modal-close" onClick={() => setShowConfirmVenta(false)}>
+                  &times;
                 </button>
               </div>
               <div className="modal-body">
-                <p className="mb-3">Revise el detalle antes de confirmar:</p>
+                <p className="mb-3 text-secondary">Revise el detalle antes de confirmar:</p>
                 <div className="table-responsive">
-                  <table className="table table-sm table-bordered mb-0">
-                    <thead><tr><th>Codigo</th><th>OEM</th><th>Nombre</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr></thead>
+                  <table className="table table-sm table-bordered">
+                    <thead>
+                      <tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
+                    </thead>
                     <tbody>
                       {carro.map((i) => (
                         <tr key={`confirm-${i.producto_id}`}>
@@ -368,8 +406,8 @@ export default function VentaPage() {
                   </table>
                 </div>
                 <div className="text-right mt-3">
-                  <h6 className="mb-1">Total neto: ${totalNetoCarro}</h6>
-                  <h5 className="mb-0">Total: ${totalCarro}</h5>
+                  <div className="text-sm text-secondary mb-1">Total neto: ${totalNetoCarro}</div>
+                  <div className="text-xl font-display font-bold">Total: ${totalCarro}</div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -382,32 +420,36 @@ export default function VentaPage() {
       )}
 
       {showPreview && lastDocumento && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">{lastDocumento.tipo_documento === "CO" ? "Cotizacion" : "Comprobante de venta"}</h5>
-                <button type="button" className="close" onClick={cerrarComprobante}>
-                  <span>&times;</span>
+                <h5 className="modal-title">{lastDocumento.tipo_documento === "CO" ? "Cotización" : "Comprobante de venta"}</h5>
+                <button type="button" className="modal-close" onClick={cerrarComprobante}>
+                  &times;
                 </button>
               </div>
               <div className="modal-body">
-                <div className="border p-3 bg-white" style={{ fontFamily: "monospace", maxWidth: 420, margin: "0 auto" }}>
-                  <h6 className="text-center mb-1">{lastDocumento.tienda}</h6>
-                  <div className="text-center mb-2">{lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}</div>
-                  <div className="mb-2 small text-center">{lastDocumento.fecha}</div>
+                <div className="receipt-preview">
+                  <h6 className="text-center mb-1" style={{ color: "#1a1a1a", fontFamily: "var(--font-mono)" }}>
+                    {lastDocumento.tienda}
+                  </h6>
+                  <div className="text-center mb-2" style={{ color: "#1a1a1a" }}>
+                    {lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}
+                  </div>
+                  <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>{lastDocumento.fecha}</div>
                   <hr />
                   {lastDocumento.items.map((item) => (
-                    <div key={`${item.producto_id}-${item.cantidad}`} className="d-flex justify-content-between">
+                    <div key={`${item.producto_id}-${item.cantidad}`} className="flex justify-between" style={{ color: "#333" }}>
                       <span>{item.cantidad} x {item.codigo_producto} - {item.nombre}</span>
                       <span>${item.subtotal}</span>
                     </div>
                   ))}
                   <hr />
-                  <div className="d-flex justify-content-between"><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
-                  <div className="d-flex justify-content-between"><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
-                  <div className="d-flex justify-content-between font-weight-bold"><span>Total</span><span>${lastDocumento.total}</span></div>
-                  <div className="text-center small mt-2">Documento carece de validez legal</div>
+                  <div className="flex justify-between" style={{ color: "#333" }}><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
+                  <div className="flex justify-between" style={{ color: "#333" }}><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
+                  <div className="flex justify-between font-bold" style={{ color: "#1a1a1a" }}><span>Total</span><span>${lastDocumento.total}</span></div>
+                  <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Documento carece de validez legal</div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -420,46 +462,48 @@ export default function VentaPage() {
       )}
 
       {showUbicacionDialog && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.45)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Seleccionar ubicacion de descuento</h5>
-                <button type="button" className="close" onClick={() => setShowUbicacionDialog(false)}>
-                  <span>&times;</span>
+                <h5 className="modal-title">Seleccionar ubicación de descuento</h5>
+                <button type="button" className="modal-close" onClick={() => setShowUbicacionDialog(false)}>
+                  &times;
                 </button>
               </div>
               <div className="modal-body">
-                <p>Los siguientes productos tienen stock en multiples ubicaciones. Seleccione de cual descontar:</p>
-                <table className="table table-sm table-bordered">
-                  <thead>
-                    <tr><th>Producto</th><th>Cantidad vendida</th><th>Ubicacion</th></tr>
-                  </thead>
-                  <tbody>
-                    {ubicacionItems.map((item) => (
-                      <tr key={item.producto_id}>
-                        <td>{item.codigo_producto} - {item.nombre}</td>
-                        <td>{item.cantidad_vendida}</td>
-                        <td>
-                          <select
-                            className="form-control form-control-sm"
-                            value={selectedUbicaciones[item.producto_id] || ""}
-                            onChange={(e) => setSelectedUbicaciones({
-                              ...selectedUbicaciones,
-                              [item.producto_id]: Number(e.target.value),
-                            })}
-                          >
-                            {item.ubicaciones.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.nombre} (stock: {u.stock})
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <p className="mb-3 text-secondary">Los siguientes productos tienen stock en múltiples ubicaciones. Seleccione de cuál descontar:</p>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead>
+                      <tr><th>Producto</th><th>Cantidad vendida</th><th>Ubicación</th></tr>
+                    </thead>
+                    <tbody>
+                      {ubicacionItems.map((item) => (
+                        <tr key={item.producto_id}>
+                          <td>{item.codigo_producto} - {item.nombre}</td>
+                          <td>{item.cantidad_vendida}</td>
+                          <td>
+                            <select
+                              className="form-control form-control-sm"
+                              value={selectedUbicaciones[item.producto_id] || ""}
+                              onChange={(e) => setSelectedUbicaciones({
+                                ...selectedUbicaciones,
+                                [item.producto_id]: Number(e.target.value),
+                              })}
+                            >
+                              {item.ubicaciones.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.nombre} (stock: {u.stock})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowUbicacionDialog(false)}>Cancelar</button>
@@ -471,83 +515,19 @@ export default function VentaPage() {
       )}
 
       {showVentaSuccess && (
-        <div className="modal" style={{ display: "block", backgroundColor: "rgba(0, 0, 0, 0.35)" }} role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 420 }}>
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
-              <div className="modal-body text-center py-4">
-                <div className="text-success mb-2" style={{ fontSize: 28 }}>&#10003;</div>
-                <h5 className="mb-0">{lastDocumento?.tipo_documento === "CO" ? "Cotizacion generada con exito" : "Venta registrada con exito"}</h5>
+              <div className="modal-body text-center py-5">
+                <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>&#10003;</div>
+                <h5 className="mb-0">
+                  {lastDocumento?.tipo_documento === "CO" ? "Cotización generada con éxito" : "Venta registrada con éxito"}
+                </h5>
               </div>
             </div>
           </div>
         </div>
       )}
-      <style>{`
-        .busqueda-table th, .busqueda-table td { white-space: nowrap; }
-        .busqueda-table th:nth-child(1), .busqueda-table td:nth-child(1) { width: 1px; }
-        .busqueda-table th:nth-child(6), .busqueda-table td:nth-child(6) { width: 1px; }
-        .busqueda-table th:nth-child(7), .busqueda-table td:nth-child(7) { width: 1px; }
-        .carrito-table th, .carrito-table td { white-space: nowrap; }
-        .carrito-table th:nth-child(1), .carrito-table td:nth-child(1) { width: 1px; }
-        .carrito-table th:nth-child(4), .carrito-table td:nth-child(4) { width: 1px; }
-        .carrito-table th:nth-child(5), .carrito-table td:nth-child(5) { width: 1px; }
-        .carrito-table th:nth-child(6), .carrito-table td:nth-child(6) { width: 1px; }
-
-        .stock-hover {
-          position: relative;
-          display: inline-block;
-          cursor: pointer;
-          border-bottom: 1px dashed #999;
-        }
-        .stock-popover {
-          visibility: hidden;
-          opacity: 0;
-          position: absolute;
-          bottom: calc(100% + 8px);
-          left: 50%;
-          transform: translateX(-50%);
-          background: #fff;
-          border: 1px solid #d1d3e2;
-          border-radius: 6px;
-          padding: 8px 12px;
-          white-space: nowrap;
-          z-index: 100;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          transition: opacity 0.15s ease;
-          min-width: 160px;
-        }
-        .stock-popover::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border: 6px solid transparent;
-          border-top-color: #fff;
-        }
-        .stock-popover::before {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border: 7px solid transparent;
-          border-top-color: #d1d3e2;
-        }
-        .stock-hover:hover .stock-popover {
-          visibility: visible;
-          opacity: 1;
-        }
-        .popover-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 16px;
-          padding: 2px 0;
-        }
-        .popover-row + .popover-row {
-          border-top: 1px solid #eaecf4;
-        }
-      `}</style>
     </Shell>
   );
 }

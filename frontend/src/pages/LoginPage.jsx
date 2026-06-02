@@ -21,12 +21,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container">
-      <div className="card shadow auth-panel">
-        <div className="card-header">
-          <h4 className="mb-0">Ingreso BAZPOS</h4>
+    <div className="auth-container">
+      <div className="auth-panel">
+        <div className="auth-logo">
+          <h1>Bazpos</h1>
+          <p>Sistema de punto de venta</p>
         </div>
-        <div className="card-body">
+        <div className="auth-card">
+          <h2>Ingresar</h2>
           {error && <div className="alert alert-danger">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -34,7 +36,7 @@ export default function LoginPage() {
               <input className="form-control" value={username} onChange={(e) => setUsername(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Contrasena</label>
+              <label>Contraseña</label>
               <input
                 className="form-control"
                 type="password"
@@ -43,7 +45,7 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <button className="btn btn-primary btn-block" type="submit">
+            <button className="btn btn-primary w-full" type="submit">
               Entrar
             </button>
           </form>

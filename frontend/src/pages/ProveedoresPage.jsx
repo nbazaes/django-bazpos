@@ -33,7 +33,7 @@ export default function ProveedoresPage() {
             { key: "proveedor_id", label: "ID" },
             { key: "rut", label: "RUT" },
             { key: "nombre", label: "Nombre" },
-            { key: "telefono", label: "Telefono" },
+            { key: "telefono", label: "Teléfono" },
           ]}
           onEdit={(row) => (window.location.href = `/gerencia/proveedores/create.html?id=${row.proveedor_id}`)}
           onDelete={onDelete}

@@ -1,12 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { initTheme } from './lib/theme'
 import './index.css'
 import './styles.css'
+import './design-system.css'
 
-const link = document.createElement('link')
-link.rel = 'stylesheet'
-link.href = '/static/css/sb-admin-2.min.css'
-document.head.appendChild(link)
+initTheme()
 
 import App from './App.jsx'
 

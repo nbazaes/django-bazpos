@@ -80,16 +80,18 @@ export default function ProductoFormPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={submit}>
         <div className="row">
-          <div className="col-md-4 form-group"><label>Codigo Producto</label><input className="form-control" value={data.codigo_producto} onChange={(e) => setData({ ...data, codigo_producto: e.target.value })} required /></div>
-          <div className="col-md-4 form-group"><label>Codigo OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
+          <div className="col-md-4 form-group"><label>Código Producto</label><input className="form-control" value={data.codigo_producto} onChange={(e) => setData({ ...data, codigo_producto: e.target.value })} required /></div>
+          <div className="col-md-4 form-group"><label>Código OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
           <div className="col-md-4 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
           <div className="col-md-4 form-group"><label>Marca</label><input className="form-control" value={data.marca} onChange={(e) => setData({ ...data, marca: e.target.value })} /></div>
-          <div className="col-12 form-group"><label>Descripcion</label><textarea className="form-control" value={data.descripcion} onChange={(e) => setData({ ...data, descripcion: e.target.value })} /></div>
+          <div className="col-12 form-group"><label>Descripción</label><textarea className="form-control" value={data.descripcion} onChange={(e) => setData({ ...data, descripcion: e.target.value })} /></div>
           <div className="col-md-3 form-group"><label>Precio costo</label><input type="number" className="form-control" value={data.precio_costo} onChange={(e) => setData({ ...data, precio_costo: e.target.value })} required /></div>
-          <div className="col-md-3 form-group"><label>Stock actual</label><input type="number" className="form-control" value={data.stock_actual ?? 0} disabled />
+          <div className="col-md-3 form-group">
+            <label>Stock actual</label>
+            <input type="number" className="form-control" value={data.stock_actual ?? 0} disabled />
             {(data.ubicaciones_stock || []).length > 0 && (
               <div className="mt-2">
-                <table className="table table-sm table-borderless mb-0" style={{ fontSize: "0.85em" }}>
+                <table className="table table-sm table-borderless" style={{ fontSize: "0.85em" }}>
                   <tbody>
                     {(data.ubicaciones_stock || []).map((u) => (
                       <tr key={u.nombre}>
@@ -102,10 +104,11 @@ export default function ProductoFormPage() {
               </div>
             )}
           </div>
-          <div className="col-md-3 form-group"><label>Stock minimo</label><input type="number" className="form-control" value={data.stock_minimo} onChange={(e) => setData({ ...data, stock_minimo: e.target.value })} required /></div>
-          <div className="col-md-3 form-group"><label>Stock maximo</label><input type="number" className="form-control" value={data.stock_maximo} onChange={(e) => setData({ ...data, stock_maximo: e.target.value })} required /></div>
+          <div className="col-md-3 form-group"><label>Stock mínimo</label><input type="number" className="form-control" value={data.stock_minimo} onChange={(e) => setData({ ...data, stock_minimo: e.target.value })} required /></div>
+          <div className="col-md-3 form-group"><label>Stock máximo</label><input type="number" className="form-control" value={data.stock_maximo} onChange={(e) => setData({ ...data, stock_maximo: e.target.value })} required /></div>
           <div className="col-md-4 form-group"><label>Margen utilidad (%)</label><input type="number" step="0.01" className="form-control" value={data.margen_utilidad} onChange={(e) => setData({ ...data, margen_utilidad: e.target.value })} required /></div>
-          <div className="col-md-8 form-group"><label>Proveedor</label>
+          <div className="col-md-8 form-group">
+            <label>Proveedor</label>
             <select className="form-control" value={data.proveedor} onChange={(e) => setData({ ...data, proveedor: e.target.value })} required>
               <option value="">Seleccione proveedor</option>
               {proveedores.map((p) => <option key={p.proveedor_id} value={p.proveedor_id}>{p.nombre}</option>)}
@@ -118,7 +121,7 @@ export default function ProductoFormPage() {
   );
 
   if (embed) {
-    return <div className="container-fluid p-3">{content}</div>;
+    return <div className="p-3">{content}</div>;
   }
 
   return (
