@@ -1,0 +1,69 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<form method="get" style="margin-bottom: 1rem; display: flex; gap: 8px;">
+  <input type="text" name="q" value="{{ query }}" placeholder="Filtrar por ruta..."
+    style="background: #111128; border: 1px solid #24244a; border-radius: 6px; color: #edecf2;
+    font-family: inherit; font-size: 0.85rem; padding: 7px 12px; width: 320px;">
+  <button type="submit" style="background: #8b5cf6; border: none; border-radius: 6px; color: #fff;
+    font-family: inherit; font-size: 0.83rem; font-weight: 500; padding: 7px 16px; cursor: pointer;">Filtrar</button>
+  {% if query %}
+  <a href="?" style="background: #151528; border: 1px solid #323268; border-radius: 6px; color: #a8a5c0;
+    display: inline-flex; align-items: center; font-size: 0.83rem; padding: 7px 14px; text-decoration: none;">Limpiar</a>
+  {% endif %}
+  <span style="color: #656388; font-size: 0.75rem; align-self: center; margin-left: auto;">
+    {{ logs|length }} entradas &middot; auto-refresh 3s
+  </span>
+</form>
+
+<div class="module">
+  <table style="width: 100%;">
+    <thead>
+      <tr>
+        <th style="width: 150px;">Timestamp</th>
+        <th style="width: 56px;">Method</th>
+        <th>Path</th>
+        <th style="width: 60px;">Status</th>
+        <th style="width: 50px;">Size</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in logs %}
+      <tr>
+        <td style="font-size: 0.78rem; color: #656388;">{{ entry.time }}</td>
+        <td style="font-size: 0.78rem; font-weight: 600; color: #a8a5c0;">{{ entry.method }}</td>
+        <td style="font-size: 0.83rem;">
+          <code style="background: #111128; border-radius: 4px; padding: 2px 6px; font-size: 0.78rem; color: #a78bfa;">
+            {{ entry.path }}
+          </code>
+        </td>
+        <td style="font-size: 0.83rem; font-weight: 600;
+          {% if entry.status >= 500 %}color: #f87171;
+          {% elif entry.status >= 400 %}color: #fbbf24;
+          {% elif entry.status >= 300 %}color: #60a5fa;
+          {% else %}color: #34d399;{% endif %}">
+          {{ entry.status }}
+        </td>
+        <td style="font-size: 0.78rem; color: #656388;">{{ entry.size }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align: center; padding: 2rem; color: #656388;">
+          Sin entradas a&uacute;n. El registro se llena al recibir requests.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<noscript>
+  <meta http-equiv="refresh" content="3">
+</noscript>
+<script>
+  setTimeout(function(){ location.reload(); }, 3000);
+</script>
+{% endblock %}
