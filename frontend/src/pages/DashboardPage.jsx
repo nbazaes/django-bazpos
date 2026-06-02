@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
@@ -21,11 +21,13 @@ export default function DashboardPage() {
   const showToast = useToast();
   const user = getUser();
   usePageTitle("Dashboard");
+  const didToast = useRef(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (location.state?.welcome) {
+    if (!didToast.current && location.state?.welcome) {
+      didToast.current = true;
       showToast(`Bienvenido, ${location.state.welcome}`, "success");
       navigate(".", { replace: true, state: {} });
     }
