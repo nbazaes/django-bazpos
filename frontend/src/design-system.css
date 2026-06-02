@@ -699,7 +699,7 @@ textarea.form-control, textarea.input {
 
 .sidebar {
   width: 250px;
-  background: var(--bg-surface);
+  background: linear-gradient(90deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 85%, var(--accent)) 100%);
   border-right: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
@@ -816,7 +816,7 @@ textarea.form-control, textarea.input {
   justify-content: space-between;
   height: 56px;
   padding: 0 1.5rem;
-  background: linear-gradient(90deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 85%, var(--accent)) 55%, var(--bg-surface) 100%);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
