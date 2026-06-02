@@ -1,5 +1,5 @@
 import { useState, createContext, useContext, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { getUser, isGerente, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
 
@@ -30,10 +30,12 @@ const gerenteLinks = [
 
 export default function Shell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = getUser();
   const showGerente = isGerente(user);
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   function handleToggleTheme() {
     const next = toggleTheme();
@@ -42,6 +44,7 @@ export default function Shell() {
 
   function handleLogout() {
     clearTokens();
+    setShowLogoutModal(false);
     navigate("/login");
   }
 
@@ -97,7 +100,7 @@ export default function Shell() {
               <button
                 type="button"
                 className="btn btn-sm btn-danger"
-                onClick={handleLogout}
+                onClick={() => setShowLogoutModal(true)}
               >
                 Salir
               </button>
@@ -105,12 +108,34 @@ export default function Shell() {
           </nav>
 
           <main className="content-area">
-            <div className="container-fluid">
-              <Outlet />
+            <div className="container-fluid" key={location.pathname}>
+              <div className="page-transition">
+                <Outlet />
+              </div>
             </div>
           </main>
         </div>
       </div>
+
+      {showLogoutModal && (
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog" style={{ maxWidth: 400 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Cerrar sesión</h5>
+                <button type="button" className="modal-close" onClick={() => setShowLogoutModal(false)}>&times;</button>
+              </div>
+              <div className="modal-body text-center py-4">
+                <p className="mb-0 text-secondary">¿Estás seguro de que deseas cerrar sesión?</p>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowLogoutModal(false)}>Cancelar</button>
+                <button type="button" className="btn btn-danger" onClick={handleLogout}>Cerrar sesión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </TitleContext.Provider>
   );
 }

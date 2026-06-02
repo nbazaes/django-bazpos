@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { getUser } from "../lib/auth";
+import { useToast } from "../lib/toast";
 
 function StatCard({ title, value, variant }) {
   return (
@@ -14,10 +16,20 @@ function StatCard({ title, value, variant }) {
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const showToast = useToast();
   const user = getUser();
   usePageTitle("Dashboard");
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (location.state?.welcome) {
+      showToast(`Bienvenido, ${location.state.welcome}`, "success");
+      navigate(".", { replace: true, state: {} });
+    }
+  }, []);
 
   useEffect(() => {
     apiRequest("/dashboard/stats/")

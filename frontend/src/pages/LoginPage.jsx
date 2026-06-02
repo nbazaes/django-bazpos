@@ -16,7 +16,7 @@ export default function LoginPage() {
       await login(username, password);
       const user = await me();
       saveUser(user);
-      navigate("/");
+      navigate("/", { state: { welcome: user.first_name || user.username } });
     } catch (err) {
       setError(err.message);
     }
