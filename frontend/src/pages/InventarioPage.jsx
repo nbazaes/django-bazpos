@@ -40,14 +40,30 @@ function UbicacionCell({ ubicaciones }) {
 export default function InventarioPage() {
   usePageTitle("Inventario");
   const [productos, setProductos] = useState([]);
+  const [texto, setTexto] = useState("");
+
+  async function load() {
+    const query = texto ? `?texto=${encodeURIComponent(texto)}` : "";
+    const data = await apiRequest(`/productos/${query}`);
+    setProductos(data);
+  }
 
   useEffect(() => {
-    apiRequest("/productos/").then(setProductos);
+    load();
   }, []);
 
   return (
     <>
       <PageCard title="Inventario actual">
+        <div className="page-actions">
+          <input
+            className="form-control"
+            placeholder="Buscar por nombre, código u OEM"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+          />
+          <button className="btn btn-primary" onClick={load}>Buscar</button>
+        </div>
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
             <thead>
