@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import JsBarcode from "jsbarcode";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
@@ -37,6 +38,69 @@ export default function FacturasPage() {
     } catch (err) {
       setDetalleError(err.message);
     }
+  }
+
+  function imprimirEtiquetas(factura) {
+    const labels = [];
+    for (const d of factura.detalles) {
+      for (let i = 0; i < d.cantidad; i++) {
+        const canvas = document.createElement("canvas");
+        JsBarcode(canvas, d.codigo_producto, {
+          format: "CODE128",
+          width: 2,
+          height: 45,
+          displayValue: true,
+          fontSize: 12,
+          margin: 5,
+          textMargin: 2,
+        });
+        labels.push({
+          codigo: d.codigo_producto,
+          nombre: d.nombre,
+          dataUrl: canvas.toDataURL("image/png"),
+        });
+      }
+    }
+
+    const win = window.open("", "_blank", "width=800,height=600");
+    if (!win) return;
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Etiquetas factura #${factura.numero_factura}</title>
+          <style>
+            @page { margin: 8mm; }
+            body { font-family: monospace; margin: 0; padding: 0; }
+            .labels { display: flex; flex-wrap: wrap; gap: 3mm; justify-content: flex-start; padding: 2mm; }
+            .label {
+              width: 30mm; min-height: 22mm;
+              display: flex; flex-direction: column;
+              align-items: center; justify-content: flex-end;
+              border: 1px dashed #ccc; padding: 2mm; box-sizing: border-box;
+            }
+            .label img { max-width: 28mm; max-height: 14mm; }
+            .label .codigo { font-size: 7px; margin-top: 1mm; word-break: break-all; text-align: center; }
+            @media print {
+              .label { border-color: transparent; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="labels">
+            ${labels.map((l) => `
+              <div class="label">
+                <img src="${l.dataUrl}" alt="${l.codigo}" />
+                <span class="codigo">${l.codigo}</span>
+              </div>
+            `).join("")}
+          </div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   }
 
   return (
@@ -106,6 +170,7 @@ export default function FacturasPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalle(null)}>Cerrar</button>
+                <button type="button" className="btn btn-primary" onClick={() => imprimirEtiquetas(detalle)}>Imprimir etiquetas</button>
               </div>
             </div>
           </div>

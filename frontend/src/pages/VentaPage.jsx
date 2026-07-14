@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
@@ -8,6 +8,8 @@ import { STORE_NAME } from "../lib/config";
 export default function VentaPage() {
   usePageTitle("Realizar venta");
   const [oem, setOem] = useState("");
+  const [codigoBarra, setCodigoBarra] = useState("");
+  const [barraFeedback, setBarraFeedback] = useState("");
   const [productosEncontrados, setProductosEncontrados] = useState([]);
   const [carro, setCarro] = useState([]);
   const [error, setError] = useState("");
@@ -18,6 +20,8 @@ export default function VentaPage() {
   const [showUbicacionDialog, setShowUbicacionDialog] = useState(false);
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
+  const barraRef = useRef(null);
+  const processingRef = useRef(false);
   const taxPercent = getTaxPercent();
   const factor = 1 + taxPercent / 100;
   const netoFromBruto = (monto) => Math.round(Number(monto || 0) / factor);
@@ -52,6 +56,67 @@ export default function VentaPage() {
     }, 250);
     return () => clearTimeout(timeoutId);
   }, [oem]);
+
+  async function escanearCodigoBarra() {
+    const codigo = codigoBarra.trim();
+    if (!codigo || processingRef.current) return;
+    processingRef.current = true;
+    setCodigoBarra("");
+    try {
+      const result = await apiRequest(`/productos/por-codigo/?codigo=${encodeURIComponent(codigo)}`);
+      if (!result.encontrado) {
+        setBarraFeedback("error");
+        setTimeout(() => setBarraFeedback(""), 1500);
+        processingRef.current = false;
+        return;
+      }
+      setBarraFeedback("success");
+      setTimeout(() => setBarraFeedback(""), 600);
+
+      const p = result.producto;
+      const existing = carro.find((x) => x.producto_id === p.producto_id);
+      if (existing) {
+        if (existing.cantidad >= p.stock_actual) {
+          setError(`No puedes agregar más de ${p.stock_actual} unidades para ${p.nombre}`);
+          processingRef.current = false;
+          return;
+        }
+        setCarro((prev) =>
+          prev.map((x) => (x.producto_id === p.producto_id ? { ...x, cantidad: x.cantidad + 1 } : x))
+        );
+      } else {
+        if ((p.stock_actual || 0) <= 0) {
+          setError(`No hay stock disponible para ${p.nombre}`);
+          processingRef.current = false;
+          return;
+        }
+        setCarro((prev) => [
+          ...prev,
+          {
+            producto_id: p.producto_id,
+            codigo_producto: p.codigo_producto,
+            oem: p.oem,
+            nombre: p.nombre,
+            precio: p.precio,
+            cantidad: 1,
+            stock_actual: p.stock_actual,
+          },
+        ]);
+      }
+      setError("");
+      barraRef.current?.focus();
+    } catch (err) {
+      setError(err.message);
+    }
+    processingRef.current = false;
+  }
+
+  function handleBarraKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      escanearCodigoBarra();
+    }
+  }
 
   function agregar(producto) {
     if ((producto.stock_actual || 0) <= 0) {
@@ -227,7 +292,19 @@ export default function VentaPage() {
   return (
     <>
       {error && <div className="alert alert-danger">{error}</div>}
-      <PageCard title="Buscar producto por OEM">
+      <PageCard title="Buscar producto">
+        <div className="row mb-3">
+          <div className="col-md-5">
+            <input
+              ref={barraRef}
+              className={`form-control ${barraFeedback === "success" ? "is-valid" : barraFeedback === "error" ? "is-invalid" : ""}`}
+              placeholder="Lector código de barra"
+              value={codigoBarra}
+              onChange={(e) => { setCodigoBarra(e.target.value); setBarraFeedback(""); }}
+              onKeyDown={handleBarraKeyDown}
+            />
+          </div>
+        </div>
         <div className="row">
           <div className="col-md-5">
             <input

@@ -89,6 +89,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         "update": [ROLE_ENCARGADO, ROLE_GERENTE],
         "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE],
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "por_codigo": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
@@ -101,6 +102,18 @@ class ProductoViewSet(viewsets.ModelViewSet):
         if proveedor:
             queryset = queryset.filter(proveedor_id=proveedor)
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="por-codigo")
+    def por_codigo(self, request):
+        codigo = request.query_params.get("codigo", "").strip()
+        if not codigo:
+            return Response({"encontrado": False})
+        try:
+            producto = Producto.objects.get(codigo_producto=codigo)
+        except Producto.DoesNotExist:
+            return Response({"encontrado": False})
+        serializer = self.get_serializer(producto)
+        return Response({"encontrado": True, "producto": serializer.data})
 
 
 class DeducirStockInputSerializer(serializers.Serializer):
