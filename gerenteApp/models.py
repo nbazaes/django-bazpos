@@ -27,7 +27,7 @@ def fecha_ayer():
 
 class Factura(models.Model):
     id = models.AutoField(primary_key=True)
-    numero_factura = models.IntegerField(verbose_name='Número de factura')
+    numero_factura = models.BigIntegerField(verbose_name='Número de factura')
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
     fecha = models.DateField(default=fecha_ayer, verbose_name='Fecha')
     monto_total = models.IntegerField(default=0)

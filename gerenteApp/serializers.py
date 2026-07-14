@@ -144,7 +144,7 @@ class FacturaDetalleSerializer(serializers.ModelSerializer):
 
 
 class FacturaUpsertSerializer(serializers.Serializer):
-    numero_factura = serializers.IntegerField()
+    numero_factura = serializers.IntegerField(max_value=999999999999)
     proveedor_id = serializers.IntegerField()
     fecha = serializers.DateField()
     productos = FacturaDetalleInputSerializer(many=True)
