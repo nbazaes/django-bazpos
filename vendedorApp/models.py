@@ -85,7 +85,8 @@ class Producto(models.Model):
             precio_costo_decimal = Decimal(self.precio_costo) 
             margen_utilidad_decimal = Decimal(self.margen_utilidad) / Decimal(100) 
             margen_total = precio_costo_decimal * (Decimal(1) + margen_utilidad_decimal) 
-            self.precio = int(margen_total * Decimal(1.19))
+            precio_calculado = int(margen_total * Decimal(1.19))
+            self.precio = ((precio_calculado + 99) // 100) * 100
         super(Producto, self).save(*args, **kwargs)
 
 class Venta(models.Model):
