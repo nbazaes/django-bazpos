@@ -72,20 +72,20 @@ export default function DashboardPage() {
           </div>
 
           <div className="row">
-            {data.es_gerente && data.ventas_dia.desglope && data.ventas_dia.desglope.length > 0 && (
+            {data.ventas_dia.desglose && data.ventas_dia.desglose.length > 0 && (
               <div className="col-md-6 mb-4">
-                <PageCard title="Ventas por vendedor">
+                <PageCard title={data.es_gerente ? "Ventas por vendedor" : "Mis ventas de hoy"}>
                   <div className="table-responsive">
                     <table className="table table-sm">
                       <thead>
                         <tr>
-                          <th>Vendedor</th>
+                          <th>{data.es_gerente ? "Vendedor" : "Usuario"}</th>
                           <th className="text-right">Ventas</th>
                           <th className="text-right">Total</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {data.ventas_dia.desglope.map((row, i) => (
+                        {data.ventas_dia.desglose.map((row, i) => (
                           <tr key={i}>
                             <td>{row.vendedor}</td>
                             <td className="text-right">{row.cantidad}</td>

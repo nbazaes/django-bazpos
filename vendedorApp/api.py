@@ -53,7 +53,14 @@ class DashboardStatsView(APIView):
             ventas_propias = ventas_hoy.filter(usuario=user)
             total_dia = ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
             cant_ventas_dia = ventas_propias.count()
-            desglose = []
+            nombre = f"{user.first_name} {user.last_name}".strip()
+            desglose = [
+                {
+                    "vendedor": nombre if nombre else user.username,
+                    "total": total_dia,
+                    "cantidad": cant_ventas_dia,
+                }
+            ]
 
         bajo_minimo = list(
             Producto.objects.filter(stock_actual__lt=F("stock_minimo"), stock_minimo__gt=0)
