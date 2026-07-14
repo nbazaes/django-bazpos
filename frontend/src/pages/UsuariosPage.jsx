@@ -35,7 +35,8 @@ export default function UsuariosPage() {
             { key: "id", label: "ID" },
             { key: "username", label: "Usuario" },
             { key: "first_name", label: "Nombre" },
-            { key: "last_name", label: "Apellido" },
+            { key: "last_name",  label: "Apellido" },
+            { key: "groups",     label: "Rol", render: (row) => row.groups?.[0]?.name ?? "—" },
           ]}
           onEdit={(row) => navigate(`/usuarios/${row.id}/editar`)}
           onDelete={onDelete}
