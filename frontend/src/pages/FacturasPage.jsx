@@ -48,11 +48,9 @@ export default function FacturasPage() {
         JsBarcode(canvas, d.codigo_producto, {
           format: "CODE128",
           width: 2,
-          height: 45,
-          displayValue: true,
-          fontSize: 12,
-          margin: 5,
-          textMargin: 2,
+          height: 40,
+          displayValue: false,
+          margin: 3,
         });
         labels.push({
           codigo: d.codigo_producto,
@@ -74,13 +72,14 @@ export default function FacturasPage() {
             body { font-family: monospace; margin: 0; padding: 0; }
             .labels { display: flex; flex-wrap: wrap; gap: 3mm; justify-content: flex-start; padding: 2mm; }
             .label {
-              width: 30mm; min-height: 22mm;
+              width: 30mm; min-height: 25mm;
               display: flex; flex-direction: column;
               align-items: center; justify-content: flex-end;
               border: 1px dashed #ccc; padding: 2mm; box-sizing: border-box;
             }
-            .label img { max-width: 28mm; max-height: 14mm; }
-            .label .codigo { font-size: 7px; margin-top: 1mm; word-break: break-all; text-align: center; }
+            .label img { max-width: 28mm; max-height: 12mm; }
+            .label .nombre { font-size: 7px; margin-top: 1mm; text-align: center; line-height: 1.1; }
+            .label .codigo { font-size: 6px; margin-top: 0.5mm; word-break: break-all; text-align: center; }
             @media print {
               .label { border-color: transparent; }
             }
@@ -91,6 +90,7 @@ export default function FacturasPage() {
             ${labels.map((l) => `
               <div class="label">
                 <img src="${l.dataUrl}" alt="${l.codigo}" />
+                <span class="nombre">${l.nombre}</span>
                 <span class="codigo">${l.codigo}</span>
               </div>
             `).join("")}
