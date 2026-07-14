@@ -25,13 +25,13 @@ export default function FacturasPage() {
 
   async function onDelete(row) {
     if (!window.confirm(`Eliminar factura ${row.numero_factura}?`)) return;
-    await apiRequest(`/facturas/${row.numero_factura}/`, { method: "DELETE" });
+    await apiRequest(`/facturas/${row.id}/`, { method: "DELETE" });
     await load();
   }
 
   async function onView(row) {
     try {
-      const data = await apiRequest(`/facturas/${row.numero_factura}/`);
+      const data = await apiRequest(`/facturas/${row.id}/`);
       setDetalle(data);
       setDetalleError("");
     } catch (err) {
@@ -54,7 +54,7 @@ export default function FacturasPage() {
             { key: "monto_total", label: "Total neto" },
             { key: "monto_total", label: "Total con IVA", render: (row) => applyTax(row.monto_total, taxPercent) },
           ]}
-          onEdit={(row) => navigate(`/facturas/${row.numero_factura}/editar`)}
+          onEdit={(row) => navigate(`/facturas/${row.id}/editar`)}
           onDelete={onDelete}
           onView={onView}
         />

@@ -42,9 +42,9 @@ class ProveedorAdmin(SuperuserOnlyAdmin):
 
 @admin.register(Factura)
 class FacturaAdmin(SuperuserOnlyAdmin):
-    list_display = ('numero_factura', 'proveedor', 'fecha', 'monto_total')
+    list_display = ('id', 'numero_factura', 'proveedor', 'fecha', 'monto_total')
     list_filter = ('fecha', 'proveedor')
-    search_fields = ('numero_factura',)
+    search_fields = ('id', 'numero_factura',)
     inlines = [DetalleFacturaInline]
 
 

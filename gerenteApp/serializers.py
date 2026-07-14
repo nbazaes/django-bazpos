@@ -93,6 +93,7 @@ class FacturaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Factura
         fields = [
+            "id",
             "numero_factura",
             "proveedor",
             "proveedor_nombre",
@@ -132,6 +133,7 @@ class FacturaDetalleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Factura
         fields = [
+            "id",
             "numero_factura",
             "proveedor",
             "proveedor_nombre",
@@ -194,11 +196,6 @@ class FacturaUpsertSerializer(serializers.Serializer):
         numero_factura = validated_data["numero_factura"]
         proveedor = Proveedor.objects.get(pk=validated_data["proveedor_id"])
         productos = validated_data["productos"]
-
-        if Factura.objects.filter(pk=numero_factura).exists():
-            raise serializers.ValidationError(
-                {"numero_factura": f"Ya existe una factura con número {numero_factura}"}
-            )
 
         factura = Factura.objects.create(
             numero_factura=numero_factura,

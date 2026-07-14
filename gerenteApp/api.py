@@ -74,7 +74,7 @@ class UserViewSet(viewsets.ModelViewSet):
 class FacturaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Factura.objects.select_related("proveedor").prefetch_related("detalles").all().order_by(
-        "-numero_factura"
+        "-id"
     )
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
