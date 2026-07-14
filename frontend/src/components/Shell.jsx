@@ -1,5 +1,5 @@
 import { useState, createContext, useContext, useEffect } from "react";
-import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
 
@@ -31,11 +31,13 @@ const gerenteLinks = [
 export default function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const user = getUser();
   const showGerente = isGerente(user);
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const embed = searchParams.get("embed") === "1";
 
   function handleToggleTheme() {
     const next = toggleTheme();
@@ -46,6 +48,14 @@ export default function Shell() {
     clearTokens();
     setShowLogoutModal(false);
     navigate("/login");
+  }
+
+  if (embed) {
+    return (
+      <TitleContext.Provider value={setTitle}>
+        <Outlet />
+      </TitleContext.Provider>
+    );
   }
 
   return (
