@@ -196,6 +196,7 @@ export default function VentaPage() {
         <body>
           <h1>${documento.tienda}</h1>
           <p>${documento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}</p>
+          <p style="font-weight:bold;">#${documento.ventaId}</p>
           <p class="small">${documento.fecha}</p>
           <div class="line"></div>
           <table>
@@ -515,6 +516,7 @@ export default function VentaPage() {
                   <div className="text-center mb-2" style={{ color: "#1a1a1a" }}>
                     {lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}
                   </div>
+                  <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>#{lastDocumento.ventaId}</div>
                   <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>{lastDocumento.fecha}</div>
                   <hr />
                   {lastDocumento.items.map((item) => (
