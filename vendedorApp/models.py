@@ -131,3 +131,42 @@ class DetalleVenta(models.Model):
 
     def __str__(self):
         return f'{self.producto.nombre}'
+
+
+class Anulacion(models.Model):
+    venta = models.OneToOneField(Venta, on_delete=models.CASCADE, related_name='anulacion')
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    motivo = models.TextField()
+    fecha_anulacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'anulaciones'
+
+    def __str__(self):
+        return f'Anulación venta #{self.venta_id}'
+
+
+class Devolucion(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name='devoluciones')
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    motivo = models.TextField()
+    fecha_devolucion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'devoluciones'
+
+    def __str__(self):
+        return f'Devolución venta #{self.venta_id}'
+
+
+class DetalleDevolucion(models.Model):
+    devolucion = models.ForeignKey(Devolucion, on_delete=models.CASCADE, related_name='detalles')
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField()
+    reponer_stock = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'detalle_devoluciones'
+
+    def __str__(self):
+        return f'{self.producto.nombre} x{self.cantidad}'

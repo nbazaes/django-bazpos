@@ -7,8 +7,16 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import Producto, StockProductoUbicacion, Venta
-from vendedorApp.serializers import ProductoSerializer, RegistrarVentaSerializer, VentaSerializer
+from vendedorApp.models import Anulacion, Devolucion, DetalleDevolucion, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.serializers import (
+    AnulacionInputSerializer,
+    AnulacionSerializer,
+    DevolucionInputSerializer,
+    DevolucionSerializer,
+    ProductoSerializer,
+    RegistrarVentaSerializer,
+    VentaSerializer,
+)
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_ENCARGADO,
@@ -149,6 +157,8 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         "validar_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
         "ubicaciones_para_deducir": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
         "deducir_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+        "anular": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
@@ -280,3 +290,147 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                         restante -= disponible
 
         return Response({"status": "ok"})
+
+    @action(detail=True, methods=["post"], url_path="anular")
+    def anular(self, request, pk=None):
+        venta = self.get_object()
+
+        if venta.estado == Venta.Estado.CANCELADA:
+            return Response({"error": "Esta venta ya fue anulada"}, status=400)
+        if venta.tipo_documento == Venta.TipoDocumento.COTIZACION:
+            return Response({"error": "No se puede anular una cotización"}, status=400)
+        if hasattr(venta, "anulacion"):
+            return Response({"error": "Esta venta ya tiene una anulación registrada"}, status=400)
+
+        serializer = AnulacionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        detalles_map = {
+            d.producto_id: d.cantidad
+            for d in venta.detalleventa_set.all()
+        }
+
+        restauradas_productos = set()
+        with transaction.atomic():
+            for item in data["restauraciones"]:
+                pid = item["producto_id"]
+                if pid not in detalles_map:
+                    return Response(
+                        {"error": f"Producto {pid} no está en esta venta"},
+                        status=400,
+                    )
+                restauradas_productos.add(pid)
+                try:
+                    ubicacion = Ubicacion.objects.get(id=item["ubicacion_id"])
+                except Ubicacion.DoesNotExist:
+                    return Response(
+                        {"error": f"Ubicación {item['ubicacion_id']} no encontrada"},
+                        status=404,
+                    )
+                stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                    producto_id=pid,
+                    ubicacion=ubicacion,
+                    defaults={"cantidad": 0},
+                )
+                stock.cantidad += item["cantidad"]
+                stock.save()
+
+            for pid in detalles_map:
+                if pid not in restauradas_productos:
+                    return Response(
+                        {"error": f"Falta especificar restauración para producto {pid}"},
+                        status=400,
+                    )
+
+            anulacion = Anulacion.objects.create(
+                venta=venta,
+                usuario=request.user,
+                motivo=data["motivo"],
+            )
+            venta.estado = Venta.Estado.CANCELADA
+            venta.save()
+
+        return Response(AnulacionSerializer(anulacion).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="devolver")
+    def devolver(self, request, pk=None):
+        venta = self.get_object()
+
+        if venta.estado == Venta.Estado.CANCELADA:
+            return Response({"error": "No se puede devolver de una venta anulada"}, status=400)
+        if venta.tipo_documento == Venta.TipoDocumento.COTIZACION:
+            return Response({"error": "No se puede devolver de una cotización"}, status=400)
+
+        serializer = DevolucionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        detalles_map = {
+            d.producto_id: d.cantidad
+            for d in venta.detalleventa_set.all()
+        }
+
+        devueltos = {}
+        for dd in DetalleDevolucion.objects.filter(
+            devolucion__venta=venta
+        ).values("producto_id").annotate(total=Sum("cantidad")):
+            devueltos[dd["producto_id"]] = dd["total"]
+
+        with transaction.atomic():
+            devolucion = Devolucion.objects.create(
+                venta=venta,
+                usuario=request.user,
+                motivo=data["motivo"],
+            )
+
+            for item in data["productos"]:
+                pid = item["producto_id"]
+                cantidad = item["cantidad"]
+                reponer = item["reponer_stock"]
+
+                if pid not in detalles_map:
+                    return Response(
+                        {"error": f"Producto {pid} no está en esta venta"},
+                        status=400,
+                    )
+
+                vendido = detalles_map[pid]
+                ya_devuelto = devueltos.get(pid, 0)
+                disponible = vendido - ya_devuelto
+                if cantidad > disponible:
+                    return Response(
+                        {"error": f"Solo {disponible} de producto {pid} están disponibles para devolver"},
+                        status=400,
+                    )
+
+                if reponer:
+                    ubicacion_id = item.get("ubicacion_id")
+                    if not ubicacion_id:
+                        return Response(
+                            {"error": f"Debe especificar ubicación para reponer stock del producto {pid}"},
+                            status=400,
+                        )
+                    try:
+                        ubicacion = Ubicacion.objects.get(id=ubicacion_id)
+                    except Ubicacion.DoesNotExist:
+                        return Response(
+                            {"error": f"Ubicación {ubicacion_id} no encontrada"},
+                            status=404,
+                        )
+                    stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                        producto_id=pid,
+                        ubicacion=ubicacion,
+                        defaults={"cantidad": 0},
+                    )
+                    stock.cantidad += cantidad
+                    stock.save()
+
+                DetalleDevolucion.objects.create(
+                    devolucion=devolucion,
+                    producto_id=pid,
+                    cantidad=cantidad,
+                    reponer_stock=reponer,
+                )
+
+        return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)

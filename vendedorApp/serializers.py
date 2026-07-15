@@ -1,7 +1,8 @@
 from django.db import transaction
+from django.db.models import Sum
 from rest_framework import serializers
 
-from vendedorApp.models import DetalleVenta, Producto, Ubicacion, Venta
+from vendedorApp.models import Anulacion, DetalleDevolucion, DetalleVenta, Devolucion, Producto, Ubicacion, Venta
 
 
 class UbicacionSerializer(serializers.ModelSerializer):
@@ -74,6 +75,7 @@ class VentaSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
     tipo_documento_display = serializers.CharField(source="get_tipo_documento_display", read_only=True)
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+    productos_devueltos = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
@@ -88,7 +90,17 @@ class VentaSerializer(serializers.ModelSerializer):
             "tipo_documento",
             "tipo_documento_display",
             "detalles",
+            "productos_devueltos",
         ]
+
+    def get_productos_devueltos(self, obj):
+        devueltos = (
+            DetalleDevolucion.objects
+            .filter(devolucion__venta=obj)
+            .values("producto_id")
+            .annotate(total=Sum("cantidad"))
+        )
+        return {d["producto_id"]: d["total"] for d in devueltos}
 
 
 class RegistrarVentaSerializer(serializers.Serializer):
@@ -134,3 +146,54 @@ class RegistrarVentaSerializer(serializers.Serializer):
             )
 
         return venta
+
+
+class AnulacionInputSerializer(serializers.Serializer):
+    motivo = serializers.CharField(trim_whitespace=False)
+
+    class RestauracionItem(serializers.Serializer):
+        producto_id = serializers.IntegerField()
+        ubicacion_id = serializers.IntegerField()
+        cantidad = serializers.IntegerField(min_value=1)
+
+    restauraciones = RestauracionItem(many=True)
+
+
+class AnulacionSerializer(serializers.ModelSerializer):
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+
+    class Meta:
+        model = Anulacion
+        fields = ["id", "venta", "usuario_nombre", "motivo", "fecha_anulacion"]
+        read_only_fields = ["id", "fecha_anulacion"]
+
+
+class DetalleDevolucionSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
+
+    class Meta:
+        model = DetalleDevolucion
+        fields = ["id", "producto", "codigo_producto", "producto_nombre", "cantidad", "reponer_stock"]
+
+
+class DevolucionSerializer(serializers.ModelSerializer):
+    detalles = DetalleDevolucionSerializer(many=True, read_only=True)
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+
+    class Meta:
+        model = Devolucion
+        fields = ["id", "venta", "usuario_nombre", "motivo", "fecha_devolucion", "detalles"]
+        read_only_fields = ["id", "fecha_devolucion"]
+
+
+class DevolucionInputSerializer(serializers.Serializer):
+    motivo = serializers.CharField(trim_whitespace=False)
+
+    class ProductoItem(serializers.Serializer):
+        producto_id = serializers.IntegerField()
+        cantidad = serializers.IntegerField(min_value=1)
+        reponer_stock = serializers.BooleanField(default=True)
+        ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
+
+    productos = ProductoItem(many=True)

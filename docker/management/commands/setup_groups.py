@@ -14,7 +14,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # ── Permisos por app/modelo ──
-        # vendedorApp: Producto, Venta, DetalleVenta
+        # vendedorApp: Producto, Venta, DetalleVenta, Anulacion, Devolucion, DetalleDevolucion
         producto_perms = Permission.objects.filter(
             content_type__app_label='vendedorApp',
             content_type__model='producto',
@@ -26,6 +26,18 @@ class Command(BaseCommand):
         detalle_venta_perms = Permission.objects.filter(
             content_type__app_label='vendedorApp',
             content_type__model='detalleventa',
+        )
+        anulacion_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='anulacion',
+        )
+        devolucion_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='devolucion',
+        )
+        detalle_devolucion_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='detalledevolucion',
         )
 
         # gerenteApp: Proveedor, Factura, DetalleFactura, PrecioHistorico
@@ -68,7 +80,7 @@ class Command(BaseCommand):
         encargado, created = Group.objects.get_or_create(name='Encargado')
         encargado.permissions.clear()
         # Puede vender
-        encargado.permissions.add(*venta_perms, *detalle_venta_perms)
+        encargado.permissions.add(*venta_perms, *detalle_venta_perms, *anulacion_perms, *devolucion_perms, *detalle_devolucion_perms)
         # Puede gestionar productos (inventario)
         encargado.permissions.add(*producto_perms)
         # Puede gestionar facturas
@@ -88,6 +100,9 @@ class Command(BaseCommand):
             *producto_perms,
             *venta_perms,
             *detalle_venta_perms,
+            *anulacion_perms,
+            *devolucion_perms,
+            *detalle_devolucion_perms,
             *proveedor_perms,
             *factura_perms,
             *detalle_factura_perms,
