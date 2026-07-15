@@ -10,6 +10,8 @@ export default function PedidosPage() {
   const [detalleVenta, setDetalleVenta] = useState(null);
   const [detalleDevolucion, setDetalleDevolucion] = useState(null);
   const [ubicaciones, setUbicaciones] = useState([]);
+  const [searchId, setSearchId] = useState("");
+  const [tipoFilter, setTipoFilter] = useState("todos");
 
   const [anularVenta, setAnularVenta] = useState(null);
   const [anularMotivo, setAnularMotivo] = useState("");
@@ -27,6 +29,13 @@ export default function PedidosPage() {
 
   const user = getUser();
   const esAdmin = isGerente(user);
+
+  const filtradas = transacciones.filter((t) => {
+    if (tipoFilter === "venta" && t._tipo !== "venta") return false;
+    if (tipoFilter === "devolucion" && t._tipo !== "devolucion") return false;
+    if (searchId && !String(t.id).includes(searchId.trim())) return false;
+    return true;
+  });
 
   useEffect(() => {
     cargarTransacciones();
@@ -176,13 +185,31 @@ export default function PedidosPage() {
   return (
     <>
       <PageCard title="Historial de ventas">
+        <div className="page-actions">
+          <select
+            className="form-control"
+            value={tipoFilter}
+            onChange={(e) => setTipoFilter(e.target.value)}
+          >
+            <option value="todos">Todos</option>
+            <option value="venta">Venta</option>
+            <option value="devolucion">Devolución</option>
+          </select>
+          <input
+            className="form-control"
+            placeholder="Buscar por ID..."
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && setSearchId(e.target.value)}
+          />
+        </div>
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
             <thead>
               <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
-              {transacciones.map((t) => (
+              {filtradas.map((t) => (
                 <tr key={`${t._tipo}-${t.id}`} className={t._tipo === "devolucion" ? "table-warning" : ""}>
                   <td>
                     {t._tipo === "devolucion" ? `D#${t.id}` : t.id}
