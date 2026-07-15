@@ -180,11 +180,27 @@ class DetalleDevolucionSerializer(serializers.ModelSerializer):
 class DevolucionSerializer(serializers.ModelSerializer):
     detalles = DetalleDevolucionSerializer(many=True, read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    venta_fecha = serializers.DateTimeField(source="venta.fecha_venta", read_only=True)
+    venta_usuario = serializers.CharField(source="venta.usuario.username", read_only=True)
+    monto_devuelto = serializers.SerializerMethodField()
 
     class Meta:
         model = Devolucion
-        fields = ["id", "venta", "usuario_nombre", "motivo", "fecha_devolucion", "detalles"]
+        fields = ["id", "venta", "venta_fecha", "venta_usuario", "usuario_nombre", "motivo", "fecha_devolucion", "monto_devuelto", "detalles"]
         read_only_fields = ["id", "fecha_devolucion"]
+
+    def get_monto_devuelto(self, obj):
+        detalles = obj.detalles.all()
+        if not hasattr(obj, "_prefetched_detalles"):
+            pass
+        total = 0
+        for detalle in detalles:
+            dv = DetalleVenta.objects.filter(
+                venta=obj.venta, producto_id=detalle.producto_id
+            ).first()
+            precio = dv.precio_unitario if dv else 0
+            total += detalle.cantidad * precio
+        return total
 
 
 class DevolucionInputSerializer(serializers.Serializer):

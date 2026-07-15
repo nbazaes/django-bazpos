@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import DashboardStatsView, ProductoViewSet, VentaViewSet
+from vendedorApp.api import DashboardStatsView, DevolucionViewSet, ProductoViewSet, VentaViewSet
 from .api_views import MeView
 
 router = DefaultRouter()
@@ -12,6 +12,7 @@ router.register("ventas", VentaViewSet, basename="venta")
 router.register("proveedores", ProveedorViewSet, basename="proveedor")
 router.register("facturas", FacturaViewSet, basename="factura")
 router.register("usuarios", UserViewSet, basename="usuario")
+router.register("devoluciones", DevolucionViewSet, basename="devolucion")
 router.register("ubicaciones", UbicacionViewSet, basename="ubicacion")
 
 urlpatterns = [

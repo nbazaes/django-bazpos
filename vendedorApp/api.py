@@ -434,3 +434,20 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 )
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
+
+
+class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
+    queryset = Devolucion.objects.select_related("venta__usuario", "usuario").prefetch_related("detalles__producto").all().order_by("-fecha_devolucion")
+    serializer_class = DevolucionSerializer
+    role_action_map = {
+        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+    }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            return queryset
+        return queryset.filter(venta__usuario=user)
