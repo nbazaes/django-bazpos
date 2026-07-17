@@ -39,6 +39,7 @@ export default function UsuarioFormPage() {
       ...data,
       group_id: data.group_id ? Number(data.group_id) : null,
     };
+    if (id && !payload.password) delete payload.password;
     try {
       await apiRequest(id ? `/usuarios/${id}/` : "/usuarios/", {
         method: id ? "PUT" : "POST",

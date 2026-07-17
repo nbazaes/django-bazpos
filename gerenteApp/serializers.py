@@ -24,7 +24,7 @@ class ProveedorSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     group_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     groups = serializers.SerializerMethodField()
-    password = serializers.CharField(write_only=True, required=False)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -46,11 +46,10 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         group_id = validated_data.pop("group_id", None)
         password = validated_data.pop("password", None)
+        if not password:
+            raise serializers.ValidationError({"password": ["Este campo es requerido."]})
         user = User(**validated_data)
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
+        user.set_password(password)
         user.save()
         if group_id:
             group = Group.objects.get(id=group_id)
