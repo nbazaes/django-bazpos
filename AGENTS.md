@@ -6,7 +6,7 @@
 - `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion models + DRF ViewSets.
 - `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`).
 - `frontend/` — Vite 8 / React 19 SPA with react-router-dom. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
-- `static/` — legacy assets; `sb-admin-2*.css` is built from SCSS and copied into `frontend/public/css/`.
+- `static/` — legacy assets (Django admin, vendor).
 - `Dockerfile` / `Dockerfile.nginx` / `docker-entrypoint.sh` / `nginx.conf` / `compose.yaml` — production container definitions.
 - `deploy/` — **removed**. Production is handled by Docker Compose.
 
@@ -35,11 +35,6 @@ docker compose up -d --build
 python manage.py migrate
 python manage.py setup_groups
 python manage.py create_admin
-
-# SCSS rebuild (then copy to frontend)
-npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.css --style=expanded --no-source-map
-npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.min.css --style=compressed --no-source-map
-cp static/css/sb-admin-2.min.css frontend/public/css/
 ```
 
 ## Architecture

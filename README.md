@@ -111,14 +111,6 @@ docker compose up -d --build
 - `python manage.py create_admin` — crea superusuario desde variables de entorno
 - `python manage.py collectstatic` — recolecta estáticos
 
-## SCSS Legacy
-
-```bash
-npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.css --style=expanded --no-source-map
-npx sass static/scss/sb-admin-2.scss static/css/sb-admin-2.min.css --style=compressed --no-source-map
-cp static/css/sb-admin-2.min.css frontend/public/css/
-```
-
 ## Base de Datos
 
 ```sql
@@ -180,7 +172,7 @@ bazpos/
 │   ├── public/          # Activos estáticos (CSS, imágenes)
 │   ├── index.html       # Entrada única de la SPA
 │   └── vite.config.js
-├── static/              # Assets legacy (SCSS → CSS → frontend/public/css)
+├── static/              # Assets legacy (Django admin, vendor)
 ├── Dockerfile           # Imagen Python/Django
 ├── Dockerfile.nginx     # Imagen nginx con el SPA
 ├── docker-entrypoint.sh # Entrypoint del contenedor app

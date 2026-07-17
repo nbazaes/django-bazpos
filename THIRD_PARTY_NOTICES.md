@@ -10,38 +10,32 @@ Resumen (acción mínima tomada):
 Componentes incluidos y licencias
 ---------------------------------
 
-1) SB Admin 2
-   - Path(s) ejemplo: `static/css/sb-admin-2.css`, `static/js/sb-admin-2.min.js`
-   - Licencia: MIT
-   - Enlace: https://startbootstrap.com/theme/sb-admin-2
-   - Nota: Archivos en `static/` incluyen cabeceras con la licencia MIT.
-
-2) Bootstrap
+1) Bootstrap
    - Path: `static/vendor/bootstrap/`
    - Licencia: MIT
    - Enlace: https://github.com/twbs/bootstrap/blob/main/LICENSE
 
-3) Font Awesome Free
+2) Font Awesome Free
    - Path: `static/vendor/fontawesome-free/`
    - Licencias: Icons (CC BY 4.0), Fonts (SIL OFL 1.1), Code (MIT)
    - Enlace de licencia: https://fontawesome.com/license/free
 
-4) Chart.js
+3) Chart.js
    - Path: `static/vendor/chart.js/`
    - Licencia: MIT
    - Enlace: https://www.chartjs.org/
 
-5) DataTables (jQuery DataTables)
+4) DataTables (jQuery DataTables)
    - Path: `static/vendor/datatables/`
    - Licencia: MIT
    - Enlace: https://datatables.net/
 
-6) jQuery
+5) jQuery
    - Path: `static/vendor/jquery/`
    - Licencia: MIT
    - Enlace: https://jquery.org/license/
 
-7) jquery-easing
+6) jquery-easing
    - Path: `static/vendor/jquery-easing/`
    - Licencia: MIT
    - Enlace: https://github.com/gdsmith/jquery.easing/blob/master/LICENSE
@@ -52,7 +46,7 @@ Notas legales y de cumplimiento (mínimas):
 - No hay objetos con licencia no permisiva detectados en `static/`.
 
 Si quieres, puedo realizar cualquiera de las siguientes acciones adicionales (elige 1):
-- A) Añadir copias de los textos de licencia (por ejemplo `LICENSE-bootstrap.txt`, `LICENSE-sb-admin-2.txt`) dentro de `static/vendor/` o en una carpeta `licenses/`.
+- A) Añadir copias de los textos de licencia (por ejemplo `LICENSE-bootstrap.txt`) dentro de `static/vendor/` o en una carpeta `licenses/`.
 - B) Configurar `STATIC_ROOT` en `bazpos/settings.py` y añadir `/staticfiles/` a `.gitignore` para preparar despliegue.
 - C) No hacer más cambios.
 
@@ -64,7 +58,6 @@ Licencias añadidas en el repositorio
 Se han añadido copias mínimas y referencias a los textos de licencia en la carpeta `licenses/`:
 
 - `licenses/LICENSE-BOOTSTRAP.txt`
-- `licenses/LICENSE-SB_ADMIN_2.txt`
 - `licenses/LICENSE-CHARTJS.txt`
 - `licenses/LICENSE-DATATABLES.txt`
 - `licenses/LICENSE-JQUERY.txt`
