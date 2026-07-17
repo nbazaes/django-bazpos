@@ -93,6 +93,10 @@ export default function Shell() {
               </ul>
             </>
           )}
+
+          <div className="sidebar-version">
+            BAZPOS &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+          </div>
         </aside>
 
         <div className="content-wrapper">
