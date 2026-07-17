@@ -11,6 +11,7 @@ export default function VentaPage() {
   const [codigoBarra, setCodigoBarra] = useState("");
   const [barraFeedback, setBarraFeedback] = useState("");
   const [productosEncontrados, setProductosEncontrados] = useState([]);
+  const [hayMasProductos, setHayMasProductos] = useState(false);
   const [carro, setCarro] = useState([]);
   const [error, setError] = useState("");
   const [showConfirmVenta, setShowConfirmVenta] = useState(false);
@@ -31,21 +32,25 @@ export default function VentaPage() {
   async function buscarProducto(texto) {
     if (!texto.trim()) {
       setProductosEncontrados([]);
+      setHayMasProductos(false);
       setError("");
       return;
     }
     try {
       const result = await apiRequest(`/productos/?texto=${encodeURIComponent(texto)}`);
-      if (result.length === 0) {
+      const productos = Array.isArray(result) ? result : result.results || [];
+      setHayMasProductos(!Array.isArray(result) && result.count > productos.length);
+      if (productos.length === 0) {
         setError("Producto no encontrado");
         setProductosEncontrados([]);
       } else {
-        setProductosEncontrados(result);
+        setProductosEncontrados(productos);
         setError("");
       }
     } catch (err) {
       setError(err.message);
       setProductosEncontrados([]);
+      setHayMasProductos(false);
     }
   }
 
@@ -274,6 +279,7 @@ export default function VentaPage() {
       setCarro([]);
       setOem("");
       setProductosEncontrados([]);
+      setHayMasProductos(false);
       setShowConfirmVenta(false);
       setShowPreview(true);
       setShowVentaSuccess(true);
@@ -321,6 +327,11 @@ export default function VentaPage() {
         </div>
         {productosEncontrados.length > 0 && (
           <div className="mt-4">
+            {hayMasProductos && (
+              <div className="alert alert-info mb-2">
+                Se encontraron más de 50 productos. Refine la búsqueda para ver el resto.
+              </div>
+            )}
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>

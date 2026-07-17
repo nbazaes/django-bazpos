@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
+import Pagination from "../components/Pagination";
+import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest } from "../lib/api";
+import { apiRequest, buildQuery } from "../lib/api";
 
 function UbicacionCell({ ubicaciones }) {
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
@@ -39,18 +42,69 @@ function UbicacionCell({ ubicaciones }) {
 
 export default function InventarioPage() {
   usePageTitle("Inventario");
-  const [productos, setProductos] = useState([]);
-  const [texto, setTexto] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  async function load() {
-    const query = texto ? `?texto=${encodeURIComponent(texto)}` : "";
-    const data = await apiRequest(`/productos/${query}`);
-    setProductos(data);
+  const [productos, setProductos] = useState([]);
+  const [texto, setTexto] = useState(searchParams.get("texto") || "");
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
+  const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
+
+  async function load(targetPage = page, targetPageSize = pageSize, targetTexto = texto) {
+    const safePage = Math.max(1, Math.min(targetPage, totalPages || 1));
+    if (safePage !== page) setPage(safePage);
+    const params = {
+      texto: targetTexto,
+      page: safePage,
+      page_size: targetPageSize,
+    };
+    const data = await apiRequest(`/productos/${buildQuery(params)}`);
+    setProductos(data.results || []);
+    setCount(data.count || 0);
+
+    setSearchParams(
+      {
+        ...(targetTexto ? { texto: targetTexto } : {}),
+        page: String(safePage),
+        page_size: String(targetPageSize),
+      },
+      { replace: true }
+    );
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    const urlTexto = searchParams.get("texto") || "";
+    const urlPage = parseInt(searchParams.get("page") || "1", 10);
+    const urlPageSize = parseInt(searchParams.get("page_size") || "50", 10);
+    if (urlTexto !== texto) setTexto(urlTexto);
+    if (urlPage !== page) setPage(urlPage);
+    if (urlPageSize !== pageSize) setPageSize(urlPageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      load();
+    }, 300);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texto, page, pageSize]);
+
+  function handleTextoChange(value) {
+    setTexto(value);
+    setPage(1);
+  }
+
+  function handlePageChange(newPage) {
+    setPage(newPage);
+  }
+
+  function handlePageSizeChange(newSize) {
+    setPageSize(newSize);
+    setPage(1);
+  }
 
   return (
     <>
@@ -60,9 +114,11 @@ export default function InventarioPage() {
             className="form-control"
             placeholder="Buscar por nombre, código u OEM"
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => handleTextoChange(e.target.value)}
           />
-          <button className="btn btn-primary" onClick={load}>Buscar</button>
+          <button className="btn btn-primary" onClick={() => { setPage(1); load(1, pageSize, texto); }}>
+            Buscar
+          </button>
         </div>
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
@@ -95,6 +151,16 @@ export default function InventarioPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            count={count}
+            pageSize={pageSize}
+          />
         </div>
       </PageCard>
     </>

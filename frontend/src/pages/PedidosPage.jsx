@@ -1,17 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
+import Pagination from "../components/Pagination";
+import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest } from "../lib/api";
+import { apiRequest, buildQuery } from "../lib/api";
 import { getUser, isGerente } from "../lib/auth";
+
+const PAGE_SIZE = 50;
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
-  const [transacciones, setTransacciones] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [ventasCount, setVentasCount] = useState(0);
+  const [devolucionesCount, setDevolucionesCount] = useState(0);
+  const [searchId, setSearchId] = useState(searchParams.get("search_id") || "");
+  const [tipoFilter, setTipoFilter] = useState(searchParams.get("tipo") || "todos");
+  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
+  const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const [ubicaciones, setUbicaciones] = useState([]);
+
   const [detalleVenta, setDetalleVenta] = useState(null);
   const [detalleDevolucion, setDetalleDevolucion] = useState(null);
-  const [ubicaciones, setUbicaciones] = useState([]);
-  const [searchId, setSearchId] = useState("");
-  const [tipoFilter, setTipoFilter] = useState("todos");
 
   const [anularVenta, setAnularVenta] = useState(null);
   const [anularMotivo, setAnularMotivo] = useState("");
@@ -29,29 +40,25 @@ export default function PedidosPage() {
 
   const user = getUser();
   const esAdmin = isGerente(user);
-
-  const filtradas = transacciones.filter((t) => {
-    if (tipoFilter === "venta" && t._tipo !== "venta") return false;
-    if (tipoFilter === "devolucion" && t._tipo !== "devolucion") return false;
-    if (searchId && !String(t.id).includes(searchId.trim())) return false;
-    return true;
-  });
+  const hayMasDatos = ventasCount > PAGE_SIZE || devolucionesCount > PAGE_SIZE;
 
   useEffect(() => {
-    cargarTransacciones();
     if (esAdmin) {
       apiRequest("/ubicaciones/").then(setUbicaciones);
     }
   }, [esAdmin]);
 
   async function cargarTransacciones() {
-    const [ventas, devoluciones] = await Promise.all([
-      apiRequest("/ventas/"),
-      apiRequest("/devoluciones/"),
+    const [ventasData, devolucionesData] = await Promise.all([
+      apiRequest(`/ventas/${buildQuery({ page: 1, page_size: PAGE_SIZE })}`),
+      apiRequest(`/devoluciones/${buildQuery({ page: 1, page_size: PAGE_SIZE })}`),
     ]);
 
+    setVentasCount(ventasData.count || 0);
+    setDevolucionesCount(devolucionesData.count || 0);
+
     const filas = [
-      ...ventas.map((v) => ({
+      ...(ventasData.results || []).map((v) => ({
         _tipo: "venta",
         _fecha: v.fecha_venta,
         id: v.id,
@@ -61,7 +68,7 @@ export default function PedidosPage() {
         estado: v.estado_display || v.estado,
         raw: v,
       })),
-      ...devoluciones.map((d) => ({
+      ...(devolucionesData.results || []).map((d) => ({
         _tipo: "devolucion",
         _fecha: d.fecha_devolucion,
         id: d.id,
@@ -74,8 +81,51 @@ export default function PedidosPage() {
     ];
 
     filas.sort((a, b) => (b._fecha || "").localeCompare(a._fecha || ""));
-    setTransacciones(filas);
+    return filas;
   }
+
+  const [transacciones, setTransacciones] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    cargarTransacciones()
+      .then(setTransacciones)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtradas = useMemo(() => {
+    return transacciones.filter((t) => {
+      if (tipoFilter === "venta" && t._tipo !== "venta") return false;
+      if (tipoFilter === "devolucion" && t._tipo !== "devolucion") return false;
+      if (searchId && !String(t.id).includes(searchId.trim())) return false;
+      return true;
+    });
+  }, [transacciones, tipoFilter, searchId]);
+
+  const totalCount = filtradas.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.max(1, Math.min(page, totalPages));
+  const paginadas = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtradas.slice(start, start + pageSize);
+  }, [filtradas, safePage, pageSize]);
+
+  useEffect(() => {
+    if (safePage !== page) {
+      setPage(safePage);
+    }
+    setSearchParams(
+      {
+        ...(searchId ? { search_id: searchId } : {}),
+        ...(tipoFilter !== "todos" ? { tipo: tipoFilter } : {}),
+        page: String(safePage),
+        page_size: String(pageSize),
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safePage, pageSize, tipoFilter, searchId]);
 
   async function verVenta(id) {
     const data = await apiRequest(`/ventas/${id}/`);
@@ -116,9 +166,12 @@ export default function PedidosPage() {
         body: { motivo: anularMotivo, restauraciones },
       });
       setAnularVenta(null);
-      cargarTransacciones();
+      setLoading(true);
+      const nuevas = await cargarTransacciones();
+      setTransacciones(nuevas);
     } finally {
       setAnularLoading(false);
+      setLoading(false);
     }
   }
 
@@ -176,10 +229,22 @@ export default function PedidosPage() {
         body: { motivo: devolverMotivo, productos },
       });
       setDevolverVenta(null);
-      cargarTransacciones();
+      setLoading(true);
+      const nuevas = await cargarTransacciones();
+      setTransacciones(nuevas);
     } finally {
       setDevolverLoading(false);
+      setLoading(false);
     }
+  }
+
+  function handlePageChange(newPage) {
+    setPage(newPage);
+  }
+
+  function handlePageSizeChange(newSize) {
+    setPageSize(newSize);
+    setPage(1);
   }
 
   return (
@@ -189,7 +254,10 @@ export default function PedidosPage() {
           <select
             className="form-control"
             value={tipoFilter}
-            onChange={(e) => setTipoFilter(e.target.value)}
+            onChange={(e) => {
+              setTipoFilter(e.target.value);
+              setPage(1);
+            }}
           >
             <option value="todos">Todos</option>
             <option value="venta">Venta</option>
@@ -199,17 +267,27 @@ export default function PedidosPage() {
             className="form-control"
             placeholder="Buscar por ID..."
             value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
+            onChange={(e) => {
+              setSearchId(e.target.value);
+              setPage(1);
+            }}
             onKeyDown={(e) => e.key === "Enter" && setSearchId(e.target.value)}
           />
         </div>
+        {hayMasDatos && (
+          <div className="alert alert-info mb-3">
+            Se muestran las transacciones más recientes. Use el filtro por tipo o ID para refinar.
+          </div>
+        )}
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
             <thead>
               <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
-              {filtradas.map((t) => (
+              {loading ? (
+                <tr><td colSpan="7" className="text-center text-muted">Cargando...</td></tr>
+              ) : paginadas.map((t) => (
                 <tr key={`${t._tipo}-${t.id}`} className={t._tipo === "devolucion" ? "table-warning" : ""}>
                   <td>
                     {t._tipo === "devolucion" ? `D#${t.id}` : t.id}
@@ -244,8 +322,21 @@ export default function PedidosPage() {
                   </td>
                 </tr>
               ))}
+              {!loading && paginadas.length === 0 && (
+                <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
+              )}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            count={totalCount}
+            pageSize={pageSize}
+          />
         </div>
       </PageCard>
 

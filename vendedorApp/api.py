@@ -17,6 +17,11 @@ from vendedorApp.serializers import (
     RegistrarVentaSerializer,
     VentaSerializer,
 )
+from vendedorApp.pagination import (
+    DevolucionPagination,
+    ProductoPagination,
+    VentaPagination,
+)
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_ENCARGADO,
@@ -97,6 +102,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
     serializer_class = ProductoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Producto.objects.select_related("proveedor").prefetch_related("stocks_ubicacion__ubicacion").all().order_by("producto_id")
+    pagination_class = ProductoPagination
     role_action_map = {
         "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
@@ -150,6 +156,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Venta.objects.select_related("usuario").all().order_by("-fecha_venta")
     serializer_class = VentaSerializer
+    pagination_class = VentaPagination
     role_action_map = {
         "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
@@ -440,6 +447,7 @@ class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Devolucion.objects.select_related("venta__usuario", "usuario").prefetch_related("detalles__producto").all().order_by("-fecha_devolucion")
     serializer_class = DevolucionSerializer
+    pagination_class = DevolucionPagination
     role_action_map = {
         "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],

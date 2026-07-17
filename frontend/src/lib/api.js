@@ -63,6 +63,16 @@ export async function apiRequest(path, options = {}) {
   return response.json();
 }
 
+export function buildQuery(params = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    query.set(key, value);
+  }
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
+}
+
 export async function login(username, password) {
   const response = await fetch(`${API_BASE}/auth/token/`, {
     method: "POST",
