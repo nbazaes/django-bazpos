@@ -7,7 +7,8 @@
 - `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`).
 - `frontend/` — Vite 8 / React 19 SPA with react-router-dom. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
 - `static/` — legacy assets; `sb-admin-2*.css` is built from SCSS and copied into `frontend/public/css/`.
-- `deploy/` — production deployment files (systemd units, run script).
+- `Dockerfile` / `Dockerfile.nginx` / `docker-entrypoint.sh` / `nginx.conf` / `compose.yaml` — production container definitions.
+- `deploy/` — **removed**. Production is handled by Docker Compose.
 
 ## Commands
 ```bash
@@ -24,17 +25,13 @@ python manage.py runserver
 # Backend dev server (LAN accessible)
 python manage.py runserver 0.0.0.0:8000
 
-# Production: start with gunicorn (LAN accessible)
-./deploy/run_prod.sh
-# Same but with Django runserver instead (dev convenience)
-./deploy/run_prod.sh --dev
+# Production: build and run the whole stack (nginx + Django + MariaDB)
+cp .env.production.example .env   # edit secrets before running
+docker compose up -d --build
+# Rebuild after code changes
+docker compose up -d --build
 
-# Production: enable systemd service (auto-start on boot)
-sudo cp deploy/bazpos.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now bazpos
-
-# Bootstrap roles & superuser
+# Bootstrap roles & superuser (already run on container start)
 python manage.py migrate
 python manage.py setup_groups
 python manage.py create_admin
@@ -46,22 +43,25 @@ cp static/css/sb-admin-2.min.css frontend/public/css/
 ```
 
 ## Architecture
-- Fully decoupled frontend/backend. Frontend makes absolute API calls to the URL set in `VITE_API_BASE_URL` (from `frontend/.env`). No Vite proxy.
-- CORS enforced on backend via `CORS_ALLOWED_ORIGINS` in root `.env`.
+- Decoupled services via Docker Compose: MariaDB, Django + Gunicorn, and nginx each run in their own container.
+- The frontend SPA is built into the nginx container and served from the same origin as the API, so the default API base is a relative path (`/api`).
+- CORS is only needed if the API is accessed from a different origin; with the default setup it can be left empty.
 - Frontend is a **SPA** (react-router-dom v7), NOT an MPA. The old HTML files in `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/`, `frontend/404.html`, `frontend/admin.html`, and `frontend/forgot-password.html` are **dead MPA leftovers** — do not edit them. All routes are defined in `frontend/src/router.jsx`.
 - `GerenteGuard` (`frontend/src/guards.jsx:33`) wraps product/management routes — only Gerente and Encargado roles can access them.
 - `ProtectedRoute` calls `/auth/me/` on mount to validate the JWT on every protected route visit.
 
 ## Production / LAN Deployment
-- Targeted architecture: a **single backend server** in the store (Django + Gunicorn), and **Electron-based clients** on each PC that point to the server's LAN IP.
-- Backend listens on `0.0.0.0:8000`. Each Electron client sets `VITE_API_BASE_URL=http://<server-lan-ip>:8000/api`.
-- DB stays on `127.0.0.1` — never expose MySQL to the network.
-- `DEBUG` is controlled via `DJANGO_DEBUG=True` in `.env`. Settings.py reads it at line 37:
-  `DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"`.
-- For LAN testing from other PCs during development, you need three things:
-  1. Backend on `0.0.0.0:8000` (`python manage.py runserver 0.0.0.0:8000`)
-  2. `.env` updated: `DJANGO_ALLOWED_HOSTS` must include the server's LAN IP, plus `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` must include the frontend's LAN origin(s)
-  3. `frontend/.env` updated: `VITE_API_BASE_URL=http://<server-lan-ip>:8000/api`
+- Production stack runs on a **single server** via Docker Compose: MariaDB container, Django + Gunicorn container, and nginx container. All services are isolated and can be scaled independently later.
+- The frontend SPA is built into the nginx container and served on port 80 from the same origin as the API. Client machines only need a browser and a Tailscale connection.
+- Backend is exposed through nginx (reverse proxy) on port 80. Gunicorn is not exposed directly.
+- DB is inside a Docker container and reachable only on the internal Docker network — never exposed to the LAN or internet.
+- `DEBUG` is controlled via `DJANGO_DEBUG` env var. Settings.py reads it at line 37:
+  `DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"`. Must be `False` in production.
+- For LAN/VPN deployment:
+  1. Install Tailscale on the server and enable Magic DNS.
+  2. Copy `.env.production.example` to `.env` and set real secrets, `DJANGO_SECRET_KEY`, and `DJANGO_ALLOWED_HOSTS` (include the Tailscale hostname, e.g., `bazpos-server.tailnet-name.ts.net`).
+  3. Run `docker compose up -d --build`.
+  4. On each client PC, open a browser and navigate to `http://<tailscale-hostname>`.
 
 ## API
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
@@ -87,17 +87,19 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 
 ## Frontend Env Vars
 Copy `frontend/.env.example` → `frontend/.env`. Never commit `.env`.
-- `VITE_API_BASE_URL` — absolute backend API URL (e.g. `http://192.168.1.50:8000/api` for LAN)
-- `VITE_BACKEND_URL` — backend base URL for redirects/media
+- `VITE_API_BASE_URL` — backend API path. Default is `/api` (relative, same origin) for the Docker production setup. Override with an absolute URL (e.g. `http://localhost:8000/api`) only when running the Vite dev server separately from the backend.
+- `VITE_BACKEND_URL` — backend base URL for redirects/media. Default is empty (same origin). Override only for local dev.
 - `VITE_STORE_NAME` — displayed in UI (default: `BAZPOS`)
 
 ## Backend Env Vars
-Copy `.env.example` → `.env`. Never commit `.env`.
+Copy `.env.production.example` → `.env` for production deployments. For local development, use `.env.example`.
+Never commit `.env`.
 - `DJANGO_DEBUG` — `True` enables debug mode (must be `False` in production)
-- `CORS_ALLOWED_ORIGINS` — comma-separated frontend origins (include LAN IPs for dev testing)
-- `CSRF_TRUSTED_ORIGINS` — comma-separated origins for CSRF
-- `DB_PASSWORD`, `DB_HOST`, `DB_USER`, `DB_NAME`, `DB_PORT` — MySQL connection
+- `CORS_ALLOWED_ORIGINS` — comma-separated frontend origins. Can be left empty when the SPA is served from the same origin as the API.
+- `CSRF_TRUSTED_ORIGINS` — comma-separated origins for CSRF. Can be left empty for same-origin deployments.
+- `DB_PASSWORD`, `DB_HOST`, `DB_USER`, `DB_NAME`, `DB_PORT` — MariaDB connection
 - `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`
+- `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` — MariaDB container initialization
 
 ## Frontend Rules
 - Plain JSX with ESLint only. No TypeScript.

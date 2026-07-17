@@ -54,7 +54,6 @@ coverage.xml
 
 # Docker
 docker-compose.override.yml
-Dockerfile.*
 
 # Bases de datos y archivos de datos
 *.sqlite3
@@ -78,3 +77,4 @@ npm-debug.log*
 yarn-error.log*
 
 tareas.md
+local_resources/
