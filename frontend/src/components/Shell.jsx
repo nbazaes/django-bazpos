@@ -2,6 +2,7 @@ import { useState, createContext, useContext, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
+import { STORE_NAME } from "../lib/config";
 
 const TitleContext = createContext(() => {});
 
@@ -9,7 +10,7 @@ export function usePageTitle(title) {
   const setTitle = useContext(TitleContext);
   useEffect(() => {
     setTitle(title);
-    document.title = `BAZPOS — ${title}`;
+    document.title = `${STORE_NAME} — ${title}`;
   }, [title, setTitle]);
 }
 
@@ -62,7 +63,7 @@ export default function Shell() {
     <TitleContext.Provider value={setTitle}>
       <div id="wrapper">
         <aside className="sidebar">
-          <NavLink className="sidebar-brand" to="/">Bazpos</NavLink>
+          <NavLink className="sidebar-brand" to="/">{STORE_NAME}</NavLink>
 
           <ul className="sidebar-nav">
             {vendedorLinks.map((link) => (
@@ -95,7 +96,7 @@ export default function Shell() {
           )}
 
           <div className="sidebar-version">
-            BAZPOS &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+            {STORE_NAME} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
           </div>
         </aside>
 

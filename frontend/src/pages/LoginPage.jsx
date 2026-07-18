@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, me } from "../lib/api";
 import { saveUser } from "../lib/auth";
+import { STORE_NAME } from "../lib/config";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function LoginPage() {
     <div className="auth-container">
       <div className="auth-panel">
         <div className="auth-logo">
-          <h1>Bazpos</h1>
+          <h1>{STORE_NAME}</h1>
           <p>Sistema de punto de venta</p>
         </div>
         <div className="auth-card">
