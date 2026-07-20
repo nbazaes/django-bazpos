@@ -14,6 +14,7 @@ from gerenteApp.serializers import (
     ProveedorSerializer,
     UserSerializer,
 )
+from vendedorApp.pagination import DefaultPagination
 from vendedorApp.models import Producto, Ubicacion
 from vendedorApp.serializers import UbicacionSerializer
 from bazpos.permissions import ROLE_ENCARGADO, ROLE_GERENTE, RoleActionPermission
@@ -23,6 +24,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     serializer_class = ProveedorSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Proveedor.objects.all().order_by("proveedor_id")
+    pagination_class = DefaultPagination
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
@@ -44,6 +46,7 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = User.objects.all().order_by("id")
+    pagination_class = DefaultPagination
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
@@ -76,6 +79,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
     queryset = Factura.objects.select_related("proveedor").prefetch_related("detalles").all().order_by(
         "-id"
     )
+    pagination_class = DefaultPagination
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
@@ -214,6 +218,7 @@ class UbicacionViewSet(viewsets.ModelViewSet):
     serializer_class = UbicacionSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Ubicacion.objects.all().order_by("nombre")
+    pagination_class = DefaultPagination
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],

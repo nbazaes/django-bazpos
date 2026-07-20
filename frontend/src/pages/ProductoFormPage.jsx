@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest } from "../lib/api";
+import {
+  useCreateProducto,
+  useProducto,
+  useProveedores,
+  useUpdateProducto,
+} from "../lib/queries";
 
 const initialState = {
   codigo_producto: "",
@@ -26,26 +31,30 @@ export default function ProductoFormPage() {
   const fromFactura = searchParams.get("from_factura") === "1";
   const embed = searchParams.get("embed") === "1";
   usePageTitle(id ? "Editar producto" : "Crear producto");
+
   const [data, setData] = useState(initialState);
-  const [proveedores, setProveedores] = useState([]);
   const [error, setError] = useState("");
 
+  const { data: proveedoresData } = useProveedores({ page_size: 200 });
+  const { data: productoData } = useProducto(id);
+  const createMutation = useCreateProducto();
+  const updateMutation = useUpdateProducto();
+
+  const proveedores = proveedoresData?.results ?? [];
+
   useEffect(() => {
-    apiRequest("/proveedores/").then(setProveedores).catch((err) => setError(err.message));
-    if (id) {
-      apiRequest(`/productos/${id}/`)
-        .then((row) => setData({ ...row, proveedor: String(row.proveedor) }))
-        .catch((err) => setError(err.message));
-    } else {
+    if (productoData && id) {
+      setData({ ...productoData, proveedor: String(productoData.proveedor) });
+    } else if (!id && (codigo_producto || proveedor)) {
       setData((prev) => ({
         ...prev,
         codigo_producto: codigo_producto || prev.codigo_producto,
         proveedor: proveedor || prev.proveedor,
       }));
     }
-  }, [id, codigo_producto, proveedor]);
+  }, [productoData, id, codigo_producto, proveedor]);
 
-  async function submit(event) {
+  function submit(event) {
     event.preventDefault();
     setError("");
     const payload = {
@@ -56,27 +65,26 @@ export default function ProductoFormPage() {
       margen_utilidad: Number(data.margen_utilidad),
       proveedor: Number(data.proveedor),
     };
-    const endpoint = id ? `/productos/${id}/` : "/productos/";
-    const method = id ? "PUT" : "POST";
-    try {
-      const saved = await apiRequest(endpoint, { method, body: payload });
-      if (fromFactura && !id) {
-        const message = { type: "PRODUCT_CREATED", producto: saved };
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(message, window.location.origin);
-          window.close();
+    const mutation = id ? updateMutation : createMutation;
+    mutation.mutate(id ? { id, data: payload } : payload, {
+      onSuccess: (saved) => {
+        if (fromFactura && !id) {
+          const message = { type: "PRODUCT_CREATED", producto: saved };
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(message, window.location.origin);
+            window.close();
+            return;
+          }
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(message, window.location.origin);
+            return;
+          }
           return;
         }
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage(message, window.location.origin);
-          return;
-        }
-        return;
-      }
-      navigate("/productos");
-    } catch (err) {
-      setError(err.message);
-    }
+        navigate("/productos");
+      },
+      onError: (err) => setError(err.message),
+    });
   }
 
   const content = (
@@ -119,7 +127,9 @@ export default function ProductoFormPage() {
             </select>
           </div>
         </div>
-        <button className="btn btn-primary" type="submit">Guardar</button>
+        <button className="btn btn-primary" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+          {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar"}
+        </button>
       </form>
     </PageCard>
   );

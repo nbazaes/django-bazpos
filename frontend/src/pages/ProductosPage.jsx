@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest, buildQuery } from "../lib/api";
+import { useDeleteProducto, useProductos } from "../lib/queries";
 
 function renderUbicacion(row) {
   const ubicaciones = row.ubicaciones_stock || [];
@@ -47,35 +47,18 @@ export default function ProductosPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Productos");
 
-  const [rows, setRows] = useState([]);
   const [texto, setTexto] = useState(searchParams.get("texto") || "");
-  const [count, setCount] = useState(0);
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const debounceRef = useRef(null);
 
+  const params = { texto, page, page_size: pageSize };
+  const { data, isFetching } = useProductos(params);
+  const deleteMutation = useDeleteProducto();
+
+  const rows = data?.results ?? [];
+  const count = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
-
-  async function load(targetPage = page, targetPageSize = pageSize, targetTexto = texto) {
-    const safePage = Math.max(1, Math.min(targetPage, totalPages || 1));
-    if (safePage !== page) setPage(safePage);
-    const params = {
-      texto: targetTexto,
-      page: safePage,
-      page_size: targetPageSize,
-    };
-    const data = await apiRequest(`/productos/${buildQuery(params)}`);
-    setRows(data.results || []);
-    setCount(data.count || 0);
-
-    setSearchParams(
-      {
-        ...(targetTexto ? { texto: targetTexto } : {}),
-        page: String(safePage),
-        page_size: String(targetPageSize),
-      },
-      { replace: true }
-    );
-  }
 
   useEffect(() => {
     const urlTexto = searchParams.get("texto") || "";
@@ -87,32 +70,36 @@ export default function ProductosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      load();
-    }, 300);
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [texto, page, pageSize]);
-
-  async function onDelete(row) {
-    if (!window.confirm(`Eliminar ${row.nombre}?`)) return;
-    await apiRequest(`/productos/${row.producto_id}/`, { method: "DELETE" });
-    await load();
-  }
+  const syncURL = (t, p, ps) => {
+    setSearchParams(
+      { ...(t ? { texto: t } : {}), page: String(p), page_size: String(ps) },
+      { replace: true },
+    );
+  };
 
   function handleTextoChange(value) {
     setTexto(value);
     setPage(1);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      syncURL(value, 1, pageSize);
+    }, 300);
   }
 
   function handlePageChange(newPage) {
     setPage(newPage);
+    syncURL(texto, newPage, pageSize);
   }
 
   function handlePageSizeChange(newSize) {
     setPageSize(newSize);
     setPage(1);
+    syncURL(texto, 1, newSize);
+  }
+
+  async function onDelete(row) {
+    if (!window.confirm(`Eliminar ${row.nombre}?`)) return;
+    deleteMutation.mutate(row.producto_id);
   }
 
   return (
@@ -124,7 +111,7 @@ export default function ProductosPage() {
           value={texto}
           onChange={(e) => handleTextoChange(e.target.value)}
         />
-        <button className="btn btn-primary" onClick={() => { setPage(1); load(1, pageSize, texto); }}>
+        <button className="btn btn-primary" onClick={() => { setPage(1); syncURL(texto, 1, pageSize); }}>
           Buscar
         </button>
         <Link className="btn btn-success" to="/productos/crear">
@@ -132,7 +119,7 @@ export default function ProductosPage() {
         </Link>
       </div>
       <CrudTable
-        rows={rows}
+        rows={isFetching && !rows.length ? [] : rows}
         columns={[
           { key: "codigo_producto", label: "Código", width: "1px" },
           { key: "oem", label: "OEM" },

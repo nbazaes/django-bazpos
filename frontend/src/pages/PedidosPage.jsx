@@ -1,328 +1,227 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest, buildQuery } from "../lib/api";
+import {
+  useAnularVenta,
+  useDevolucion,
+  useDevoluciones,
+  useDevolverProductos,
+  useUbicaciones,
+  useVenta,
+  useVentas,
+} from "../lib/queries";
 import { getUser, isGerente } from "../lib/auth";
-
-const PAGE_SIZE = 50;
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [ventasCount, setVentasCount] = useState(0);
-  const [devolucionesCount, setDevolucionesCount] = useState(0);
-  const [searchId, setSearchId] = useState(searchParams.get("search_id") || "");
-  const [tipoFilter, setTipoFilter] = useState(searchParams.get("tipo") || "todos");
+  const [tab, setTab] = useState(searchParams.get("tab") || "ventas");
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
-  const [ubicaciones, setUbicaciones] = useState([]);
 
-  const [detalleVenta, setDetalleVenta] = useState(null);
-  const [detalleDevolucion, setDetalleDevolucion] = useState(null);
+  const [detalleVentaId, setDetalleVentaId] = useState(null);
+  const [detalleDevolucionId, setDetalleDevolucionId] = useState(null);
 
-  const [anularVenta, setAnularVenta] = useState(null);
+  const [anularVentaId, setAnularVentaId] = useState(null);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anularUbicaciones, setAnularUbicaciones] = useState({});
   const [anularCantidades, setAnularCantidades] = useState({});
-  const [anularLoading, setAnularLoading] = useState(false);
 
-  const [devolverVenta, setDevolverVenta] = useState(null);
+  const [devolverVentaId, setDevolverVentaId] = useState(null);
   const [devolverMotivo, setDevolverMotivo] = useState("");
   const [devolverSeleccion, setDevolverSeleccion] = useState({});
   const [devolverCantidades, setDevolverCantidades] = useState({});
   const [devolverReponer, setDevolverReponer] = useState({});
   const [devolverUbicacion, setDevolverUbicacion] = useState({});
-  const [devolverLoading, setDevolverLoading] = useState(false);
 
   const user = getUser();
   const esAdmin = isGerente(user);
-  const hayMasDatos = ventasCount > PAGE_SIZE || devolucionesCount > PAGE_SIZE;
+
+  const params = { page, page_size: pageSize };
+  const { data: ventasData } = useVentas(params);
+  const { data: devolucionesData } = useDevoluciones(params);
+  const { data: detalleVentaData } = useVenta(detalleVentaId);
+  const { data: detalleDevolucionData } = useDevolucion(detalleDevolucionId);
+  const { data: anularVentaData } = useVenta(anularVentaId);
+  const { data: devolverVentaData } = useVenta(devolverVentaId);
+  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
+
+  const ubicacionesList = ubicacionesData?.results ?? [];
+  const anularMutation = useAnularVenta();
+  const devolverMutation = useDevolverProductos();
+
+  const activeData = tab === "ventas" ? ventasData : devolucionesData;
+  const rows = activeData?.results ?? [];
+  const count = activeData?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   useEffect(() => {
-    if (esAdmin) {
-      apiRequest("/ubicaciones/").then(setUbicaciones);
-    }
-  }, [esAdmin]);
-
-  async function cargarTransacciones() {
-    const [ventasData, devolucionesData] = await Promise.all([
-      apiRequest(`/ventas/${buildQuery({ page: 1, page_size: PAGE_SIZE })}`),
-      apiRequest(`/devoluciones/${buildQuery({ page: 1, page_size: PAGE_SIZE })}`),
-    ]);
-
-    setVentasCount(ventasData.count || 0);
-    setDevolucionesCount(devolucionesData.count || 0);
-
-    const filas = [
-      ...(ventasData.results || []).map((v) => ({
-        _tipo: "venta",
-        _fecha: v.fecha_venta,
-        id: v.id,
-        usuario: v.usuario_nombre,
-        monto: v.monto_total,
-        tipo: v.tipo_documento_display || v.tipo_documento,
-        estado: v.estado_display || v.estado,
-        raw: v,
-      })),
-      ...(devolucionesData.results || []).map((d) => ({
-        _tipo: "devolucion",
-        _fecha: d.fecha_devolucion,
-        id: d.id,
-        usuario: d.usuario_nombre,
-        monto: d.monto_devuelto,
-        tipo: "Devolución",
-        estado: "—",
-        raw: d,
-      })),
-    ];
-
-    filas.sort((a, b) => (b._fecha || "").localeCompare(a._fecha || ""));
-    return filas;
-  }
-
-  const [transacciones, setTransacciones] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    cargarTransacciones()
-      .then(setTransacciones)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtradas = useMemo(() => {
-    return transacciones.filter((t) => {
-      if (tipoFilter === "venta" && t._tipo !== "venta") return false;
-      if (tipoFilter === "devolucion" && t._tipo !== "devolucion") return false;
-      if (searchId && !String(t.id).includes(searchId.trim())) return false;
-      return true;
-    });
-  }, [transacciones, tipoFilter, searchId]);
-
-  const totalCount = filtradas.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const paginadas = useMemo(() => {
-    const start = (safePage - 1) * pageSize;
-    return filtradas.slice(start, start + pageSize);
-  }, [filtradas, safePage, pageSize]);
-
-  useEffect(() => {
-    if (safePage !== page) {
-      setPage(safePage);
-    }
-    setSearchParams(
-      {
-        ...(searchId ? { search_id: searchId } : {}),
-        ...(tipoFilter !== "todos" ? { tipo: tipoFilter } : {}),
-        page: String(safePage),
-        page_size: String(pageSize),
-      },
-      { replace: true }
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safePage, pageSize, tipoFilter, searchId]);
-
-  async function verVenta(id) {
-    const data = await apiRequest(`/ventas/${id}/`);
-    setDetalleVenta(data);
-  }
-
-  async function verDevolucion(id) {
-    const data = await apiRequest(`/devoluciones/${id}/`);
-    setDetalleDevolucion(data);
-  }
-
-  async function abrirAnular(venta) {
-    const data = await apiRequest(`/ventas/${venta.id}/`);
-    setAnularVenta(data);
-    setAnularMotivo("");
-
+    if (!anularVentaData?.detalles?.length) return;
     const ubiMap = {};
     const cantMap = {};
-    for (const d of data.detalles || []) {
-      ubiMap[d.producto] = ubicaciones.length > 0 ? String(ubicaciones[0].id) : "";
+    for (const d of anularVentaData.detalles) {
+      ubiMap[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
       cantMap[d.producto] = d.cantidad;
     }
     setAnularUbicaciones(ubiMap);
     setAnularCantidades(cantMap);
-  }
+  }, [anularVentaData, ubicacionesList]);
 
-  async function confirmarAnular() {
-    if (!anularMotivo.trim()) return;
-    setAnularLoading(true);
-    try {
-      const restauraciones = (anularVenta.detalles || []).map((d) => ({
-        producto_id: d.producto,
-        ubicacion_id: parseInt(anularUbicaciones[d.producto]),
-        cantidad: anularCantidades[d.producto],
-      }));
-      await apiRequest(`/ventas/${anularVenta.id}/anular/`, {
-        method: "POST",
-        body: { motivo: anularMotivo, restauraciones },
-      });
-      setAnularVenta(null);
-      setLoading(true);
-      const nuevas = await cargarTransacciones();
-      setTransacciones(nuevas);
-    } finally {
-      setAnularLoading(false);
-      setLoading(false);
-    }
-  }
-
-  async function abrirDevolver(venta) {
-    const data = await apiRequest(`/ventas/${venta.id}/`);
-    setDevolverVenta(data);
-    setDevolverMotivo("");
-
-    const prodDevueltos = data.productos_devueltos || {};
+  useEffect(() => {
+    if (!devolverVentaData?.detalles?.length) return;
+    const prodDevueltos = devolverVentaData.productos_devueltos || {};
     const sel = {};
     const cant = {};
     const rep = {};
     const ubi = {};
-    for (const d of data.detalles || []) {
+    for (const d of devolverVentaData.detalles) {
       const devuelto = prodDevueltos[d.producto] || 0;
       const disponible = d.cantidad - devuelto;
       sel[d.producto] = false;
       cant[d.producto] = disponible > 0 ? disponible : 1;
       rep[d.producto] = true;
-      ubi[d.producto] = ubicaciones.length > 0 ? String(ubicaciones[0].id) : "";
+      ubi[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
     }
     setDevolverSeleccion(sel);
     setDevolverCantidades(cant);
     setDevolverReponer(rep);
     setDevolverUbicacion(ubi);
-  }
+  }, [devolverVentaData, ubicacionesList]);
 
-  async function confirmarDevolver() {
-    if (!devolverMotivo.trim()) return;
-    setDevolverLoading(true);
-    try {
-      const devueltosMap = devolverVenta.productos_devueltos || {};
-      const productos = [];
-      for (const d of devolverVenta.detalles || []) {
-        if (!devolverSeleccion[d.producto]) continue;
-        const devuelto = devueltosMap[d.producto] || 0;
-        const maxDisp = d.cantidad - devuelto;
-        const cantidad = Math.min(devolverCantidades[d.producto] || 0, maxDisp);
-        if (cantidad <= 0) continue;
+  const syncURL = (t, p, ps) => {
+    setSearchParams({ tab: t, page: String(p), page_size: String(ps) }, { replace: true });
+  };
 
-        const item = {
-          producto_id: d.producto,
-          cantidad,
-          reponer_stock: devolverReponer[d.producto],
-        };
-        if (item.reponer_stock) {
-          item.ubicacion_id = parseInt(devolverUbicacion[d.producto]);
-        }
-        productos.push(item);
-      }
-      if (productos.length === 0) return;
-
-      await apiRequest(`/ventas/${devolverVenta.id}/devolver/`, {
-        method: "POST",
-        body: { motivo: devolverMotivo, productos },
-      });
-      setDevolverVenta(null);
-      setLoading(true);
-      const nuevas = await cargarTransacciones();
-      setTransacciones(nuevas);
-    } finally {
-      setDevolverLoading(false);
-      setLoading(false);
-    }
+  function handleTabChange(newTab) {
+    setTab(newTab);
+    setPage(1);
+    syncURL(newTab, 1, pageSize);
   }
 
   function handlePageChange(newPage) {
     setPage(newPage);
+    syncURL(tab, newPage, pageSize);
   }
 
   function handlePageSizeChange(newSize) {
     setPageSize(newSize);
     setPage(1);
+    syncURL(tab, 1, newSize);
   }
+
+  function abrirAnular(venta) {
+    setAnularVentaId(venta.id);
+    setAnularMotivo("");
+  }
+
+  function confirmarAnular() {
+    if (!anularMotivo.trim()) return;
+    const restauraciones = (anularVentaData?.detalles || []).map((d) => ({
+      producto_id: d.producto,
+      ubicacion_id: parseInt(anularUbicaciones[d.producto] || 0),
+      cantidad: anularCantidades[d.producto],
+    }));
+    anularMutation.mutate(
+      { ventaId: anularVentaId, motivo: anularMotivo, restauraciones },
+      { onSuccess: () => setAnularVentaId(null) },
+    );
+  }
+
+  function abrirDevolver(venta) {
+    setDevolverVentaId(venta.id);
+    setDevolverMotivo("");
+  }
+
+  function confirmarDevolver() {
+    if (!devolverMotivo.trim()) return;
+    const devueltosMap = devolverVentaData?.productos_devueltos || {};
+    const productos = [];
+    for (const d of devolverVentaData?.detalles || []) {
+      if (!devolverSeleccion[d.producto]) continue;
+      const devuelto = devueltosMap[d.producto] || 0;
+      const maxDisp = d.cantidad - devuelto;
+      const cantidad = Math.min(devolverCantidades[d.producto] || 0, maxDisp);
+      if (cantidad <= 0) continue;
+      const item = { producto_id: d.producto, cantidad, reponer_stock: devolverReponer[d.producto] };
+      if (item.reponer_stock) {
+        item.ubicacion_id = parseInt(devolverUbicacion[d.producto] || 0);
+      }
+      productos.push(item);
+    }
+    if (productos.length === 0) return;
+    devolverMutation.mutate(
+      { ventaId: devolverVentaId, motivo: devolverMotivo, productos },
+      { onSuccess: () => setDevolverVentaId(null) },
+    );
+  }
+
+  const closeAnularModal = () => setAnularVentaId(null);
+  const closeDevolverModal = () => setDevolverVentaId(null);
+  const anularDisabled = anularMutation.isPending;
 
   return (
     <>
       <PageCard title="Historial de ventas">
         <div className="page-actions">
-          <select
-            className="form-control"
-            value={tipoFilter}
-            onChange={(e) => {
-              setTipoFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="todos">Todos</option>
-            <option value="venta">Venta</option>
-            <option value="devolucion">Devolución</option>
-          </select>
-          <input
-            className="form-control"
-            placeholder="Buscar por ID..."
-            value={searchId}
-            onChange={(e) => {
-              setSearchId(e.target.value);
-              setPage(1);
-            }}
-            onKeyDown={(e) => e.key === "Enter" && setSearchId(e.target.value)}
-          />
-        </div>
-        {hayMasDatos && (
-          <div className="alert alert-info mb-3">
-            Se muestran las transacciones más recientes. Use el filtro por tipo o ID para refinar.
+          <div className="btn-group">
+            <button
+              className={`btn btn-sm ${tab === "ventas" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => handleTabChange("ventas")}
+            >
+              Ventas
+            </button>
+            <button
+              className={`btn btn-sm ${tab === "devoluciones" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => handleTabChange("devoluciones")}
+            >
+              Devoluciones
+            </button>
           </div>
-        )}
+        </div>
         <div className="table-responsive">
           <table className="table table-sm table-bordered">
             <thead>
               <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan="7" className="text-center text-muted">Cargando...</td></tr>
-              ) : paginadas.map((t) => (
-                <tr key={`${t._tipo}-${t.id}`} className={t._tipo === "devolucion" ? "table-warning" : ""}>
-                  <td>
-                    {t._tipo === "devolucion" ? `D#${t.id}` : t.id}
-                  </td>
-                  <td>{t._fecha}</td>
-                  <td>{t.usuario}</td>
-                  <td style={{ color: t._tipo === "devolucion" ? "var(--color-danger, #d32f2f)" : undefined }}>
-                    {t._tipo === "devolucion" ? "-" : ""}${t.monto}
-                  </td>
-                  <td>
-                    {t._tipo === "devolucion" ? (
-                      <span className="badge badge-warning">Devolución</span>
-                    ) : (
-                      t.tipo
-                    )}
-                  </td>
-                  <td>{t.estado}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {t._tipo === "venta" ? (
-                      <>
-                        <button className="btn btn-sm btn-info me-1" onClick={() => verVenta(t.id)}>Ver</button>
-                        {esAdmin && t.raw.estado === "CO" && t.raw.tipo_documento === "VE" && (
+              {tab === "ventas"
+                ? rows.map((v) => (
+                    <tr key={v.id}>
+                      <td>{v.id}</td>
+                      <td>{v.fecha_venta}</td>
+                      <td>{v.usuario_nombre}</td>
+                      <td>${v.monto_total}</td>
+                      <td>{v.tipo_documento_display || v.tipo_documento}</td>
+                      <td>{v.estado_display || v.estado}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
+                        {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
                           <>
-                            <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(t.raw)}>Anular</button>
-                            <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(t.raw)}>Devolver</button>
+                            <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
+                            <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
                           </>
                         )}
-                      </>
-                    ) : (
-                      <button className="btn btn-sm btn-info" onClick={() => verDevolucion(t.id)}>Ver</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!loading && paginadas.length === 0 && (
+                      </td>
+                    </tr>
+                  ))
+                : rows.map((d) => (
+                    <tr key={d.id} className="table-warning">
+                      <td>D#{d.id}</td>
+                      <td>{d.fecha_devolucion}</td>
+                      <td>{d.usuario_nombre}</td>
+                      <td style={{ color: "var(--danger)" }}>-${d.monto_devuelto}</td>
+                      <td><span className="badge badge-warning">Devolución</span></td>
+                      <td>—</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="btn btn-sm btn-info" onClick={() => setDetalleDevolucionId(d.id)}>Ver</button>
+                      </td>
+                    </tr>
+                  ))}
+              {rows.length === 0 && (
                 <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
               )}
             </tbody>
@@ -330,37 +229,29 @@ export default function PedidosPage() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
           <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
-          <Pagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            count={totalCount}
-            pageSize={pageSize}
-          />
+          <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
         </div>
       </PageCard>
 
-      {detalleVenta && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetalleVenta(null)}>
+      {detalleVentaId && detalleVentaData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetalleVentaId(null)}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Detalle de venta #{detalleVenta.id}</h5>
-                <button type="button" className="modal-close" onClick={() => setDetalleVenta(null)}>&times;</button>
+                <h5 className="modal-title">Detalle de venta #{detalleVentaData.id}</h5>
+                <button type="button" className="modal-close" onClick={() => setDetalleVentaId(null)}>&times;</button>
               </div>
               <div className="modal-body">
                 <div className="row mb-4">
-                  <div className="col-md-4"><strong>Fecha:</strong> {detalleVenta.fecha_venta}</div>
-                  <div className="col-md-4"><strong>Usuario:</strong> {detalleVenta.usuario_nombre}</div>
-                  <div className="col-md-4"><strong>Tipo:</strong> {detalleVenta.tipo_documento_display || detalleVenta.tipo_documento}</div>
+                  <div className="col-md-4"><strong>Fecha:</strong> {detalleVentaData.fecha_venta}</div>
+                  <div className="col-md-4"><strong>Usuario:</strong> {detalleVentaData.usuario_nombre}</div>
+                  <div className="col-md-4"><strong>Tipo:</strong> {detalleVentaData.tipo_documento_display || detalleVentaData.tipo_documento}</div>
                 </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr>
-                    </thead>
+                    <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>
                     <tbody>
-                      {(detalleVenta.detalles || []).map((d) => (
+                      {(detalleVentaData.detalles || []).map((d) => (
                         <tr key={d.id}>
                           <td>{d.codigo_producto}</td><td>{d.producto_nombre}</td><td>{d.cantidad}</td>
                           <td>${d.precio_unitario}</td><td>${d.subtotal}</td>
@@ -369,80 +260,71 @@ export default function PedidosPage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="text-right mt-4 text-lg font-bold">Total: ${detalleVenta.monto_total}</div>
+                <div className="text-right mt-4 text-lg font-bold">Total: ${detalleVentaData.monto_total}</div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDetalleVenta(null)}>Cerrar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setDetalleVentaId(null)}>Cerrar</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {detalleDevolucion && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetalleDevolucion(null)}>
+      {detalleDevolucionId && detalleDevolucionData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetalleDevolucionId(null)}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Detalle de devolución #{detalleDevolucion.id}</h5>
-                <button type="button" className="modal-close" onClick={() => setDetalleDevolucion(null)}>&times;</button>
+                <h5 className="modal-title">Detalle de devolución #{detalleDevolucionData.id}</h5>
+                <button type="button" className="modal-close" onClick={() => setDetalleDevolucionId(null)}>&times;</button>
               </div>
               <div className="modal-body">
                 <div className="row mb-4">
-                  <div className="col-md-4"><strong>Fecha:</strong> {detalleDevolucion.fecha_devolucion}</div>
-                  <div className="col-md-4"><strong>Usuario:</strong> {detalleDevolucion.usuario_nombre}</div>
-                  <div className="col-md-4"><strong>Venta original:</strong> #{detalleDevolucion.venta}</div>
+                  <div className="col-md-4"><strong>Fecha:</strong> {detalleDevolucionData.fecha_devolucion}</div>
+                  <div className="col-md-4"><strong>Usuario:</strong> {detalleDevolucionData.usuario_nombre}</div>
+                  <div className="col-md-4"><strong>Venta original:</strong> #{detalleDevolucionData.venta}</div>
                 </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Repuso stock</th></tr>
-                    </thead>
+                    <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Repuso stock</th></tr></thead>
                     <tbody>
-                      {(detalleDevolucion.detalles || []).map((d) => (
+                      {(detalleDevolucionData.detalles || []).map((d) => (
                         <tr key={d.id}>
-                          <td>{d.codigo_producto}</td>
-                          <td>{d.producto_nombre}</td>
-                          <td>{d.cantidad}</td>
+                          <td>{d.codigo_producto}</td><td>{d.producto_nombre}</td><td>{d.cantidad}</td>
                           <td>{d.reponer_stock ? "Sí" : "No"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {detalleDevolucion.motivo && (
-                  <div className="mt-3">
-                    <strong>Motivo:</strong>
-                    <p className="mb-0">{detalleDevolucion.motivo}</p>
-                  </div>
+                {detalleDevolucionData.motivo && (
+                  <div className="mt-3"><strong>Motivo:</strong><p className="mb-0">{detalleDevolucionData.motivo}</p></div>
                 )}
-                <div className="text-right mt-4 text-lg font-bold">Total devuelto: ${detalleDevolucion.monto_devuelto}</div>
+                <div className="text-right mt-4 text-lg font-bold">Total devuelto: ${detalleDevolucionData.monto_devuelto}</div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDetalleDevolucion(null)}>Cerrar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setDetalleDevolucionId(null)}>Cerrar</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {anularVenta && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setAnularVenta(null)}>
+      {anularVentaId && anularVentaData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && closeAnularModal()}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Anular venta #{anularVenta.id}</h5>
-                <button type="button" className="modal-close" onClick={() => setAnularVenta(null)} disabled={anularLoading}>&times;</button>
+                <h5 className="modal-title">Anular venta #{anularVentaData.id}</h5>
+                <button type="button" className="modal-close" onClick={closeAnularModal} disabled={anularDisabled}>&times;</button>
               </div>
               <div className="modal-body">
                 <p className="mb-3">Se repondrá el stock de los siguientes productos. Seleccione la ubicación de reposición:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Código</th><th>Producto</th><th>Cantidad vendida</th><th>Ubicación reposición</th></tr>
-                    </thead>
+                    <thead><tr><th>Código</th><th>Producto</th><th>Cantidad vendida</th><th>Ubicación reposición</th></tr></thead>
                     <tbody>
-                      {(anularVenta.detalles || []).map((d) => (
+                      {(anularVentaData.detalles || []).map((d) => (
                         <tr key={d.producto}>
                           <td>{d.codigo_producto}</td>
                           <td>{d.producto_nombre}</td>
@@ -452,9 +334,9 @@ export default function PedidosPage() {
                               className="form-control form-control-sm"
                               value={anularUbicaciones[d.producto] || ""}
                               onChange={(e) => setAnularUbicaciones({ ...anularUbicaciones, [d.producto]: e.target.value })}
-                              disabled={anularLoading}
+                              disabled={anularDisabled}
                             >
-                              {ubicaciones.map((u) => (
+                              {ubicacionesList.map((u) => (
                                 <option key={u.id} value={u.id}>{u.nombre}</option>
                               ))}
                             </select>
@@ -466,20 +348,15 @@ export default function PedidosPage() {
                 </div>
                 <div className="form-group mt-3">
                   <label className="font-weight-bold">Motivo de anulación:</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={anularMotivo}
+                  <textarea className="form-control" rows="3" value={anularMotivo}
                     onChange={(e) => setAnularMotivo(e.target.value)}
-                    placeholder="Describa el motivo de la anulación..."
-                    disabled={anularLoading}
-                  />
+                    placeholder="Describa el motivo de la anulación..." disabled={anularDisabled} />
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setAnularVenta(null)} disabled={anularLoading}>Cancelar</button>
-                <button type="button" className="btn btn-danger" onClick={confirmarAnular} disabled={anularLoading || !anularMotivo.trim()}>
-                  {anularLoading ? "Anulando..." : "Confirmar anulación"}
+                <button type="button" className="btn btn-secondary" onClick={closeAnularModal} disabled={anularDisabled}>Cancelar</button>
+                <button type="button" className="btn btn-danger" onClick={confirmarAnular} disabled={anularDisabled || !anularMotivo.trim()}>
+                  {anularDisabled ? "Anulando..." : "Confirmar anulación"}
                 </button>
               </div>
             </div>
@@ -487,71 +364,37 @@ export default function PedidosPage() {
         </div>
       )}
 
-      {devolverVenta && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDevolverVenta(null)}>
+      {devolverVentaId && devolverVentaData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && closeDevolverModal()}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Devolver productos — venta #{devolverVenta.id}</h5>
-                <button type="button" className="modal-close" onClick={() => setDevolverVenta(null)} disabled={devolverLoading}>&times;</button>
+                <h5 className="modal-title">Devolver productos — venta #{devolverVentaData.id}</h5>
+                <button type="button" className="modal-close" onClick={closeDevolverModal} disabled={devolverMutation.isPending}>&times;</button>
               </div>
               <div className="modal-body">
                 <p className="mb-3">Seleccione los productos a devolver y si se repone el stock:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Cant. a devolver</th><th>Reponer stock</th><th>Ubicación</th></tr>
-                    </thead>
+                    <thead><tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Cant. a devolver</th><th>Reponer stock</th><th>Ubicación</th></tr></thead>
                     <tbody>
-                      {(devolverVenta.detalles || []).map((d) => {
-                        const devuelto = (devolverVenta.productos_devueltos || {})[d.producto] || 0;
+                      {(devolverVentaData.detalles || []).map((d) => {
+                        const devuelto = (devolverVentaData.productos_devueltos || {})[d.producto] || 0;
                         const disponible = d.cantidad - devuelto;
                         if (disponible <= 0) return null;
-                        const seleccionado = devolverSeleccion[d.producto] || false;
+                        const sel = devolverSeleccion[d.producto] || false;
                         return (
                           <tr key={d.producto}>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={seleccionado}
-                                onChange={(e) => setDevolverSeleccion({ ...devolverSeleccion, [d.producto]: e.target.checked })}
-                                disabled={devolverLoading}
-                              />
-                            </td>
+                            <td><input type="checkbox" checked={sel} onChange={(e) => setDevolverSeleccion({ ...devolverSeleccion, [d.producto]: e.target.checked })} disabled={devolverMutation.isPending} /></td>
                             <td>{d.codigo_producto}</td>
                             <td>{d.producto_nombre}</td>
                             <td>{d.cantidad}</td>
                             <td>{disponible}</td>
+                            <td><input type="number" className="form-control form-control-sm" style={{ width: 70 }} min="1" max={disponible} value={devolverCantidades[d.producto] || 1} onChange={(e) => setDevolverCantidades({ ...devolverCantidades, [d.producto]: parseInt(e.target.value) || 0 })} disabled={!sel || devolverMutation.isPending} /></td>
+                            <td><input type="checkbox" checked={devolverReponer[d.producto] !== false} onChange={(e) => setDevolverReponer({ ...devolverReponer, [d.producto]: e.target.checked })} disabled={!sel || devolverMutation.isPending} /></td>
                             <td>
-                              <input
-                                type="number"
-                                className="form-control form-control-sm"
-                                style={{ width: 70 }}
-                                min="1"
-                                max={disponible}
-                                value={devolverCantidades[d.producto] || 1}
-                                onChange={(e) => setDevolverCantidades({ ...devolverCantidades, [d.producto]: parseInt(e.target.value) || 0 })}
-                                disabled={!seleccionado || devolverLoading}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={devolverReponer[d.producto] !== false}
-                                onChange={(e) => setDevolverReponer({ ...devolverReponer, [d.producto]: e.target.checked })}
-                                disabled={!seleccionado || devolverLoading}
-                              />
-                            </td>
-                            <td>
-                              <select
-                                className="form-control form-control-sm"
-                                value={devolverUbicacion[d.producto] || ""}
-                                onChange={(e) => setDevolverUbicacion({ ...devolverUbicacion, [d.producto]: e.target.value })}
-                                disabled={!seleccionado || devolverReponer[d.producto] === false || devolverLoading}
-                              >
-                                {ubicaciones.map((u) => (
-                                  <option key={u.id} value={u.id}>{u.nombre}</option>
-                                ))}
+                              <select className="form-control form-control-sm" value={devolverUbicacion[d.producto] || ""} onChange={(e) => setDevolverUbicacion({ ...devolverUbicacion, [d.producto]: e.target.value })} disabled={!sel || devolverReponer[d.producto] === false || devolverMutation.isPending}>
+                                {ubicacionesList.map((u) => (<option key={u.id} value={u.id}>{u.nombre}</option>))}
                               </select>
                             </td>
                           </tr>
@@ -562,20 +405,13 @@ export default function PedidosPage() {
                 </div>
                 <div className="form-group mt-3">
                   <label className="font-weight-bold">Motivo de devolución:</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    value={devolverMotivo}
-                    onChange={(e) => setDevolverMotivo(e.target.value)}
-                    placeholder="Describa el motivo de la devolución..."
-                    disabled={devolverLoading}
-                  />
+                  <textarea className="form-control" rows="3" value={devolverMotivo} onChange={(e) => setDevolverMotivo(e.target.value)} placeholder="Describa el motivo de la devolución..." disabled={devolverMutation.isPending} />
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDevolverVenta(null)} disabled={devolverLoading}>Cancelar</button>
-                <button type="button" className="btn btn-warning" onClick={confirmarDevolver} disabled={devolverLoading || !devolverMotivo.trim()}>
-                  {devolverLoading ? "Procesando..." : "Confirmar devolución"}
+                <button type="button" className="btn btn-secondary" onClick={closeDevolverModal} disabled={devolverMutation.isPending}>Cancelar</button>
+                <button type="button" className="btn btn-warning" onClick={confirmarDevolver} disabled={devolverMutation.isPending || !devolverMotivo.trim()}>
+                  {devolverMutation.isPending ? "Procesando..." : "Confirmar devolución"}
                 </button>
               </div>
             </div>

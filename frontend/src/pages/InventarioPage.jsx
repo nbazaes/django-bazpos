@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest, buildQuery } from "../lib/api";
+import { useProductos } from "../lib/queries";
 
 function UbicacionCell({ ubicaciones }) {
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
@@ -44,35 +44,17 @@ export default function InventarioPage() {
   usePageTitle("Inventario");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [productos, setProductos] = useState([]);
   const [texto, setTexto] = useState(searchParams.get("texto") || "");
-  const [count, setCount] = useState(0);
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const debounceRef = useRef(null);
 
+  const params = { texto, page, page_size: pageSize };
+  const { data, isFetching } = useProductos(params);
+
+  const productos = data?.results ?? [];
+  const count = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
-
-  async function load(targetPage = page, targetPageSize = pageSize, targetTexto = texto) {
-    const safePage = Math.max(1, Math.min(targetPage, totalPages || 1));
-    if (safePage !== page) setPage(safePage);
-    const params = {
-      texto: targetTexto,
-      page: safePage,
-      page_size: targetPageSize,
-    };
-    const data = await apiRequest(`/productos/${buildQuery(params)}`);
-    setProductos(data.results || []);
-    setCount(data.count || 0);
-
-    setSearchParams(
-      {
-        ...(targetTexto ? { texto: targetTexto } : {}),
-        page: String(safePage),
-        page_size: String(targetPageSize),
-      },
-      { replace: true }
-    );
-  }
 
   useEffect(() => {
     const urlTexto = searchParams.get("texto") || "";
@@ -84,59 +66,68 @@ export default function InventarioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      load();
-    }, 300);
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [texto, page, pageSize]);
+  const syncURL = (t, p, ps) => {
+    setSearchParams(
+      { ...(t ? { texto: t } : {}), page: String(p), page_size: String(ps) },
+      { replace: true },
+    );
+  };
 
   function handleTextoChange(value) {
     setTexto(value);
     setPage(1);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      syncURL(value, 1, pageSize);
+    }, 300);
   }
 
   function handlePageChange(newPage) {
     setPage(newPage);
+    syncURL(texto, newPage, pageSize);
   }
 
   function handlePageSizeChange(newSize) {
     setPageSize(newSize);
     setPage(1);
+    syncURL(texto, 1, newSize);
   }
 
   return (
-    <>
-      <PageCard title="Inventario actual">
-        <div className="page-actions">
-          <input
-            className="form-control"
-            placeholder="Buscar por nombre, código u OEM"
-            value={texto}
-            onChange={(e) => handleTextoChange(e.target.value)}
-          />
-          <button className="btn btn-primary" onClick={() => { setPage(1); load(1, pageSize, texto); }}>
-            Buscar
-          </button>
-        </div>
-        <div className="table-responsive">
-          <table className="table table-sm table-bordered">
-            <thead>
-              <tr>
-                <th style={{ width: "1px" }}>Código</th>
-                <th style={{ width: "1px" }}>OEM</th>
-                <th>Nombre</th>
-                <th>Marca</th>
-                <th>Descripción</th>
-                <th style={{ width: "1px" }}>Stock actual</th>
-                <th>Ubicación</th>
-                <th style={{ width: "1px" }}>Stock min</th>
-                <th style={{ width: "1px" }}>Stock max</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productos.map((p) => (
+    <PageCard title="Inventario actual">
+      <div className="page-actions">
+        <input
+          className="form-control"
+          placeholder="Buscar por nombre, código u OEM"
+          value={texto}
+          onChange={(e) => handleTextoChange(e.target.value)}
+        />
+        <button className="btn btn-primary" onClick={() => { setPage(1); syncURL(texto, 1, pageSize); }}>
+          Buscar
+        </button>
+      </div>
+      <div className="table-responsive">
+        <table className="table table-sm table-bordered">
+          <thead>
+            <tr>
+              <th style={{ width: "1px" }}>Código</th>
+              <th style={{ width: "1px" }}>OEM</th>
+              <th>Nombre</th>
+              <th>Marca</th>
+              <th>Descripción</th>
+              <th style={{ width: "1px" }}>Stock actual</th>
+              <th>Ubicación</th>
+              <th style={{ width: "1px" }}>Stock min</th>
+              <th style={{ width: "1px" }}>Stock max</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isFetching && !productos.length ? (
+              <tr><td colSpan="9" className="text-center text-muted">Cargando...</td></tr>
+            ) : productos.length === 0 ? (
+              <tr><td colSpan="9" className="text-center text-muted">No hay registros</td></tr>
+            ) : (
+              productos.map((p) => (
                 <tr key={p.producto_id}>
                   <td className="text-nowrap">{p.codigo_producto}</td>
                   <td className="text-nowrap">{p.oem}</td>
@@ -148,21 +139,21 @@ export default function InventarioPage() {
                   <td>{p.stock_minimo}</td>
                   <td>{p.stock_maximo}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            count={count}
-            pageSize={pageSize}
-          />
-        </div>
-      </PageCard>
-    </>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          count={count}
+          pageSize={pageSize}
+        />
+      </div>
+    </PageCard>
   );
 }

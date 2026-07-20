@@ -1,9 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest } from "../lib/api";
-import { fetchTaxPercent, getTaxPercent } from "../lib/tax";
+import {
+  useCreateFactura,
+  useFactura,
+  useImpuesto,
+  useBuscarProductoFactura,
+  useProveedores,
+  useUpdateFactura,
+} from "../lib/queries";
 
 function todayLocal() {
   const now = new Date();
@@ -17,88 +23,91 @@ export default function FacturaFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   usePageTitle(id ? "Editar factura" : "Crear factura");
-  const [proveedores, setProveedores] = useState([]);
+
   const [header, setHeader] = useState({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
   const [productoId, setProductoId] = useState("");
+  const [searchCodigo, setSearchCodigo] = useState("");
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
   const [createUrl, setCreateUrl] = useState("");
-  const [taxPercent, setTaxPercent] = useState(getTaxPercent());
+
+  const { data: proveedoresData } = useProveedores({ page_size: 200 });
+  const { data: facturaData } = useFactura(id);
+  const { data: impuestoData } = useImpuesto();
+  const { data: productoSearchData, isFetching: buscandoProducto } = useBuscarProductoFactura(searchCodigo);
+  const createMutation = useCreateFactura();
+  const updateMutation = useUpdateFactura();
+
+  useEffect(() => {
+    if (!searchCodigo || buscandoProducto) return;
+    if (!productoSearchData) return;
+    if (productoSearchData.encontrado) {
+      const p = productoSearchData.producto;
+      setItems((prev) => [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1 }]);
+      setProductoId("");
+      setSearchCodigo("");
+      setError("");
+    } else {
+      setShowCreatePrompt(true);
+      setError("Producto no encontrado");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoSearchData, buscandoProducto]);
+
+  const proveedores = proveedoresData?.results ?? [];
+  const taxPercent = impuestoData?.tax_percent ?? 0;
   const totalFactura = items.reduce((sum, it) => sum + Number(it.precio || 0) * Number(it.cantidad || 0), 0);
   const totalFacturaConIva = Math.round(totalFactura * (1 + taxPercent / 100));
 
   useEffect(() => {
-    fetchTaxPercent().then((p) => setTaxPercent(p));
-    function handleProductCreated(event) {
-      const payload = event.data;
-      if (!payload || payload.type !== "PRODUCT_CREATED" || !payload.producto) return;
-      const p = payload.producto;
-      setItems((prev) => {
-        const exists = prev.find((it) => it.producto_id === p.producto_id);
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            producto_id: p.producto_id,
-            codigo_producto: p.codigo_producto,
-            nombre: p.nombre,
-            precio: p.precio_costo,
-            cantidad: 1,
-          },
-        ];
+    if (facturaData && id) {
+      setHeader({
+        numero_factura: facturaData.numero_factura,
+        proveedor_id: facturaData.proveedor,
+        fecha: facturaData.fecha,
       });
-      setProductoId("");
-      setError("");
-      setShowCreatedSuccess(true);
-      setTimeout(() => {
-        setShowCreatedSuccess(false);
-        setShowCreateModal(false);
-      }, 1200);
+      setItems(
+        (facturaData.detalles || []).map((d) => ({
+          producto_id: d.producto,
+          codigo_producto: d.codigo_producto,
+          nombre: d.nombre,
+          precio: d.costo_compra,
+          cantidad: d.cantidad,
+        }))
+      );
     }
+  }, [facturaData, id]);
 
-    window.addEventListener("message", handleProductCreated);
-    return () => window.removeEventListener("message", handleProductCreated);
+  const handleProductCreated = useCallback((event) => {
+    const payload = event.data;
+    if (!payload || payload.type !== "PRODUCT_CREATED" || !payload.producto) return;
+    const p = payload.producto;
+    setItems((prev) => {
+      const exists = prev.find((it) => it.producto_id === p.producto_id);
+      if (exists) return prev;
+      return [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1 }];
+    });
+    setProductoId("");
+    setError("");
+    setShowCreatedSuccess(true);
+    setTimeout(() => {
+      setShowCreatedSuccess(false);
+      setShowCreateModal(false);
+    }, 1200);
   }, []);
 
   useEffect(() => {
-    apiRequest("/proveedores/").then(setProveedores).catch((err) => setError(err.message));
-    if (id) {
-      apiRequest(`/facturas/${id}/`).then((data) => {
-        setHeader({
-          numero_factura: data.numero_factura,
-          proveedor_id: data.proveedor,
-          fecha: data.fecha,
-        });
-        setItems(
-          (data.detalles || []).map((d) => ({
-            producto_id: d.producto,
-            codigo_producto: d.codigo_producto,
-            nombre: d.nombre,
-            precio: d.costo_compra,
-            cantidad: d.cantidad,
-          }))
-        );
-      });
-    }
-  }, [id]);
+    window.addEventListener("message", handleProductCreated);
+    return () => window.removeEventListener("message", handleProductCreated);
+  }, [handleProductCreated]);
 
-  async function buscarProducto() {
-    try {
-      const result = await apiRequest(`/facturas/buscar-producto/?codigo_producto=${encodeURIComponent(productoId)}`);
-      if (!result.encontrado) {
-        setShowCreatePrompt(true);
-        setError("Producto no encontrado");
-        return;
-      }
-      setItems([...items, { producto_id: result.producto.producto_id, codigo_producto: result.producto.codigo_producto, nombre: result.producto.nombre, precio: result.producto.precio_costo, cantidad: 1 }]);
-      setProductoId("");
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
+  function buscarProducto() {
+    const codigo = productoId.trim();
+    if (!codigo) return;
+    setSearchCodigo(codigo);
   }
 
   function abrirCrearProducto() {
@@ -112,21 +121,23 @@ export default function FacturaFormPage() {
     setShowCreateModal(true);
   }
 
-  async function guardar(event) {
+  function guardar(event) {
     event.preventDefault();
+    setError("");
     const payload = {
       numero_factura: Number(header.numero_factura),
       proveedor_id: Number(header.proveedor_id),
       fecha: header.fecha,
       productos: items.map((it) => ({ producto_id: Number(it.producto_id), precio: Number(it.precio), cantidad: Number(it.cantidad) })),
     };
-    try {
-      await apiRequest(id ? `/facturas/${id}/` : "/facturas/", { method: id ? "PUT" : "POST", body: payload });
-      navigate("/facturas");
-    } catch (err) {
-      setError(err.message);
-    }
+    const mutation = id ? updateMutation : createMutation;
+    mutation.mutate(id ? { id, data: payload } : payload, {
+      onSuccess: () => navigate("/facturas"),
+      onError: (err) => setError(err.message),
+    });
   }
+
+  const saving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <>
@@ -141,7 +152,9 @@ export default function FacturaFormPage() {
 
           <div className="page-actions">
             <input className="form-control" style={{ maxWidth: 260 }} placeholder="Código producto" value={productoId} onChange={(e) => setProductoId(e.target.value)} />
-            <button type="button" className="btn btn-secondary" onClick={buscarProducto}>Agregar producto</button>
+            <button type="button" className="btn btn-secondary" onClick={buscarProducto}>
+              {buscandoProducto ? "Buscando..." : "Agregar producto"}
+            </button>
           </div>
 
           <div className="table-responsive">
@@ -169,7 +182,9 @@ export default function FacturaFormPage() {
             </div>
           </div>
 
-          <button className="btn btn-primary" type="submit">Guardar factura</button>
+          <button className="btn btn-primary" type="submit" disabled={saving}>
+            {saving ? "Guardando..." : "Guardar factura"}
+          </button>
         </form>
       </PageCard>
 
@@ -214,7 +229,7 @@ export default function FacturaFormPage() {
           <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
               <div className="modal-body text-center py-5">
-                <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>✓</div>
+                <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>&#10003;</div>
                 <h5 className="mb-0">Producto creado con éxito</h5>
               </div>
             </div>

@@ -1,106 +1,103 @@
-import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import JsBarcode from "jsbarcode";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
+import Pagination from "../components/Pagination";
+import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
-import { apiRequest } from "../lib/api";
-import { applyTax, fetchTaxPercent, getTaxPercent } from "../lib/tax";
+import { useDeleteFactura, useFactura, useFacturas, useImpuesto } from "../lib/queries";
+import { applyTax } from "../lib/tax";
+
+function imprimirEtiquetas(factura) {
+  const labels = [];
+  for (const d of factura.detalles) {
+    for (let i = 0; i < d.cantidad; i++) {
+      const canvas = document.createElement("canvas");
+      JsBarcode(canvas, d.codigo_producto, {
+        format: "CODE128", width: 2, height: 40, displayValue: false, margin: 3,
+      });
+      labels.push({
+        codigo: d.codigo_producto,
+        nombre: d.nombre,
+        dataUrl: canvas.toDataURL("image/png"),
+      });
+    }
+  }
+
+  const win = window.open("", "_blank", "width=800,height=600");
+  if (!win) return;
+
+  win.document.write(`
+    <html><head><title>Etiquetas factura #${factura.numero_factura}</title>
+    <style>
+      @page { margin: 8mm; }
+      body { font-family: monospace; margin: 0; padding: 0; }
+      .labels { display: flex; flex-wrap: wrap; gap: 3mm; justify-content: flex-start; padding: 2mm; }
+      .label { width: 30mm; min-height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; border: 1px dashed #ccc; padding: 2mm; box-sizing: border-box; }
+      .label img { max-width: 28mm; max-height: 12mm; }
+      .label .nombre { font-size: 7px; margin-top: 1mm; text-align: center; line-height: 1.1; }
+      .label .codigo { font-size: 6px; margin-top: 0.5mm; word-break: break-all; text-align: center; }
+      @media print { .label { border-color: transparent; } }
+    </style></head><body>
+    <div class="labels">
+      ${labels.map((l) => `
+        <div class="label">
+          <img src="${l.dataUrl}" alt="${l.codigo}" />
+          <span class="nombre">${l.nombre}</span>
+          <span class="codigo">${l.codigo}</span>
+        </div>
+      `).join("")}
+    </div>
+    </body></html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
 
 export default function FacturasPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Facturas");
-  const [rows, setRows] = useState([]);
-  const [detalle, setDetalle] = useState(null);
-  const [detalleError, setDetalleError] = useState("");
-  const [taxPercent, setTaxPercent] = useState(getTaxPercent());
 
-  async function load() {
-    setRows(await apiRequest("/facturas/"));
+  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
+  const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const [detalleId, setDetalleId] = useState(null);
+
+  const params = { page, page_size: pageSize };
+  const { data } = useFacturas(params);
+  const deleteMutation = useDeleteFactura();
+  const { data: impuestoData } = useImpuesto();
+  const { data: detalle } = useFactura(detalleId);
+
+  const taxPercent = impuestoData?.tax_percent ?? 0;
+  const rows = data?.results ?? [];
+  const count = data?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
+
+  const syncURL = (p, ps) => {
+    setSearchParams({ page: String(p), page_size: String(ps) }, { replace: true });
+  };
+
+  function handlePageChange(newPage) {
+    setPage(newPage);
+    syncURL(newPage, pageSize);
   }
 
-  useEffect(() => {
-    fetchTaxPercent().then((p) => setTaxPercent(p));
-    load();
-  }, []);
+  function handlePageSizeChange(newSize) {
+    setPageSize(newSize);
+    setPage(1);
+    syncURL(1, newSize);
+  }
 
-  async function onDelete(row) {
+  function onDelete(row) {
     if (!window.confirm(`Eliminar factura ${row.numero_factura}?`)) return;
-    await apiRequest(`/facturas/${row.id}/`, { method: "DELETE" });
-    await load();
+    deleteMutation.mutate(row.id);
   }
 
-  async function onView(row) {
-    try {
-      const data = await apiRequest(`/facturas/${row.id}/`);
-      setDetalle(data);
-      setDetalleError("");
-    } catch (err) {
-      setDetalleError(err.message);
-    }
-  }
-
-  function imprimirEtiquetas(factura) {
-    const labels = [];
-    for (const d of factura.detalles) {
-      for (let i = 0; i < d.cantidad; i++) {
-        const canvas = document.createElement("canvas");
-        JsBarcode(canvas, d.codigo_producto, {
-          format: "CODE128",
-          width: 2,
-          height: 40,
-          displayValue: false,
-          margin: 3,
-        });
-        labels.push({
-          codigo: d.codigo_producto,
-          nombre: d.nombre,
-          dataUrl: canvas.toDataURL("image/png"),
-        });
-      }
-    }
-
-    const win = window.open("", "_blank", "width=800,height=600");
-    if (!win) return;
-
-    win.document.write(`
-      <html>
-        <head>
-          <title>Etiquetas factura #${factura.numero_factura}</title>
-          <style>
-            @page { margin: 8mm; }
-            body { font-family: monospace; margin: 0; padding: 0; }
-            .labels { display: flex; flex-wrap: wrap; gap: 3mm; justify-content: flex-start; padding: 2mm; }
-            .label {
-              width: 30mm; min-height: 25mm;
-              display: flex; flex-direction: column;
-              align-items: center; justify-content: flex-end;
-              border: 1px dashed #ccc; padding: 2mm; box-sizing: border-box;
-            }
-            .label img { max-width: 28mm; max-height: 12mm; }
-            .label .nombre { font-size: 7px; margin-top: 1mm; text-align: center; line-height: 1.1; }
-            .label .codigo { font-size: 6px; margin-top: 0.5mm; word-break: break-all; text-align: center; }
-            @media print {
-              .label { border-color: transparent; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="labels">
-            ${labels.map((l) => `
-              <div class="label">
-                <img src="${l.dataUrl}" alt="${l.codigo}" />
-                <span class="nombre">${l.nombre}</span>
-                <span class="codigo">${l.codigo}</span>
-              </div>
-            `).join("")}
-          </div>
-        </body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+  function onView(row) {
+    setDetalleId(row.id);
   }
 
   return (
@@ -122,6 +119,16 @@ export default function FacturasPage() {
           onDelete={onDelete}
           onView={onView}
         />
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            count={count}
+            pageSize={pageSize}
+          />
+        </div>
       </PageCard>
 
       {detalle && (
@@ -130,7 +137,7 @@ export default function FacturasPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Detalle factura #{detalle.numero_factura}</h5>
-                <button type="button" className="modal-close" onClick={() => setDetalle(null)}>&times;</button>
+                <button type="button" className="modal-close" onClick={() => setDetalleId(null)}>&times;</button>
               </div>
               <div className="modal-body">
                 <div className="row mb-4">
@@ -169,15 +176,13 @@ export default function FacturasPage() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDetalle(null)}>Cerrar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setDetalleId(null)}>Cerrar</button>
                 <button type="button" className="btn btn-primary" onClick={() => imprimirEtiquetas(detalle)}>Imprimir etiquetas</button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {detalleError && <div className="alert alert-danger mt-4">{detalleError}</div>}
     </>
   );
 }
