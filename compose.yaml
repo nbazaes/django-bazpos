@@ -2,7 +2,7 @@ services:
   db:
     image: mariadb:12
     container_name: bazpos_db
-    restart: unless-stopped
+    restart: always
     env_file: .env
     volumes:
       - mysql_data:/var/lib/mysql
@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
+    restart: always
     env_file: .env
     volumes:
       - static_files:/app/staticfiles
