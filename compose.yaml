@@ -47,9 +47,11 @@ services:
     restart: unless-stopped
     ports:
       - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
     volumes:
       - static_files:/var/www/static:ro
       - media_files:/var/www/media:ro
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       app:
         condition: service_healthy

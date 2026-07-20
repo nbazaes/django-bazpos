@@ -68,6 +68,7 @@ docker-compose.override.yml
 credentials.json
 secrets/
 *.secret
+certs/
 
 # Otros
 *.swp

@@ -45,18 +45,27 @@ python manage.py create_admin
 - `GerenteGuard` (`frontend/src/guards.jsx:33`) wraps product/management routes — only Gerente and Encargado roles can access them.
 - `ProtectedRoute` calls `/auth/me/` on mount to validate the JWT on every protected route visit.
 
-## Production / LAN Deployment
+## Production / VPS Deployment
 - Production stack runs on a **single server** via Docker Compose: MariaDB container, Django + Gunicorn container, and nginx container. All services are isolated and can be scaled independently later.
-- The frontend SPA is built into the nginx container and served on port 80 from the same origin as the API. Client machines only need a browser and a Tailscale connection.
-- Backend is exposed through nginx (reverse proxy) on port 80. Gunicorn is not exposed directly.
+- The frontend SPA is built into the nginx container and served from the same origin as the API.
+- Backend is exposed through nginx (reverse proxy) on ports 80 and 443. Gunicorn is not exposed directly.
 - DB is inside a Docker container and reachable only on the internal Docker network — never exposed to the LAN or internet.
 - `DEBUG` is controlled via `DJANGO_DEBUG` env var. Settings.py reads it at line 37:
   `DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"`. Must be `False` in production.
-- For LAN/VPN deployment:
-  1. Install Tailscale on the server and enable Magic DNS.
-  2. Copy `.env.production.example` to `.env` and set real secrets, `DJANGO_SECRET_KEY`, and `DJANGO_ALLOWED_HOSTS` (include the Tailscale hostname, e.g., `bazpos-server.tailnet-name.ts.net`).
-  3. Run `docker compose up -d --build`.
-  4. On each client PC, open a browser and navigate to `http://<tailscale-hostname>`.
+
+### Cloudflare + HTTPS Setup
+1. On Cloudflare dashboard, point your domain's DNS A record to the VPS IP (orange cloud / proxied).
+2. SSL/TLS → Origin Server → Create Certificate. Generate a certificate for `*.yourdomain.com` and `yourdomain.com` (15-year validity, RSA).
+3. On the VPS, create the certs directory and save the files:
+   ```bash
+   mkdir certs
+   # Copy the Origin Certificate → certs/origin.pem
+   # Copy the Private Key → certs/origin.key
+   ```
+4. Set SSL/TLS encryption mode to **Full (strict)**.
+5. Copy `.env.production.example` to `.env`, fill in secrets, and set `DJANGO_ALLOWED_HOSTS` to include your domain.
+6. Run `docker compose up -d --build`.
+7. Access at `https://<your-domain>`.
 
 ## API
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
