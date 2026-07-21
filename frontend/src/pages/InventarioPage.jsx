@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
@@ -11,71 +11,87 @@ import { useProductos } from "../lib/queries";
 import { getUser, isBodeguero } from "../lib/auth";
 
 function StockPopover({ ubicaciones, triggerRef }) {
-  const [show, setShow] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: "0px", left: "0px" });
+  const [measured, setMeasured] = useState(false);
+  const popoverRef = useRef(null);
   const hideTimer = useRef(null);
+  const visibleRef = useRef(false);
+  const rafRef = useRef(null);
   const posRef = useRef({ top: 0, left: 0 });
-  const showRef = useRef(false);
 
   function calcPos() {
-    const el = triggerRef.current;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    if (!trigger || !popover) return;
+    const tr = trigger.getBoundingClientRect();
+    const pr = popover.getBoundingClientRect();
     return {
-      top: rect.top - 8,
-      left: rect.left + rect.width / 2,
+      top: tr.top - 8 - pr.height,
+      left: tr.left + tr.width / 2 - pr.width / 2,
     };
   }
 
-  function syncPos() {
+  function applyPos() {
     const p = calcPos();
     if (!p) return;
-    posRef.current = p;
-    setPos({ top: p.top + "px", left: p.left + "px" });
+    posRef.current = { top: p.top, left: p.left };
+    setPos({ top: Math.round(p.top) + "px", left: Math.round(p.left) + "px" });
   }
+
+  useLayoutEffect(() => {
+    if (visible && popoverRef.current) {
+      applyPos();
+      setMeasured(true);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setMeasured(false);
+      return;
+    }
+
+    function onScroll() {
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          if (visibleRef.current) applyPos();
+        });
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", applyPos);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", applyPos);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [visible]);
 
   function handleEnter() {
     clearTimeout(hideTimer.current);
-    if (!showRef.current) {
-      syncPos();
-      requestAnimationFrame(() => syncPos());
-      showRef.current = true;
-      setShow(true);
+    if (!visibleRef.current) {
+      visibleRef.current = true;
+      setVisible(true);
     }
   }
 
   function handleLeave() {
     clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => {
-      showRef.current = false;
-      setShow(false);
-    }, 200);
+      visibleRef.current = false;
+      setVisible(false);
+    }, 150);
   }
 
   useEffect(() => {
     return () => {
       clearTimeout(hideTimer.current);
-      showRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!show) return;
-
-    function onUpdate() {
-      const p = calcPos();
-      if (!p) return;
-      posRef.current = p;
-      setPos({ top: p.top + "px", left: p.left + "px" });
-    }
-
-    window.addEventListener("scroll", onUpdate, true);
-    window.addEventListener("resize", onUpdate);
-    return () => {
-      window.removeEventListener("scroll", onUpdate, true);
-      window.removeEventListener("resize", onUpdate);
-    };
-  }, [show]);
 
   return (
     <>
@@ -87,9 +103,10 @@ function StockPopover({ ubicaciones, triggerRef }) {
       >
         Múltiples
       </span>
-      {show && createPortal(
+      {createPortal(
         <div
-          className="stock-popover-portal"
+          ref={popoverRef}
+          className={"stock-popover-portal" + (measured ? " shown" : "")}
           style={{ top: pos.top, left: pos.left }}
           onMouseEnter={handleEnter}
           onMouseLeave={handleLeave}

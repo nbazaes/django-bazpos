@@ -921,7 +921,6 @@ textarea.form-control, textarea.input {
 
 .stock-popover-portal {
   position: fixed;
-  transform: translate(-50%, -100%);
   z-index: 1060;
   background: var(--bg-elevated);
   border: 1px solid var(--border-light);
@@ -930,6 +929,14 @@ textarea.form-control, textarea.input {
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
   min-width: 180px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.stock-popover-portal.shown {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .popover-row {
