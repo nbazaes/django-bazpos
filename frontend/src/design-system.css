@@ -911,51 +911,6 @@ textarea.form-control, textarea.input {
   .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
 }
 
-/* ====== STOCK POPOVER ====== */
-.stock-hover {
-  display: inline-block;
-  cursor: pointer;
-  border-bottom: 1px dashed var(--text-muted);
-  color: var(--text-primary);
-}
-
-.stock-popover-portal {
-  position: fixed;
-  z-index: 1060;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 8px 14px;
-  white-space: nowrap;
-  box-shadow: var(--shadow-lg);
-  min-width: 180px;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-  pointer-events: none;
-}
-
-.stock-popover-portal.shown {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.popover-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 3px 0;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-}
-
-.popover-row strong { color: var(--text-primary); font-family: var(--font-mono); }
-
-.popover-row + .popover-row {
-  border-top: 1px solid var(--border-default);
-  padding-top: 5px;
-  margin-top: 3px;
-}
-
 /* ====== UBI CATION RESPONSIVE ====== */
 .ubicacion-mobile { display: none; }
 

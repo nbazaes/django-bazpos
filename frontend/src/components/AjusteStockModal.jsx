@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAjustarStock, useUbicaciones } from "../lib/queries";
 
-function formatDate(date) {
-  const d = new Date(date);
+function todayInputValue() {
+  const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -12,54 +12,50 @@ function formatDate(date) {
 export default function AjusteStockModal({ producto, onClose }) {
   const { data: ubicacionesData } = useUbicaciones();
   const todasUbicaciones = ubicacionesData?.results ?? [];
-
-  const existingStocks = producto.ubicaciones_stock || [];
-
-  const [adjustments, setAdjustments] = useState(() => {
-    const map = {};
-    for (const s of existingStocks) {
-      map[s.ubicacion_id] = { nombre: s.nombre, cantidad_actual: s.cantidad, cantidad_nueva: s.cantidad };
-    }
-    return map;
-  });
-
-  const [motivo, setMotivo] = useState("");
-  const [fecha, setFecha] = useState(() => formatDate(new Date()));
-  const [error, setError] = useState("");
-  const [newUbicacionId, setNewUbicacionId] = useState("");
-
   const mutation = useAjustarStock();
 
-  const usedUbicacionIds = Object.keys(adjustments).map(Number);
-  const availableUbicaciones = todasUbicaciones.filter(
-    (u) => !usedUbicacionIds.includes(u.id)
+  const initialRows = useMemo(() => {
+    return (producto.ubicaciones_stock || []).map((s) => ({
+      ubicacion_id: s.ubicacion_id,
+      nombre: s.nombre,
+      cantidad_actual: s.cantidad,
+      cantidad_nueva: String(s.cantidad),
+    }));
+  }, [producto.ubicaciones_stock]);
+
+  const [rows, setRows] = useState(initialRows);
+  const [fecha, setFecha] = useState(todayInputValue());
+  const [motivo, setMotivo] = useState("");
+  const [error, setError] = useState("");
+  const [nuevaUbicacionId, setNuevaUbicacionId] = useState("");
+
+  const ubicacionesUsadas = new Set(rows.map((r) => r.ubicacion_id));
+  const ubicacionesDisponibles = todasUbicaciones.filter(
+    (u) => !ubicacionesUsadas.has(u.id)
   );
 
-  function handleCantidadChange(ubicacionId, value) {
-    setAdjustments((prev) => ({
-      ...prev,
-      [ubicacionId]: { ...prev[ubicacionId], cantidad_nueva: value === "" ? 0 : Number(value) },
-    }));
+  function updateCantidad(ubicacionId, value) {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.ubicacion_id === ubicacionId ? { ...r, cantidad_nueva: value } : r
+      )
+    );
   }
 
-  function handleAddUbicacion() {
-    if (!newUbicacionId) return;
-    const u = todasUbicaciones.find((ub) => ub.id === Number(newUbicacionId));
+  function agregarUbicacion() {
+    const id = Number(nuevaUbicacionId);
+    const u = todasUbicaciones.find((x) => x.id === id);
     if (!u) return;
-    setAdjustments((prev) => ({
+    setRows((prev) => [
       ...prev,
-      [u.id]: { nombre: u.nombre, cantidad_actual: 0, cantidad_nueva: 0 },
-    }));
-    setNewUbicacionId("");
+      { ubicacion_id: u.id, nombre: u.nombre, cantidad_actual: 0, cantidad_nueva: "0" },
+    ]);
+    setNuevaUbicacionId("");
   }
 
-  function handleRemoveUbicacion(ubicacionId, cantidad_actual) {
-    if (cantidad_actual > 0) return;
-    setAdjustments((prev) => {
-      const next = { ...prev };
-      delete next[ubicacionId];
-      return next;
-    });
+  function quitarUbicacion(ubicacionId, cantidadActual) {
+    if (cantidadActual > 0) return;
+    setRows((prev) => prev.filter((r) => r.ubicacion_id !== ubicacionId));
   }
 
   function handleSubmit(e) {
@@ -71,12 +67,12 @@ export default function AjusteStockModal({ producto, onClose }) {
       return;
     }
 
-    const ajustes = [];
-    for (const [id, a] of Object.entries(adjustments)) {
-      if (a.cantidad_nueva !== a.cantidad_actual) {
-        ajustes.push({ ubicacion_id: Number(id), cantidad: a.cantidad_nueva });
-      }
-    }
+    const ajustes = rows
+      .map((r) => ({
+        ubicacion_id: r.ubicacion_id,
+        cantidad: r.cantidad_nueva === "" ? 0 : Number(r.cantidad_nueva),
+      }))
+      .filter((r, idx) => r.cantidad !== rows[idx].cantidad_actual);
 
     if (ajustes.length === 0) {
       setError("No se ha modificado ninguna cantidad");
@@ -92,19 +88,18 @@ export default function AjusteStockModal({ producto, onClose }) {
     );
   }
 
-  const adjustmentEntries = Object.entries(adjustments);
-
   return (
     <div className="modal" role="dialog" aria-modal="true">
       <div className="modal-dialog" style={{ maxWidth: 600 }}>
         <div className="modal-content">
           <form onSubmit={handleSubmit}>
             <div className="modal-header">
-              <h5 className="modal-title">
-                Ajustar stock — {producto.nombre}
-              </h5>
-              <button type="button" className="modal-close" onClick={onClose}>&times;</button>
+              <h5 className="modal-title">Ajustar stock — {producto.nombre}</h5>
+              <button type="button" className="modal-close" onClick={onClose}>
+                &times;
+              </button>
             </div>
+
             <div className="modal-body">
               {error && <div className="alert alert-danger">{error}</div>}
 
@@ -154,33 +149,33 @@ export default function AjusteStockModal({ producto, onClose }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {adjustmentEntries.length === 0 ? (
+                    {rows.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="text-center text-muted">
                           Sin ubicaciones
                         </td>
                       </tr>
                     ) : (
-                      adjustmentEntries.map(([id, a]) => (
-                        <tr key={id}>
-                          <td>{a.nombre}</td>
-                          <td className="text-center">{a.cantidad_actual}</td>
+                      rows.map((r) => (
+                        <tr key={r.ubicacion_id}>
+                          <td>{r.nombre}</td>
+                          <td className="text-center">{r.cantidad_actual}</td>
                           <td>
                             <input
                               type="number"
-                              className="form-control form-control-sm"
                               min={0}
-                              value={a.cantidad_nueva}
-                              onChange={(e) => handleCantidadChange(id, e.target.value)}
+                              className="form-control form-control-sm"
+                              value={r.cantidad_nueva}
+                              onChange={(e) => updateCantidad(r.ubicacion_id, e.target.value)}
                             />
                           </td>
                           <td className="text-center">
-                            {a.cantidad_actual === 0 && (
+                            {r.cantidad_actual === 0 && (
                               <button
                                 type="button"
                                 className="btn btn-sm btn-danger"
                                 title="Quitar ubicación"
-                                onClick={() => handleRemoveUbicacion(Number(id), a.cantidad_actual)}
+                                onClick={() => quitarUbicacion(r.ubicacion_id, r.cantidad_actual)}
                               >
                                 &times;
                               </button>
@@ -193,16 +188,16 @@ export default function AjusteStockModal({ producto, onClose }) {
                 </table>
               </div>
 
-              {availableUbicaciones.length > 0 && (
+              {ubicacionesDisponibles.length > 0 && (
                 <div className="form-row align-items-end">
                   <div className="col form-group">
                     <select
                       className="form-control form-control-sm"
-                      value={newUbicacionId}
-                      onChange={(e) => setNewUbicacionId(e.target.value)}
+                      value={nuevaUbicacionId}
+                      onChange={(e) => setNuevaUbicacionId(e.target.value)}
                     >
                       <option value="">Agregar ubicación...</option>
-                      {availableUbicaciones.map((u) => (
+                      {ubicacionesDisponibles.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.nombre}
                         </option>
@@ -213,8 +208,8 @@ export default function AjusteStockModal({ producto, onClose }) {
                     <button
                       type="button"
                       className="btn btn-sm btn-secondary"
-                      onClick={handleAddUbicacion}
-                      disabled={!newUbicacionId}
+                      onClick={agregarUbicacion}
+                      disabled={!nuevaUbicacionId}
                     >
                       Agregar
                     </button>
@@ -222,6 +217,7 @@ export default function AjusteStockModal({ producto, onClose }) {
                 </div>
               )}
             </div>
+
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={onClose}>
                 Cancelar

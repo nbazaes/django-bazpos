@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
@@ -10,123 +9,7 @@ import HistorialAjustesModal from "../components/HistorialAjustesModal";
 import { useProductos } from "../lib/queries";
 import { getUser, isBodeguero } from "../lib/auth";
 
-function StockPopover({ ubicaciones, triggerRef }) {
-  const [visible, setVisible] = useState(false);
-  const [pos, setPos] = useState({ top: "0px", left: "0px" });
-  const [measured, setMeasured] = useState(false);
-  const popoverRef = useRef(null);
-  const hideTimer = useRef(null);
-  const visibleRef = useRef(false);
-  const rafRef = useRef(null);
-  const posRef = useRef({ top: 0, left: 0 });
-
-  function calcPos() {
-    const trigger = triggerRef.current;
-    const popover = popoverRef.current;
-    if (!trigger || !popover) return;
-    const tr = trigger.getBoundingClientRect();
-    const pr = popover.getBoundingClientRect();
-    return {
-      top: tr.top - 8 - pr.height,
-      left: tr.left + tr.width / 2 - pr.width / 2,
-    };
-  }
-
-  function applyPos() {
-    const p = calcPos();
-    if (!p) return;
-    posRef.current = { top: p.top, left: p.left };
-    setPos({ top: Math.round(p.top) + "px", left: Math.round(p.left) + "px" });
-  }
-
-  useLayoutEffect(() => {
-    if (visible && popoverRef.current) {
-      applyPos();
-      setMeasured(true);
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (!visible) {
-      setMeasured(false);
-      return;
-    }
-
-    function onScroll() {
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(() => {
-          rafRef.current = null;
-          if (visibleRef.current) applyPos();
-        });
-      }
-    }
-
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", applyPos);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", applyPos);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [visible]);
-
-  function handleEnter() {
-    clearTimeout(hideTimer.current);
-    if (!visibleRef.current) {
-      visibleRef.current = true;
-      setVisible(true);
-    }
-  }
-
-  function handleLeave() {
-    clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      visibleRef.current = false;
-      setVisible(false);
-    }, 150);
-  }
-
-  useEffect(() => {
-    return () => {
-      clearTimeout(hideTimer.current);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  return (
-    <>
-      <span
-        ref={triggerRef}
-        className="stock-hover"
-        onMouseEnter={handleEnter}
-        onMouseLeave={handleLeave}
-      >
-        Múltiples
-      </span>
-      {createPortal(
-        <div
-          ref={popoverRef}
-          className={"stock-popover-portal" + (measured ? " shown" : "")}
-          style={{ top: pos.top, left: pos.left }}
-          onMouseEnter={handleEnter}
-          onMouseLeave={handleLeave}
-        >
-          {ubicaciones.map((u) => (
-            <div key={u.nombre} className="popover-row">
-              <span>{u.nombre}</span>
-              <strong>{u.cantidad}</strong>
-            </div>
-          ))}
-        </div>,
-        document.body,
-      )}
-    </>
-  );
-}
-
 function UbicacionCell({ ubicaciones }) {
-  const triggerRef = useRef(null);
-
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
 
   return (
@@ -142,9 +25,7 @@ function UbicacionCell({ ubicaciones }) {
       <span className="ubicacion-mobile">
         {ubicaciones.length === 1
           ? `${ubicaciones[0].nombre} (${ubicaciones[0].cantidad})`
-          : (
-            <StockPopover ubicaciones={ubicaciones} triggerRef={triggerRef} />
-          )}
+          : `${ubicaciones.length} ubicaciones`}
       </span>
     </>
   );
