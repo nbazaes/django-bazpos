@@ -40,6 +40,10 @@ export default function Shell() {
   const user = getUser();
   const showGerente = isGerente(user);
   const showBodeguero = isBodeguero(user);
+
+  const filteredVendedorLinks = showBodeguero
+    ? vendedorLinks.filter((link) => link.label !== "Inventario")
+    : vendedorLinks;
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -71,7 +75,7 @@ export default function Shell() {
           <NavLink className="sidebar-brand" to="/">{STORE_NAME}</NavLink>
 
           <ul className="sidebar-nav">
-            {vendedorLinks.map((link) => (
+            {filteredVendedorLinks.map((link) => (
               <li className="nav-item" key={link.to}>
                 <NavLink
                   className="nav-link"

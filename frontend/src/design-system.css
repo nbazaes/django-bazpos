@@ -394,7 +394,6 @@ textarea.form-control, textarea.input {
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
-  overflow: hidden;
   margin-bottom: 1.5rem;
   transition: border-color var(--transition), box-shadow var(--transition);
   box-shadow: var(--shadow-sm);
