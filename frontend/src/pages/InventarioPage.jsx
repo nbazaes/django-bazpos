@@ -91,85 +91,87 @@ export default function InventarioPage() {
   }
 
   return (
-    <PageCard title="Inventario actual">
-      <div className="page-actions">
-        <input
-          className="form-control"
-          placeholder="Buscar por nombre, código u OEM"
-          value={texto}
-          onChange={(e) => handleTextoChange(e.target.value)}
-        />
-        <button className="btn btn-primary" onClick={() => { setPage(1); syncURL(texto, 1, pageSize); }}>
-          Buscar
-        </button>
-      </div>
-      <div className="table-responsive">
-        <table className="table table-sm table-bordered">
-          <thead>
-            <tr>
-              <th style={{ width: "1px" }}>Código</th>
-              <th style={{ width: "1px" }}>OEM</th>
-              <th>Nombre</th>
-              <th>Marca</th>
-              <th>Descripción</th>
-              <th style={{ width: "1px" }}>Stock actual</th>
-              <th>Ubicación</th>
-              <th style={{ width: "1px" }}>Stock min</th>
-              <th style={{ width: "1px" }}>Stock max</th>
-              {puedeAjustar && <th style={{ width: "1px" }}>Acciones</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {isFetching && !productos.length ? (
-              <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">Cargando...</td></tr>
-            ) : productos.length === 0 ? (
-              <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">No hay registros</td></tr>
-            ) : (
-              productos.map((p) => (
-                <tr key={p.producto_id}>
-                  <td className="text-nowrap">{p.codigo_producto}</td>
-                  <td className="text-nowrap">{p.oem}</td>
-                  <td>{p.nombre}</td>
-                  <td>{p.marca}</td>
-                  <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
-                  <td>{p.stock_actual}</td>
-                  <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
-                  <td>{p.stock_minimo}</td>
-                  <td>{p.stock_maximo}</td>
-                  {puedeAjustar && (
-                    <td className="text-nowrap">
-                      <button
-                        className="btn btn-sm btn-outline mr-1"
-                        title="Ajustar stock"
-                        onClick={() => setAjusteProducto(p)}
-                      >
-                        Ajustar
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline"
-                        title="Ver historial"
-                        onClick={() => setHistorialProducto(p)}
-                      >
-                        Historial
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-        <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          count={count}
-          pageSize={pageSize}
-        />
-      </div>
+    <>
+      <PageCard title="Inventario actual">
+        <div className="page-actions">
+          <input
+            className="form-control"
+            placeholder="Buscar por nombre, código u OEM"
+            value={texto}
+            onChange={(e) => handleTextoChange(e.target.value)}
+          />
+          <button className="btn btn-primary" onClick={() => { setPage(1); syncURL(texto, 1, pageSize); }}>
+            Buscar
+          </button>
+        </div>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th style={{ width: "1px" }}>Código</th>
+                <th style={{ width: "1px" }}>OEM</th>
+                <th>Nombre</th>
+                <th>Marca</th>
+                <th>Descripción</th>
+                <th style={{ width: "1px" }}>Stock actual</th>
+                <th>Ubicación</th>
+                <th style={{ width: "1px" }}>Stock min</th>
+                <th style={{ width: "1px" }}>Stock max</th>
+                {puedeAjustar && <th style={{ width: "1px" }}>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {isFetching && !productos.length ? (
+                <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">Cargando...</td></tr>
+              ) : productos.length === 0 ? (
+                <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">No hay registros</td></tr>
+              ) : (
+                productos.map((p) => (
+                  <tr key={p.producto_id}>
+                    <td className="text-nowrap">{p.codigo_producto}</td>
+                    <td className="text-nowrap">{p.oem}</td>
+                    <td>{p.nombre}</td>
+                    <td>{p.marca}</td>
+                    <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
+                    <td>{p.stock_actual}</td>
+                    <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
+                    <td>{p.stock_minimo}</td>
+                    <td>{p.stock_maximo}</td>
+                    {puedeAjustar && (
+                      <td className="text-nowrap">
+                        <button
+                          className="btn btn-sm btn-outline mr-1"
+                          title="Ajustar stock"
+                          onClick={() => setAjusteProducto(p)}
+                        >
+                          Ajustar
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          title="Ver historial"
+                          onClick={() => setHistorialProducto(p)}
+                        >
+                          Historial
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            count={count}
+            pageSize={pageSize}
+          />
+        </div>
+      </PageCard>
       {ajusteProducto && (
         <AjusteStockModal
           producto={ajusteProducto}
@@ -182,6 +184,6 @@ export default function InventarioPage() {
           onClose={() => setHistorialProducto(null)}
         />
       )}
-    </PageCard>
+    </>
   );
 }
