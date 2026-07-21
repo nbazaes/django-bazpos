@@ -12,40 +12,69 @@ import { getUser, isBodeguero } from "../lib/auth";
 
 function StockPopover({ ubicaciones, triggerRef }) {
   const [show, setShow] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: "0px", left: "0px" });
   const hideTimer = useRef(null);
-  const showTimer = useRef(null);
+  const posRef = useRef({ top: 0, left: 0 });
+  const showRef = useRef(false);
 
-  function updatePos() {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPos({
+  function calcPos() {
+    const el = triggerRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
-    });
+    };
+  }
+
+  function syncPos() {
+    const p = calcPos();
+    if (!p) return;
+    posRef.current = p;
+    setPos({ top: p.top + "px", left: p.left + "px" });
   }
 
   function handleEnter() {
     clearTimeout(hideTimer.current);
-    updatePos();
-    showTimer.current = setTimeout(() => setShow(true), 150);
+    if (!showRef.current) {
+      syncPos();
+      requestAnimationFrame(() => syncPos());
+      showRef.current = true;
+      setShow(true);
+    }
   }
 
   function handleLeave() {
-    clearTimeout(showTimer.current);
-    hideTimer.current = setTimeout(() => setShow(false), 100);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      showRef.current = false;
+      setShow(false);
+    }, 200);
   }
 
   useEffect(() => {
-    if (show) {
-      const onUpdate = () => updatePos();
-      window.addEventListener("scroll", onUpdate, true);
-      window.addEventListener("resize", onUpdate);
-      return () => {
-        window.removeEventListener("scroll", onUpdate, true);
-        window.removeEventListener("resize", onUpdate);
-      };
+    return () => {
+      clearTimeout(hideTimer.current);
+      showRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!show) return;
+
+    function onUpdate() {
+      const p = calcPos();
+      if (!p) return;
+      posRef.current = p;
+      setPos({ top: p.top + "px", left: p.left + "px" });
     }
+
+    window.addEventListener("scroll", onUpdate, true);
+    window.addEventListener("resize", onUpdate);
+    return () => {
+      window.removeEventListener("scroll", onUpdate, true);
+      window.removeEventListener("resize", onUpdate);
+    };
   }, [show]);
 
   return (
