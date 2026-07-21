@@ -4,7 +4,10 @@ import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
+import AjusteStockModal from "../components/AjusteStockModal";
+import HistorialAjustesModal from "../components/HistorialAjustesModal";
 import { useProductos } from "../lib/queries";
+import { getUser, isGerente } from "../lib/auth";
 
 function UbicacionCell({ ubicaciones }) {
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
@@ -51,6 +54,12 @@ export default function InventarioPage() {
 
   const params = { texto, page, page_size: pageSize };
   const { data, isFetching } = useProductos(params);
+
+  const user = getUser();
+  const puedeAjustar = isGerente(user);
+
+  const [ajusteProducto, setAjusteProducto] = useState(null);
+  const [historialProducto, setHistorialProducto] = useState(null);
 
   const productos = data?.results ?? [];
   const count = data?.count ?? 0;
@@ -119,13 +128,14 @@ export default function InventarioPage() {
               <th>Ubicación</th>
               <th style={{ width: "1px" }}>Stock min</th>
               <th style={{ width: "1px" }}>Stock max</th>
+              {puedeAjustar && <th style={{ width: "1px" }}>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {isFetching && !productos.length ? (
-              <tr><td colSpan="9" className="text-center text-muted">Cargando...</td></tr>
+              <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">Cargando...</td></tr>
             ) : productos.length === 0 ? (
-              <tr><td colSpan="9" className="text-center text-muted">No hay registros</td></tr>
+              <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">No hay registros</td></tr>
             ) : (
               productos.map((p) => (
                 <tr key={p.producto_id}>
@@ -138,6 +148,24 @@ export default function InventarioPage() {
                   <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
                   <td>{p.stock_minimo}</td>
                   <td>{p.stock_maximo}</td>
+                  {puedeAjustar && (
+                    <td className="text-nowrap">
+                      <button
+                        className="btn btn-sm btn-outline mr-1"
+                        title="Ajustar stock"
+                        onClick={() => setAjusteProducto(p)}
+                      >
+                        Ajustar
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        title="Ver historial"
+                        onClick={() => setHistorialProducto(p)}
+                      >
+                        Historial
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -154,6 +182,18 @@ export default function InventarioPage() {
           pageSize={pageSize}
         />
       </div>
+      {ajusteProducto && (
+        <AjusteStockModal
+          producto={ajusteProducto}
+          onClose={() => setAjusteProducto(null)}
+        />
+      )}
+      {historialProducto && (
+        <HistorialAjustesModal
+          producto={historialProducto}
+          onClose={() => setHistorialProducto(null)}
+        />
+      )}
     </PageCard>
   );
 }

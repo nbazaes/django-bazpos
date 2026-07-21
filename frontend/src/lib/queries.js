@@ -410,6 +410,25 @@ export function useDeleteUbicacion() {
   });
 }
 
+// ── Ajustes de stock ──
+
+export function useAjustarStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ productoId, data }) =>
+      apiRequest(`/productos/${productoId}/ajustar-stock/`, { method: "POST", body: data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all }),
+  });
+}
+
+export function useHistorialAjustes(productoId) {
+  return useQuery({
+    queryKey: ["historial-ajustes", productoId],
+    queryFn: () => apiRequest(`/productos/${productoId}/historial-ajustes/`),
+    enabled: !!productoId,
+  });
+}
+
 // ── Dashboard ──
 
 export function useDashboardStats() {

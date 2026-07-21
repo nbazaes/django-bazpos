@@ -19,6 +19,10 @@ class Ubicacion(models.Model):
         return self.nombre
 
 
+def fecha_hoy():
+    return timezone.now().date()
+
+
 class StockProductoUbicacion(models.Model):
     producto = models.ForeignKey("Producto", on_delete=models.CASCADE, related_name="stocks_ubicacion")
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE)
@@ -170,3 +174,20 @@ class DetalleDevolucion(models.Model):
 
     def __str__(self):
         return f'{self.producto.nombre} x{self.cantidad}'
+
+
+class AjusteStock(models.Model):
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="ajustes_stock")
+    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE)
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT)
+    cantidad_anterior = models.IntegerField()
+    cantidad_nueva = models.IntegerField()
+    motivo = models.TextField()
+    fecha_ajuste = models.DateField(default=fecha_hoy)
+
+    class Meta:
+        db_table = "ajustes_stock"
+        ordering = ["-fecha_ajuste", "-id"]
+
+    def __str__(self):
+        return f"Ajuste {self.producto.nombre} en {self.ubicacion.nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"

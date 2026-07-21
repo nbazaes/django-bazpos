@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
-from vendedorApp.models import Anulacion, DetalleDevolucion, DetalleVenta, Devolucion, Producto, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, DetalleDevolucion, DetalleVenta, Devolucion, Producto, Ubicacion, Venta
 
 
 class UbicacionSerializer(serializers.ModelSerializer):
@@ -41,7 +41,7 @@ class ProductoSerializer(serializers.ModelSerializer):
         if stocks is None:
             stocks = obj.stocks_ubicacion.select_related("ubicacion").all()
         return [
-            {"nombre": s.ubicacion.nombre, "cantidad": s.cantidad}
+            {"ubicacion_id": s.ubicacion.id, "nombre": s.ubicacion.nombre, "cantidad": s.cantidad}
             for s in stocks
             if s.cantidad > 0
         ]
@@ -213,3 +213,41 @@ class DevolucionInputSerializer(serializers.Serializer):
         ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
 
     productos = ProductoItem(many=True)
+
+
+class AjusteItemSerializer(serializers.Serializer):
+    ubicacion_id = serializers.IntegerField()
+    cantidad = serializers.IntegerField(min_value=0)
+
+
+class AjustarStockInputSerializer(serializers.Serializer):
+    ajustes = AjusteItemSerializer(many=True)
+    motivo = serializers.CharField(trim_whitespace=False)
+    fecha = serializers.DateField(required=False)
+
+    def validate_ajustes(self, value):
+        if not value:
+            raise serializers.ValidationError("Debe especificar al menos un ajuste")
+        ids = [item["ubicacion_id"] for item in value]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("No puede haber ubicaciones duplicadas")
+        return value
+
+
+class AjusteStockSerializer(serializers.ModelSerializer):
+    ubicacion_nombre = serializers.CharField(source="ubicacion.nombre", read_only=True)
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+
+    class Meta:
+        model = AjusteStock
+        fields = [
+            "id",
+            "producto",
+            "ubicacion",
+            "ubicacion_nombre",
+            "cantidad_anterior",
+            "cantidad_nueva",
+            "motivo",
+            "fecha_ajuste",
+            "usuario_nombre",
+        ]

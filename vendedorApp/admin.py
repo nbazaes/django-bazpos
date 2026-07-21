@@ -1,5 +1,5 @@
 from django.contrib import admin
-from vendedorApp.models import Ubicacion, Producto, StockProductoUbicacion, Venta, DetalleVenta
+from vendedorApp.models import AjusteStock, Ubicacion, Producto, StockProductoUbicacion, Venta, DetalleVenta
 
 
 class SuperuserOnlyAdmin(admin.ModelAdmin):
@@ -68,3 +68,10 @@ class VentaAdmin(SuperuserOnlyAdmin):
     list_display = ('id', 'usuario', 'fecha_venta', 'monto_total', 'estado', 'tipo_documento')
     list_filter = ('estado', 'tipo_documento', 'fecha_venta')
     inlines = [DetalleVentaInline]
+
+
+@admin.register(AjusteStock)
+class AjusteStockAdmin(SuperuserOnlyAdmin):
+    list_display = ('id', 'producto', 'ubicacion', 'cantidad_anterior', 'cantidad_nueva', 'motivo', 'usuario', 'fecha_ajuste')
+    list_filter = ('fecha_ajuste', 'ubicacion')
+    search_fields = ('producto__nombre', 'producto__codigo_producto', 'motivo')

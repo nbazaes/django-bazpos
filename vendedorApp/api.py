@@ -7,8 +7,10 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import Anulacion, Devolucion, DetalleDevolucion, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
+    AjustarStockInputSerializer,
+    AjusteStockSerializer,
     AnulacionInputSerializer,
     AnulacionSerializer,
     DevolucionInputSerializer,
@@ -111,6 +113,8 @@ class ProductoViewSet(viewsets.ModelViewSet):
         "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE],
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
         "por_codigo": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+        "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
@@ -135,6 +139,64 @@ class ProductoViewSet(viewsets.ModelViewSet):
             return Response({"encontrado": False})
         serializer = self.get_serializer(producto)
         return Response({"encontrado": True, "producto": serializer.data})
+
+    @action(detail=True, methods=["post"], url_path="ajustar-stock")
+    def ajustar_stock(self, request, pk=None):
+        producto = self.get_object()
+
+        serializer = AjustarStockInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        motivo = data["motivo"]
+        fecha = data.get("fecha", timezone.now().date())
+
+        with transaction.atomic():
+            for item in data["ajustes"]:
+                ubicacion_id = item["ubicacion_id"]
+                cantidad_nueva = item["cantidad"]
+
+                try:
+                    ubicacion = Ubicacion.objects.get(id=ubicacion_id)
+                except Ubicacion.DoesNotExist:
+                    return Response(
+                        {"error": f"Ubicación {ubicacion_id} no encontrada"},
+                        status=404,
+                    )
+
+                stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                    producto=producto,
+                    ubicacion=ubicacion,
+                    defaults={"cantidad": 0},
+                )
+
+                cantidad_anterior = stock.cantidad
+
+                if cantidad_anterior == cantidad_nueva:
+                    continue
+
+                stock.cantidad = cantidad_nueva
+                stock.save()
+
+                AjusteStock.objects.create(
+                    producto=producto,
+                    ubicacion=ubicacion,
+                    usuario=request.user,
+                    cantidad_anterior=cantidad_anterior,
+                    cantidad_nueva=cantidad_nueva,
+                    motivo=motivo,
+                    fecha_ajuste=fecha,
+                )
+
+        producto_actualizado = self.get_serializer(producto)
+        return Response(producto_actualizado.data)
+
+    @action(detail=True, methods=["get"], url_path="historial-ajustes")
+    def historial_ajustes(self, request, pk=None):
+        producto = self.get_object()
+        ajustes = producto.ajustes_stock.select_related("ubicacion", "usuario").all()
+        serializer = AjusteStockSerializer(ajustes, many=True)
+        return Response(serializer.data)
 
 
 class DeducirStockInputSerializer(serializers.Serializer):
