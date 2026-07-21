@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
@@ -9,7 +10,77 @@ import HistorialAjustesModal from "../components/HistorialAjustesModal";
 import { useProductos } from "../lib/queries";
 import { getUser, isBodeguero } from "../lib/auth";
 
+function StockPopover({ ubicaciones, triggerRef }) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const hideTimer = useRef(null);
+  const showTimer = useRef(null);
+
+  function updatePos() {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.top - 8,
+      left: rect.left + rect.width / 2,
+    });
+  }
+
+  function handleEnter() {
+    clearTimeout(hideTimer.current);
+    updatePos();
+    showTimer.current = setTimeout(() => setShow(true), 150);
+  }
+
+  function handleLeave() {
+    clearTimeout(showTimer.current);
+    hideTimer.current = setTimeout(() => setShow(false), 100);
+  }
+
+  useEffect(() => {
+    if (show) {
+      const onUpdate = () => updatePos();
+      window.addEventListener("scroll", onUpdate, true);
+      window.addEventListener("resize", onUpdate);
+      return () => {
+        window.removeEventListener("scroll", onUpdate, true);
+        window.removeEventListener("resize", onUpdate);
+      };
+    }
+  }, [show]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="stock-hover"
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
+      >
+        Múltiples
+      </span>
+      {show && createPortal(
+        <div
+          className="stock-popover-portal"
+          style={{ top: pos.top, left: pos.left }}
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
+        >
+          {ubicaciones.map((u) => (
+            <div key={u.nombre} className="popover-row">
+              <span>{u.nombre}</span>
+              <strong>{u.cantidad}</strong>
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 function UbicacionCell({ ubicaciones }) {
+  const triggerRef = useRef(null);
+
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
 
   return (
@@ -26,17 +97,7 @@ function UbicacionCell({ ubicaciones }) {
         {ubicaciones.length === 1
           ? `${ubicaciones[0].nombre} (${ubicaciones[0].cantidad})`
           : (
-            <span className="stock-hover">
-              Múltiples
-              <span className="stock-popover">
-                {ubicaciones.map((u) => (
-                  <div key={u.nombre} className="popover-row">
-                    <span>{u.nombre}</span>
-                    <strong>{u.cantidad}</strong>
-                  </div>
-                ))}
-              </span>
-            </span>
+            <StockPopover ubicaciones={ubicaciones} triggerRef={triggerRef} />
           )}
       </span>
     </>

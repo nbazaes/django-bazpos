@@ -911,56 +911,25 @@ textarea.form-control, textarea.input {
   .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
 }
 
-/* ====== STOCK POPOVER (dark theme) ====== */
+/* ====== STOCK POPOVER ====== */
 .stock-hover {
-  position: relative;
   display: inline-block;
   cursor: pointer;
   border-bottom: 1px dashed var(--text-muted);
   color: var(--text-primary);
 }
 
-.stock-popover {
-  visibility: hidden;
-  opacity: 0;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+.stock-popover-portal {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 1060;
   background: var(--bg-elevated);
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   padding: 8px 14px;
   white-space: nowrap;
-  z-index: 200;
   box-shadow: var(--shadow-lg);
-  transition: opacity 0.15s ease, visibility 0.15s ease;
   min-width: 180px;
-}
-
-.stock-popover::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: var(--bg-elevated);
-}
-
-.stock-popover::before {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 7px solid transparent;
-  border-top-color: var(--border-light);
-}
-
-.stock-hover:hover .stock-popover {
-  visibility: visible;
-  opacity: 1;
 }
 
 .popover-row {
