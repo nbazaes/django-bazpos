@@ -4,6 +4,7 @@ from rest_framework.permissions import BasePermission
 ROLE_VENDEDOR = "Vendedor"
 ROLE_ENCARGADO = "Encargado"
 ROLE_GERENTE = "Gerente"
+ROLE_BODEGUERO = "Bodeguero"
 
 
 def get_user_roles(user):
@@ -57,7 +58,7 @@ class RoleActionPermission(BasePermission):
 class HasKnownRole(BasePermission):
     """Allow authenticated users with one of the configured business roles."""
 
-    known_roles = [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE]
+    known_roles = [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO]
 
     def has_permission(self, request, view):
         return has_any_role(request.user, self.known_roles)

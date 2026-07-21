@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { isLoggedIn, isGerente, saveUser, getUser } from "./lib/auth";
+import { isLoggedIn, isGerente, isBodeguero, saveUser, getUser } from "./lib/auth";
 import { me } from "./lib/api";
 import { useEffect, useState } from "react";
 
@@ -32,6 +32,11 @@ export function ProtectedRoute() {
 
 export function GerenteGuard() {
   if (!isGerente(getUser())) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
+export function BodegueroGuard() {
+  if (!isBodeguero(getUser())) return <Navigate to="/" replace />;
   return <Outlet />;
 }
 

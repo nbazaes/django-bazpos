@@ -5,12 +5,13 @@ from django.contrib.contenttypes.models import ContentType
 
 class Command(BaseCommand):
     """
-    Crea los tres grupos de usuario con sus permisos respectivos:
+    Crea los grupos de usuario con sus permisos respectivos:
       - Vendedor: solo vender y consultar inventario
       - Encargado: vender + facturas + inventario + usuarios
+      - Bodeguero: gestionar inventario y ubicaciones
       - Gerente: permiso total
     """
-    help = "Crea los grupos Vendedor, Encargado y Gerente con permisos."
+    help = "Crea los grupos Vendedor, Bodeguero, Encargado y Gerente con permisos."
 
     def handle(self, *args, **options):
         # ── Permisos por app/modelo ──
@@ -64,6 +65,20 @@ class Command(BaseCommand):
             content_type__model='user',
         )
 
+        # vendedorApp: AjusteStock, StockProductoUbicacion, Ubicacion
+        ajuste_stock_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='ajustestock',
+        )
+        stock_ubicacion_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='stockproductoubicacion',
+        )
+        ubicacion_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='ubicacion',
+        )
+
         # ── 1. Vendedor ──
         vendedor, created = Group.objects.get_or_create(name='Vendedor')
         vendedor.permissions.clear()
@@ -92,7 +107,20 @@ class Command(BaseCommand):
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Encargado' {status} con permisos."))
 
-        # ── 3. Gerente ──
+        # ── 3. Bodeguero ──
+        bodeguero, created = Group.objects.get_or_create(name='Bodeguero')
+        bodeguero.permissions.clear()
+        bodeguero.permissions.add(
+            *producto_perms.filter(codename__in=['view_producto', 'add_producto', 'change_producto']),
+        )
+        bodeguero.permissions.add(*venta_perms, *detalle_venta_perms)
+        bodeguero.permissions.add(*ajuste_stock_perms)
+        bodeguero.permissions.add(*stock_ubicacion_perms)
+        bodeguero.permissions.add(*ubicacion_perms)
+        status = "creado" if created else "actualizado"
+        self.stdout.write(self.style.SUCCESS(f"Grupo 'Bodeguero' {status} con permisos."))
+
+        # ── 4. Gerente ──
         gerente, created = Group.objects.get_or_create(name='Gerente')
         gerente.permissions.clear()
         # Permiso total sobre todas las entidades de la app

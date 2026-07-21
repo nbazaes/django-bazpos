@@ -54,6 +54,12 @@ export function isGerente(user) {
   if (!user) return false;
   if (user.is_superuser) return true;
   const grupos = user.groups || [];
-  // API returns list of strings: ["Gerente", "Encargado"]
   return grupos.some((g) => g === "Gerente" || g === "Encargado");
+}
+
+export function isBodeguero(user) {
+  if (!user) return false;
+  if (user.is_superuser) return true;
+  const grupos = user.groups || [];
+  return grupos.some((g) => g === "Bodeguero" || g === "Encargado" || g === "Gerente");
 }

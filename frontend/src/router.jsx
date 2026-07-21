@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import Shell from "./components/Shell";
-import { ProtectedRoute, GerenteGuard, RedirectIfLoggedIn } from "./guards";
+import { ProtectedRoute, GerenteGuard, BodegueroGuard, RedirectIfLoggedIn } from "./guards";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import VentaPage from "./pages/VentaPage";
@@ -35,6 +35,12 @@ export const router = createBrowserRouter([
           { path: "ventas/historial", element: <PedidosPage /> },
           { path: "ventas/inventario", element: <InventarioPage /> },
           {
+            element: <BodegueroGuard />,
+            children: [
+              { path: "ubicaciones", element: <UbicacionPage /> },
+            ],
+          },
+          {
             element: <GerenteGuard />,
             children: [
               { path: "productos", element: <ProductosPage /> },
@@ -49,7 +55,6 @@ export const router = createBrowserRouter([
               { path: "facturas", element: <FacturasPage /> },
               { path: "facturas/crear", element: <FacturaFormPage /> },
               { path: "facturas/:id/editar", element: <FacturaFormPage /> },
-              { path: "ubicaciones", element: <UbicacionPage /> },
             ],
           },
         ],

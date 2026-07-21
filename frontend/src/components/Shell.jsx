@@ -1,6 +1,6 @@
 import { useState, createContext, useContext, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { getUser, isGerente, clearTokens } from "../lib/auth";
+import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
 import { STORE_NAME } from "../lib/config";
 
@@ -26,6 +26,10 @@ const gerenteLinks = [
   { to: "/proveedores", label: "Proveedores" },
   { to: "/usuarios", label: "Usuarios" },
   { to: "/facturas", label: "Facturas" },
+];
+
+const bodegueroLinks = [
+  { to: "/ventas/inventario", label: "Inventario" },
   { to: "/ubicaciones", label: "Ubicaciones" },
 ];
 
@@ -35,6 +39,7 @@ export default function Shell() {
   const [searchParams] = useSearchParams();
   const user = getUser();
   const showGerente = isGerente(user);
+  const showBodeguero = isBodeguero(user);
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -78,6 +83,22 @@ export default function Shell() {
               </li>
             ))}
           </ul>
+
+          {showBodeguero && (
+            <>
+              <hr className="sidebar-divider" />
+              <div className="sidebar-heading">Bodeguero</div>
+              <ul className="sidebar-nav">
+                {bodegueroLinks.map((link) => (
+                  <li className="nav-item" key={link.to}>
+                    <NavLink className="nav-link" to={link.to}>
+                      {link.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           {showGerente && (
             <>

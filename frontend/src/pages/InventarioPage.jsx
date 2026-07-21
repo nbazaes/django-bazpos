@@ -7,7 +7,7 @@ import { usePageTitle } from "../components/Shell";
 import AjusteStockModal from "../components/AjusteStockModal";
 import HistorialAjustesModal from "../components/HistorialAjustesModal";
 import { useProductos } from "../lib/queries";
-import { getUser, isGerente } from "../lib/auth";
+import { getUser, isBodeguero } from "../lib/auth";
 
 function UbicacionCell({ ubicaciones }) {
   if (!ubicaciones || ubicaciones.length === 0) return <span>—</span>;
@@ -56,7 +56,7 @@ export default function InventarioPage() {
   const { data, isFetching } = useProductos(params);
 
   const user = getUser();
-  const puedeAjustar = isGerente(user);
+  const puedeAjustar = isBodeguero(user);
 
   const [ajusteProducto, setAjusteProducto] = useState(null);
   const [historialProducto, setHistorialProducto] = useState(null);

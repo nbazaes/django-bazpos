@@ -26,6 +26,7 @@ from vendedorApp.pagination import (
 )
 from bazpos.permissions import (
     HasKnownRole,
+    ROLE_BODEGUERO,
     ROLE_ENCARGADO,
     ROLE_GERENTE,
     ROLE_VENDEDOR,
@@ -106,15 +107,15 @@ class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.select_related("proveedor").prefetch_related("stocks_ubicacion__ubicacion").all().order_by("producto_id")
     pagination_class = ProductoPagination
     role_action_map = {
-        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "create": [ROLE_ENCARGADO, ROLE_GERENTE],
         "update": [ROLE_ENCARGADO, ROLE_GERENTE],
         "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE],
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "por_codigo": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "por_codigo": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
@@ -220,12 +221,12 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     serializer_class = VentaSerializer
     pagination_class = VentaPagination
     role_action_map = {
-        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "validar_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "ubicaciones_para_deducir": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
-        "deducir_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE],
+        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "validar_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "ubicaciones_para_deducir": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "deducir_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "anular": [ROLE_ENCARGADO, ROLE_GERENTE],
         "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
     }

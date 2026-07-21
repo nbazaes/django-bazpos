@@ -17,7 +17,7 @@ from gerenteApp.serializers import (
 from vendedorApp.pagination import DefaultPagination
 from vendedorApp.models import Producto, Ubicacion
 from vendedorApp.serializers import UbicacionSerializer
-from bazpos.permissions import ROLE_ENCARGADO, ROLE_GERENTE, RoleActionPermission
+from bazpos.permissions import ROLE_BODEGUERO, ROLE_ENCARGADO, ROLE_GERENTE, RoleActionPermission
 
 
 class ProveedorViewSet(viewsets.ModelViewSet):
@@ -220,10 +220,10 @@ class UbicacionViewSet(viewsets.ModelViewSet):
     queryset = Ubicacion.objects.all().order_by("nombre")
     pagination_class = DefaultPagination
     role_action_map = {
-        "list": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "create": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "update": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "list": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "create": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "update": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "destroy": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
