@@ -4,6 +4,7 @@ import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
+import StepperInput from "../components/StepperInput";
 
 function roundTotal(amount) {
   const remainder = amount % 1000;
@@ -428,27 +429,25 @@ export default function VentaPage() {
                   <td className="text-nowrap">{i.oem}</td>
                   <td>{i.nombre}</td>
                   <td>
-                    <input
-                      type="number"
-                      className="form-control form-control-sm"
-                      style={{ width: 80 }}
-                      min="1"
-                      max={i.stock_actual}
+                    <StepperInput
                       value={i.cantidad}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         const maxStock = i.stock_actual || 1;
-                        const requested = parseInt(e.target.value, 10) || 1;
-                        const safeCantidad = Math.max(1, Math.min(requested, maxStock));
                         const next = [...carro];
                         const idx = next.findIndex((x) => x.producto_id === i.producto_id);
-                        next[idx].cantidad = safeCantidad;
+                        next[idx].cantidad = val;
                         setCarro(next);
-                        if (requested > maxStock) {
+                        if (val >= maxStock) {
                           setError(`Stock maximo para ${i.nombre}: ${maxStock}`);
                         } else {
                           setError("");
                         }
                       }}
+                      min={1}
+                      max={i.stock_actual || 1}
+                      inputStyle={{ width: 64, fontSize: "0.9rem" }}
+                      decrementLabel={`Disminuir cantidad de ${i.nombre}`}
+                      incrementLabel={`Aumentar cantidad de ${i.nombre}`}
                     />
                   </td>
                   <td>${netoFromBruto(i.precio * i.cantidad)}</td>
@@ -486,49 +485,43 @@ export default function VentaPage() {
               gap: "0.75rem",
             }}>
               <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>Descuento</span>
-              <label style={{
+              <div style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.35rem",
+                gap: "0.25rem",
                 background: discount > 0 ? "var(--accent-soft)" : "var(--bg-input)",
                 border: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
                 borderRadius: "var(--radius)",
-                padding: "0.35rem 0.85rem",
+                padding: "0.25rem 0.5rem",
                 transition: "all var(--transition)",
                 boxShadow: discount > 0 ? "0 0 0 3px var(--accent-glow)" : "none",
-                cursor: "text",
               }}>
-                <input
-                  type="number"
-                  style={{
-                    width: 64,
+                <StepperInput
+                  value={descuentoPorcentaje || 0}
+                  onChange={(val) => setDescuentoPorcentaje(val)}
+                  min={0}
+                  max={100}
+                  active={discount > 0}
+                  inputStyle={{
+                    width: 52,
                     border: "none",
                     background: "transparent",
                     color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
-                    fontSize: "1.4rem",
-                    fontFamily: "var(--font-mono)",
+                    fontSize: "1.35rem",
                     fontWeight: 700,
-                    textAlign: "right",
-                    outline: "none",
                     padding: 0,
-                    MozAppearance: "textfield",
                   }}
-                  min="0"
-                  max="100"
-                  placeholder="0"
-                  value={descuentoPorcentaje || ""}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setDescuentoPorcentaje(isNaN(val) || val < 0 ? 0 : val > 100 ? 100 : val);
-                  }}
+                  decrementLabel="Disminuir descuento"
+                  incrementLabel="Aumentar descuento"
                 />
                 <span style={{
-                  fontSize: "1rem",
+                  fontSize: "0.95rem",
                   fontWeight: 600,
                   color: discount > 0 ? "var(--accent)" : "var(--text-secondary)",
                   userSelect: "none",
+                  marginLeft: 2,
                 }}>%</span>
-              </label>
+              </div>
             </div>
 
             <div style={{ width: "100%", height: 1, background: "var(--border-default)" }} />

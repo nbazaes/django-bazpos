@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
+import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../components/Shell";
 import {
   useCreateFactura,
@@ -167,7 +168,20 @@ export default function FacturaFormPage() {
                     <td>{it.nombre}</td>
                     <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
                     <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
-                    <td><input className="form-control form-control-sm" type="number" value={it.cantidad} onChange={(e) => { const next = [...items]; next[idx].cantidad = e.target.value; setItems(next); }} /></td>
+                    <td>
+                      <StepperInput
+                        value={it.cantidad}
+                        onChange={(val) => {
+                          const next = [...items];
+                          next[idx].cantidad = val;
+                          setItems(next);
+                        }}
+                        min={1}
+                        inputStyle={{ width: 64, fontSize: "0.85rem" }}
+                        decrementLabel={`Disminuir cantidad de ${it.nombre}`}
+                        incrementLabel={`Aumentar cantidad de ${it.nombre}`}
+                      />
+                    </td>
                     <td><button type="button" className="btn btn-sm btn-danger" onClick={() => setItems(items.filter((_, i) => i !== idx))}>X</button></td>
                   </tr>
                 ))}

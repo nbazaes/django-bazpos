@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
+import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../components/Shell";
 import {
   useAnularVenta,
@@ -398,7 +399,18 @@ export default function PedidosPage() {
                             <td>{d.producto_nombre}</td>
                             <td>{d.cantidad}</td>
                             <td>{disponible}</td>
-                            <td><input type="number" className="form-control form-control-sm" style={{ width: 70 }} min="1" max={disponible} value={devolverCantidades[d.producto] || 1} onChange={(e) => setDevolverCantidades({ ...devolverCantidades, [d.producto]: parseInt(e.target.value) || 0 })} disabled={!sel || devolverMutation.isPending} /></td>
+                            <td>
+                              <StepperInput
+                                value={devolverCantidades[d.producto] || 1}
+                                onChange={(val) => setDevolverCantidades({ ...devolverCantidades, [d.producto]: val })}
+                                min={1}
+                                max={disponible}
+                                disabled={!sel || devolverMutation.isPending}
+                                inputStyle={{ width: 56, fontSize: "0.85rem" }}
+                                decrementLabel={`Disminuir cantidad a devolver de ${d.producto_nombre}`}
+                                incrementLabel={`Aumentar cantidad a devolver de ${d.producto_nombre}`}
+                              />
+                            </td>
                             <td><input type="checkbox" checked={devolverReponer[d.producto] !== false} onChange={(e) => setDevolverReponer({ ...devolverReponer, [d.producto]: e.target.checked })} disabled={!sel || devolverMutation.isPending} /></td>
                             <td>
                               <select className="form-control form-control-sm" value={devolverUbicacion[d.producto] || ""} onChange={(e) => setDevolverUbicacion({ ...devolverUbicacion, [d.producto]: e.target.value })} disabled={!sel || devolverReponer[d.producto] === false || devolverMutation.isPending}>

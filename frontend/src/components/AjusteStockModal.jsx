@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import StepperInput from "./StepperInput";
 import { useAjustarStock, useUbicaciones } from "../lib/queries";
 
 function todayInputValue() {
@@ -161,12 +162,13 @@ export default function AjusteStockModal({ producto, onClose }) {
                           <td>{r.nombre}</td>
                           <td className="text-center">{r.cantidad_actual}</td>
                           <td>
-                            <input
-                              type="number"
-                              min={0}
-                              className="form-control form-control-sm"
+                            <StepperInput
                               value={r.cantidad_nueva}
-                              onChange={(e) => updateCantidad(r.ubicacion_id, e.target.value)}
+                              onChange={(val) => updateCantidad(r.ubicacion_id, val)}
+                              min={0}
+                              inputStyle={{ width: 70, fontSize: "0.85rem" }}
+                              decrementLabel={`Disminuir stock en ${r.nombre}`}
+                              incrementLabel={`Aumentar stock en ${r.nombre}`}
                             />
                           </td>
                           <td className="text-center">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
+import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../components/Shell";
 import {
   useCreateProducto,
@@ -116,9 +117,40 @@ export default function ProductoFormPage() {
               </div>
             )}
           </div>
-          <div className="col-md-3 form-group"><label>Stock mínimo</label><input type="number" className="form-control" value={data.stock_minimo} onChange={(e) => setData({ ...data, stock_minimo: e.target.value })} required /></div>
-          <div className="col-md-3 form-group"><label>Stock máximo</label><input type="number" className="form-control" value={data.stock_maximo} onChange={(e) => setData({ ...data, stock_maximo: e.target.value })} required /></div>
-          <div className="col-md-4 form-group"><label>Margen utilidad (%)</label><input type="number" step="0.01" className="form-control" value={data.margen_utilidad} onChange={(e) => setData({ ...data, margen_utilidad: e.target.value })} required /></div>
+          <div className="col-md-3 form-group"><label>Stock mínimo</label>
+            <StepperInput
+              value={data.stock_minimo}
+              onChange={(val) => setData({ ...data, stock_minimo: val })}
+              min={0}
+              style={{ width: "100%" }}
+              inputStyle={{ width: "100%" }}
+              decrementLabel="Disminuir stock mínimo"
+              incrementLabel="Aumentar stock mínimo"
+            />
+          </div>
+          <div className="col-md-3 form-group"><label>Stock máximo</label>
+            <StepperInput
+              value={data.stock_maximo}
+              onChange={(val) => setData({ ...data, stock_maximo: val })}
+              min={0}
+              style={{ width: "100%" }}
+              inputStyle={{ width: "100%" }}
+              decrementLabel="Disminuir stock máximo"
+              incrementLabel="Aumentar stock máximo"
+            />
+          </div>
+          <div className="col-md-4 form-group"><label>Margen utilidad (%)</label>
+            <StepperInput
+              value={data.margen_utilidad}
+              onChange={(val) => setData({ ...data, margen_utilidad: val })}
+              min={0}
+              step={0.01}
+              style={{ width: "100%" }}
+              inputStyle={{ width: "100%" }}
+              decrementLabel="Disminuir margen de utilidad"
+              incrementLabel="Aumentar margen de utilidad"
+            />
+          </div>
           <div className="col-md-8 form-group">
             <label>Proveedor</label>
             <select className="form-control" value={data.proveedor} onChange={(e) => setData({ ...data, proveedor: e.target.value })} required>
