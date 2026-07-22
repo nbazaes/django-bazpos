@@ -27,6 +27,26 @@ export default function DashboardPage() {
   const { data, error } = useDashboardStats();
   const queryClient = useQueryClient();
   const [popoverAbierto, setPopoverAbierto] = useState(null);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const popoverRef = useRef(null);
+
+  useEffect(() => {
+    if (!popoverAbierto) return;
+    const handleClickOutside = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setPopoverAbierto(null);
+      }
+    };
+    const handleEscape = (e) => {
+      if (e.key === "Escape") setPopoverAbierto(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [popoverAbierto]);
 
   const ignorarMutation = useMutation({
     mutationFn: ({ productoId, accion }) =>
@@ -134,19 +154,40 @@ export default function DashboardPage() {
                               <button
                                 type="button"
                                 className="stock-hover warning-icon popover-trigger"
-                                onClick={() =>
-                                  setPopoverAbierto(
-                                    popoverAbierto === p.producto_id ? null : p.producto_id
-                                  )
-                                }
+                                onClick={(e) => {
+                                  if (popoverAbierto === p.producto_id) {
+                                    setPopoverAbierto(null);
+                                  } else {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const approxHeight = 160;
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    const showAbove =
+                                      spaceBelow < approxHeight && rect.top > approxHeight;
+                                    setPopoverPos({
+                                      top: showAbove ? rect.top - 8 : rect.bottom + 8,
+                                      left: rect.left + rect.width / 2,
+                                    });
+                                    setPopoverAbierto(p.producto_id);
+                                  }
+                                }}
                                 aria-label="Ver productos con mismo OEM que tienen stock"
                                 aria-expanded={popoverAbierto === p.producto_id}
                               >
                                 <i className="bi bi-exclamation-triangle-fill"></i>
                                 <span
+                                  ref={popoverRef}
                                   className={`stock-popover ${
                                     popoverAbierto === p.producto_id ? "is-open" : ""
                                   }`}
+                                  style={
+                                    popoverAbierto === p.producto_id
+                                      ? {
+                                          "--popover-top": `${popoverPos.top}px`,
+                                          "--popover-left": `${popoverPos.left}px`,
+                                        }
+                                      : undefined
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="popover-header">
                                     Productos con mismo OEM en stock

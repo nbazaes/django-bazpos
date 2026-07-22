@@ -1166,14 +1166,14 @@ textarea.form-control, textarea.input {
 
 .stock-popover {
   display: none;
-  position: absolute;
-  z-index: 100;
-  top: 100%;
-  left: 50%;
+  position: fixed;
+  z-index: 1000;
+  top: var(--popover-top, auto);
+  left: var(--popover-left, auto);
   transform: translateX(-50%);
   min-width: 280px;
   max-width: 340px;
-  margin-top: 0.5rem;
+  margin-top: 0;
   padding: 0.5rem 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border-light);
@@ -1184,8 +1184,6 @@ textarea.form-control, textarea.input {
   text-align: left;
 }
 
-.stock-hover:hover .stock-popover,
-.stock-hover:focus-within .stock-popover,
 .stock-popover.is-open {
   display: block;
 }
