@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
@@ -160,13 +161,19 @@ export default function DashboardPage() {
                                   } else {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const approxHeight = 160;
+                                    const popoverWidth = 300;
                                     const spaceBelow = window.innerHeight - rect.bottom;
                                     const showAbove =
                                       spaceBelow < approxHeight && rect.top > approxHeight;
-                                    setPopoverPos({
-                                      top: showAbove ? rect.top - 8 : rect.bottom + 8,
-                                      left: rect.left + rect.width / 2,
-                                    });
+                                    const top = showAbove ? rect.top - 8 : rect.bottom + 8;
+                                    const left = Math.max(
+                                      8,
+                                      Math.min(
+                                        window.innerWidth - popoverWidth - 8,
+                                        rect.left + rect.width / 2 - popoverWidth / 2
+                                      )
+                                    );
+                                    setPopoverPos({ top, left });
                                     setPopoverAbierto(p.producto_id);
                                   }
                                 }}
@@ -174,47 +181,6 @@ export default function DashboardPage() {
                                 aria-expanded={popoverAbierto === p.producto_id}
                               >
                                 <i className="bi bi-exclamation-triangle-fill"></i>
-                                <span
-                                  ref={popoverRef}
-                                  className={`stock-popover ${
-                                    popoverAbierto === p.producto_id ? "is-open" : ""
-                                  }`}
-                                  style={
-                                    popoverAbierto === p.producto_id
-                                      ? {
-                                          "--popover-top": `${popoverPos.top}px`,
-                                          "--popover-left": `${popoverPos.left}px`,
-                                        }
-                                      : undefined
-                                  }
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <div className="popover-header">
-                                    Productos con mismo OEM en stock
-                                  </div>
-                                  <ul className="popover-list">
-                                    {p.oem_productos.map((op) => (
-                                      <li key={op.producto_id} className="popover-row">
-                                        <div className="popover-row-main">
-                                          <span>{op.nombre}</span>
-                                          <strong>{op.stock_actual}</strong>
-                                        </div>
-                                        <div className="popover-row-meta">
-                                          {op.codigo_producto}
-                                        </div>
-                                        {op.ubicaciones && op.ubicaciones.length > 0 && (
-                                          <div className="popover-row-ubicaciones">
-                                            {op.ubicaciones.map((u) => (
-                                              <span key={u.nombre}>
-                                                {u.nombre}: {u.cantidad}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </span>
                               </button>
                             )}
                           </td>
@@ -270,6 +236,47 @@ export default function DashboardPage() {
               </PageCard>
             </div>
           )}
+          {(() => {
+            const productoActivo = data.stock.bajo_minimo?.find(
+              (p) => p.producto_id === popoverAbierto
+            );
+            return (
+              productoActivo &&
+              createPortal(
+                <div
+                  ref={popoverRef}
+                  className="stock-popover is-open"
+                  style={{ top: popoverPos.top, left: popoverPos.left }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="popover-header">
+                    Productos con mismo OEM en stock
+                  </div>
+                  <ul className="popover-list">
+                    {productoActivo.oem_productos.map((op) => (
+                      <li key={op.producto_id} className="popover-row">
+                        <div className="popover-row-main">
+                          <span>{op.nombre}</span>
+                          <strong>{op.stock_actual}</strong>
+                        </div>
+                        <div className="popover-row-meta">{op.codigo_producto}</div>
+                        {op.ubicaciones && op.ubicaciones.length > 0 && (
+                          <div className="popover-row-ubicaciones">
+                            {op.ubicaciones.map((u) => (
+                              <span key={u.nombre}>
+                                {u.nombre}: {u.cantidad}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>,
+                document.body
+              )
+            );
+          })()}
         </>
       )}
       {!data && !error && (
