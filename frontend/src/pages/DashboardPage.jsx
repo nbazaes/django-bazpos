@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const didToast = useRef(false);
   const { data, error } = useDashboardStats();
   const queryClient = useQueryClient();
+  const [popoverAbierto, setPopoverAbierto] = useState(null);
 
   const ignorarMutation = useMutation({
     mutationFn: ({ productoId, accion }) =>
@@ -130,37 +131,50 @@ export default function DashboardPage() {
                         <tr key={p.producto_id}>
                           <td className="text-center">
                             {p.oem_productos && p.oem_productos.length > 0 && (
-                              <span
-                                className="stock-hover warning-icon"
-                                title="Existen productos con el mismo OEM que tienen stock"
+                              <button
+                                type="button"
+                                className="stock-hover warning-icon popover-trigger"
+                                onClick={() =>
+                                  setPopoverAbierto(
+                                    popoverAbierto === p.producto_id ? null : p.producto_id
+                                  )
+                                }
+                                aria-label="Ver productos con mismo OEM que tienen stock"
+                                aria-expanded={popoverAbierto === p.producto_id}
                               >
                                 <i className="bi bi-exclamation-triangle-fill"></i>
-                                <span className="stock-popover">
+                                <span
+                                  className={`stock-popover ${
+                                    popoverAbierto === p.producto_id ? "is-open" : ""
+                                  }`}
+                                >
                                   <div className="popover-header">
                                     Productos con mismo OEM en stock
                                   </div>
-                                  {p.oem_productos.map((op) => (
-                                    <div key={op.producto_id} className="popover-row">
-                                      <div className="popover-row-main">
-                                        <span>{op.nombre}</span>
-                                        <strong>{op.stock_actual}</strong>
-                                      </div>
-                                      <div className="popover-row-meta">
-                                        {op.codigo_producto}
-                                      </div>
-                                      {op.ubicaciones && op.ubicaciones.length > 0 && (
-                                        <div className="popover-row-ubicaciones">
-                                          {op.ubicaciones.map((u) => (
-                                            <span key={u.nombre}>
-                                              {u.nombre}: {u.cantidad}
-                                            </span>
-                                          ))}
+                                  <ul className="popover-list">
+                                    {p.oem_productos.map((op) => (
+                                      <li key={op.producto_id} className="popover-row">
+                                        <div className="popover-row-main">
+                                          <span>{op.nombre}</span>
+                                          <strong>{op.stock_actual}</strong>
                                         </div>
-                                      )}
-                                    </div>
-                                  ))}
+                                        <div className="popover-row-meta">
+                                          {op.codigo_producto}
+                                        </div>
+                                        {op.ubicaciones && op.ubicaciones.length > 0 && (
+                                          <div className="popover-row-ubicaciones">
+                                            {op.ubicaciones.map((u) => (
+                                              <span key={u.nombre}>
+                                                {u.nombre}: {u.cantidad}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </span>
-                              </span>
+                              </button>
                             )}
                           </td>
                           <td>{p.nombre}</td>
