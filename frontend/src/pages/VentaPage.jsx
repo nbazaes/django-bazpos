@@ -466,62 +466,125 @@ export default function VentaPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex justify-end mb-4 text-right">
-          <div style={{ marginBottom: 10 }}>
-            <label style={{
-              display: "inline-flex",
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
+            gap: "0.75rem",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-lg)",
+            padding: "1.25rem 1.5rem",
+            minWidth: 320,
+            boxShadow: "var(--shadow)",
+          }}>
+            <div style={{
+              display: "flex",
               alignItems: "center",
-              gap: 5,
-              background: "var(--bg-elevated)",
-              border: `1px solid ${discount > 0 ? "var(--border-accent)" : "var(--border-default)"}`,
-              borderRadius: "var(--radius)",
-              padding: "3px 10px",
-              fontSize: "0.825rem",
-              color: "var(--text-secondary)",
-              transition: "border-color var(--transition)",
-              cursor: "text",
+              justifyContent: "space-between",
+              gap: "0.75rem",
             }}>
-              <input
-                type="number"
-                style={{
-                  width: 40,
-                  border: "none",
-                  background: "transparent",
-                  color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
-                  fontSize: "0.85rem",
-                  fontFamily: "var(--font-mono)",
+              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>Descuento</span>
+              <label style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                background: discount > 0 ? "var(--accent-soft)" : "var(--bg-input)",
+                border: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
+                borderRadius: "var(--radius)",
+                padding: "0.35rem 0.85rem",
+                transition: "all var(--transition)",
+                boxShadow: discount > 0 ? "0 0 0 3px var(--accent-glow)" : "none",
+                cursor: "text",
+              }}>
+                <input
+                  type="number"
+                  style={{
+                    width: 64,
+                    border: "none",
+                    background: "transparent",
+                    color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
+                    fontSize: "1.4rem",
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 700,
+                    textAlign: "right",
+                    outline: "none",
+                    padding: 0,
+                    MozAppearance: "textfield",
+                  }}
+                  min="0"
+                  max="100"
+                  placeholder="0"
+                  value={descuentoPorcentaje || ""}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setDescuentoPorcentaje(isNaN(val) || val < 0 ? 0 : val > 100 ? 100 : val);
+                  }}
+                />
+                <span style={{
+                  fontSize: "1rem",
                   fontWeight: 600,
-                  textAlign: "right",
-                  outline: "none",
-                  padding: 0,
-                  MozAppearance: "textfield",
-                }}
-                min="0"
-                max="100"
-                placeholder="0"
-                value={descuentoPorcentaje || ""}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  setDescuentoPorcentaje(isNaN(val) || val < 0 ? 0 : val > 100 ? 100 : val);
-                }}
-              />
-              <span style={{ fontWeight: 500, whiteSpace: "nowrap", userSelect: "none" }}>% desc.</span>
-            </label>
-          </div>
-          {discount > 0 && (
-            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-              <span style={{ fontFamily: "var(--font-mono)" }}>Subtotal ${subtotalCarro.toLocaleString()}</span>
-              <span style={{ color: "var(--danger)", marginLeft: 12, fontFamily: "var(--font-mono)" }}>
-                -${(subtotalCarro - totalConDescuento).toLocaleString()}
+                  color: discount > 0 ? "var(--accent)" : "var(--text-secondary)",
+                  userSelect: "none",
+                }}>%</span>
+              </label>
+            </div>
+
+            <div style={{ width: "100%", height: 1, background: "var(--border-default)" }} />
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%" }}>
+              {discount > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.85rem",
+                  color: "var(--text-secondary)",
+                }}>
+                  <span>Subtotal</span>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>${subtotalCarro.toLocaleString()}</span>
+                </div>
+              )}
+              {discount > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.85rem",
+                  color: "var(--danger)",
+                }}>
+                  <span>Descuento ({discount}%)</span>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>-${(subtotalCarro - totalConDescuento).toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "0.9rem",
+                color: "var(--text-secondary)",
+              }}>
+                <span>Neto</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>${netoFromBruto(totalConDescuento).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              width: "100%",
+              paddingTop: "0.6rem",
+              borderTop: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
+            }}>
+              <span style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>Total</span>
+              <span style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "2.1rem",
+                fontWeight: 800,
+                color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
+                letterSpacing: "-0.02em",
+              }}>
+                ${totalConDescuento.toLocaleString()}
               </span>
-            </div>
-          )}
-          <div>
-            <div className="text-sm text-secondary mb-1" style={{ fontFamily: "var(--font-mono)" }}>
-              Total neto: ${netoFromBruto(totalConDescuento).toLocaleString()}
-            </div>
-            <div className="text-xl font-display font-bold" style={{ fontFamily: "var(--font-mono)", fontSize: "1.6rem" }}>
-              Total: ${totalConDescuento.toLocaleString()}
             </div>
           </div>
         </div>
@@ -566,20 +629,54 @@ export default function VentaPage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="text-right mt-3">
-                  {discount > 0 && (
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 4 }}>
-                      <span style={{ fontFamily: "var(--font-mono)" }}>Subtotal ${subtotalCarro.toLocaleString()}</span>
-                      <span style={{ color: "var(--danger)", marginLeft: 12, fontFamily: "var(--font-mono)" }}>
-                        -${(subtotalCarro - totalConDescuento).toLocaleString()}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                    gap: "0.5rem",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-lg)",
+                    padding: "1rem 1.25rem",
+                    minWidth: 260,
+                    boxShadow: "var(--shadow)",
+                  }}>
+                    {discount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                        <span>Subtotal</span>
+                        <span style={{ fontFamily: "var(--font-mono)" }}>${subtotalCarro.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {discount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--danger)" }}>
+                        <span>Descuento ({discount}%)</span>
+                        <span style={{ fontFamily: "var(--font-mono)" }}>-${(subtotalCarro - totalConDescuento).toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                      <span>Neto</span>
+                      <span style={{ fontFamily: "var(--font-mono)" }}>${netoFromBruto(totalConDescuento).toLocaleString()}</span>
+                    </div>
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      width: "100%",
+                      paddingTop: "0.5rem",
+                      borderTop: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
+                    }}>
+                      <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-primary)" }}>Total</span>
+                      <span style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "1.7rem",
+                        fontWeight: 800,
+                        color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
+                        letterSpacing: "-0.02em",
+                      }}>
+                        ${totalConDescuento.toLocaleString()}
                       </span>
                     </div>
-                  )}
-                  <div className="text-sm text-secondary mb-1" style={{ fontFamily: "var(--font-mono)" }}>
-                    Total neto: ${netoFromBruto(totalConDescuento).toLocaleString()}
-                  </div>
-                  <div className="text-xl font-display font-bold" style={{ fontFamily: "var(--font-mono)", fontSize: "1.6rem" }}>
-                    Total: ${totalConDescuento.toLocaleString()}
                   </div>
                 </div>
               </div>
