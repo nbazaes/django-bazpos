@@ -97,6 +97,9 @@ class Venta(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     fecha_venta = models.DateTimeField(default=timezone.now)
     monto_total = models.IntegerField()
+    monto_subtotal = models.IntegerField(default=0)
+    descuento_porcentaje = models.IntegerField(default=0)
+
     class TipoDocumento(models.TextChoices):
         VENTA = 'VE', 'Venta'
         COTIZACION = 'CO', 'Cotizacion'

@@ -260,7 +260,15 @@ export default function PedidosPage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="text-right mt-4 text-lg font-bold">Total: ${detalleVentaData.monto_total}</div>
+                <div className="text-right mt-4">
+                  {detalleVentaData.descuento_porcentaje > 0 && (
+                    <div className="text-secondary">
+                      Subtotal: ${detalleVentaData.monto_subtotal}<br />
+                      Descuento ({detalleVentaData.descuento_porcentaje}%): -${detalleVentaData.monto_descuento}
+                    </div>
+                  )}
+                  <div className="text-lg font-bold">Total: ${detalleVentaData.monto_total}</div>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalleVentaId(null)}>Cerrar</button>

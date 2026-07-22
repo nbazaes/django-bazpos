@@ -76,6 +76,7 @@ class VentaSerializer(serializers.ModelSerializer):
     tipo_documento_display = serializers.CharField(source="get_tipo_documento_display", read_only=True)
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     productos_devueltos = serializers.SerializerMethodField()
+    monto_descuento = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
@@ -85,6 +86,9 @@ class VentaSerializer(serializers.ModelSerializer):
             "usuario_nombre",
             "fecha_venta",
             "monto_total",
+            "monto_subtotal",
+            "descuento_porcentaje",
+            "monto_descuento",
             "estado",
             "estado_display",
             "tipo_documento",
@@ -92,6 +96,11 @@ class VentaSerializer(serializers.ModelSerializer):
             "detalles",
             "productos_devueltos",
         ]
+
+    def get_monto_descuento(self, obj):
+        if obj.descuento_porcentaje and obj.monto_subtotal:
+            return obj.monto_subtotal - obj.monto_total
+        return 0
 
     def get_productos_devueltos(self, obj):
         devueltos = (
@@ -103,26 +112,59 @@ class VentaSerializer(serializers.ModelSerializer):
         return {d["producto_id"]: d["total"] for d in devueltos}
 
 
+def _round_total(amount):
+    remainder = amount % 1000
+    if remainder >= 900:
+        return ((amount // 1000) + 1) * 1000
+    return (amount // 1000) * 1000
+
+
 class RegistrarVentaSerializer(serializers.Serializer):
     productos = VentaDetalleInputSerializer(many=True)
     total = serializers.IntegerField(min_value=0)
+    descuento_porcentaje = serializers.IntegerField(min_value=0, max_value=100, default=0, required=False)
+    monto_subtotal = serializers.IntegerField(min_value=0, required=False)
     tipo_documento = serializers.ChoiceField(
         choices=Venta.TipoDocumento.choices,
         default=Venta.TipoDocumento.VENTA,
         required=False,
     )
 
+    def validate(self, data):
+        subtotal = data.get("monto_subtotal")
+        total = data.get("total")
+        descuento = data.get("descuento_porcentaje", 0)
+
+        if descuento > 0:
+            if not subtotal:
+                raise serializers.ValidationError({"monto_subtotal": "Requerido cuando se aplica descuento"})
+
+            discounted = int(subtotal * (1 - descuento / 100))
+            expected = _round_total(discounted)
+
+            if total != expected:
+                raise serializers.ValidationError({
+                    "total": f"El total con descuento no coincide con el redondeo esperado. "
+                             f"Subtotal={subtotal}, descuento={descuento}%, esperado={expected}, recibido={total}"
+                })
+
+        return data
+
     @transaction.atomic
     def create(self, validated_data):
         request = self.context["request"]
         productos = validated_data["productos"]
         total = validated_data["total"]
+        descuento_porcentaje = validated_data.get("descuento_porcentaje", 0)
+        monto_subtotal = validated_data.get("monto_subtotal", total)
         tipo_documento = validated_data.get("tipo_documento", Venta.TipoDocumento.VENTA)
         estado = Venta.Estado.COMPLETADA if tipo_documento == Venta.TipoDocumento.VENTA else Venta.Estado.PENDIENTE
 
         venta = Venta.objects.create(
             usuario=request.user,
             monto_total=total,
+            monto_subtotal=monto_subtotal,
+            descuento_porcentaje=descuento_porcentaje,
             estado=estado,
             tipo_documento=tipo_documento,
         )

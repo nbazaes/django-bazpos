@@ -5,6 +5,12 @@ import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
 
+function roundTotal(amount) {
+  const remainder = amount % 1000;
+  if (remainder >= 900) return (Math.floor(amount / 1000) + 1) * 1000;
+  return Math.floor(amount / 1000) * 1000;
+}
+
 export default function VentaPage() {
   usePageTitle("Realizar venta");
   const [oem, setOem] = useState("");
@@ -21,13 +27,17 @@ export default function VentaPage() {
   const [showUbicacionDialog, setShowUbicacionDialog] = useState(false);
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
   const taxPercent = getTaxPercent();
   const factor = 1 + taxPercent / 100;
   const netoFromBruto = (monto) => Math.round(Number(monto || 0) / factor);
-  const totalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+  const subtotalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
   const totalNetoCarro = carro.reduce((sum, item) => sum + netoFromBruto(item.precio * item.cantidad), 0);
+  const discount = descuentoPorcentaje > 0 ? descuentoPorcentaje : 0;
+  const discountedTotal = Math.round(subtotalCarro * (1 - discount / 100));
+  const totalConDescuento = roundTotal(discountedTotal);
 
   async function buscarProducto(texto) {
     if (!texto.trim()) {
@@ -156,6 +166,7 @@ export default function VentaPage() {
 
   function buildDocumento(tipoDocumento) {
     const ahora = new Date();
+    const total = totalConDescuento;
     return {
       tienda: STORE_NAME,
       tipo_documento: tipoDocumento,
@@ -165,9 +176,11 @@ export default function VentaPage() {
         subtotal: item.precio * item.cantidad,
         subtotal_neto: netoFromBruto(item.precio * item.cantidad),
       })),
-      total: totalCarro,
-      total_neto: totalNetoCarro,
-      impuesto: totalCarro - totalNetoCarro,
+      total: total,
+      total_neto: netoFromBruto(total),
+      impuesto: total - netoFromBruto(total),
+      descuento_porcentaje: discount,
+      subtotal_original: subtotalCarro,
     };
   }
 
@@ -210,6 +223,8 @@ export default function VentaPage() {
             </tbody>
           </table>
           <div class="line"></div>
+          <p class="right">Subtotal: $${documento.subtotal_original}</p>
+          ${documento.descuento_porcentaje > 0 ? `<p class="right">Descuento (${documento.descuento_porcentaje}%): -$${documento.subtotal_original - documento.total}</p>` : ""}
           <p class="right">Neto: $${documento.total_neto}</p>
           <p class="right">Impuesto: $${documento.impuesto}</p>
           <p class="right"><strong>Total: $${documento.total}</strong></p>
@@ -264,12 +279,16 @@ export default function VentaPage() {
 
   async function guardar(tipoDocumento = "VE") {
     try {
-      const total = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+      const subtotal = subtotalCarro;
+      const discounted = Math.round(subtotal * (1 - discount / 100));
+      const total = roundTotal(discounted);
       await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
       const result = await apiRequest("/ventas/", {
         method: "POST",
         body: {
           total,
+          descuento_porcentaje: discount,
+          monto_subtotal: subtotal,
           tipo_documento: tipoDocumento,
           productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
         },
@@ -449,9 +468,31 @@ export default function VentaPage() {
           </table>
         </div>
         <div className="flex justify-end mb-4 text-right">
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+              <label className="text-sm text-secondary" style={{ whiteSpace: "nowrap" }}>Desc. %:</label>
+              <input
+                type="number"
+                className="form-control form-control-sm"
+                style={{ width: 70 }}
+                min="0"
+                max="100"
+                value={descuentoPorcentaje || ""}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setDescuentoPorcentaje(isNaN(val) || val < 0 ? 0 : val > 100 ? 100 : val);
+                }}
+              />
+            </div>
+          </div>
+          {discount > 0 && (
+            <div className="text-sm text-secondary mb-1">
+              Subtotal: ${subtotalCarro} &rarr; Descuento ({discount}%): -${subtotalCarro - totalConDescuento}
+            </div>
+          )}
           <div>
-            <div className="text-sm text-secondary mb-1">Total neto: ${totalNetoCarro}</div>
-            <div className="text-xl font-display font-bold">Total: ${totalCarro}</div>
+            <div className="text-sm text-secondary mb-1">Total neto: ${netoFromBruto(totalConDescuento)}</div>
+            <div className="text-xl font-display font-bold">Total: ${totalConDescuento}</div>
           </div>
         </div>
         <div className="btn-group">
@@ -496,8 +537,13 @@ export default function VentaPage() {
                   </table>
                 </div>
                 <div className="text-right mt-3">
-                  <div className="text-sm text-secondary mb-1">Total neto: ${totalNetoCarro}</div>
-                  <div className="text-xl font-display font-bold">Total: ${totalCarro}</div>
+                  {discount > 0 && (
+                    <div className="text-sm text-secondary mb-1">
+                      Subtotal: ${subtotalCarro} &rarr; Descuento ({discount}%): -${subtotalCarro - totalConDescuento}
+                    </div>
+                  )}
+                  <div className="text-sm text-secondary mb-1">Total neto: ${netoFromBruto(totalConDescuento)}</div>
+                  <div className="text-xl font-display font-bold">Total: ${totalConDescuento}</div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -537,6 +583,13 @@ export default function VentaPage() {
                     </div>
                   ))}
                   <hr />
+                  <div className="flex justify-between" style={{ color: "#333" }}><span>Subtotal</span><span>${lastDocumento.subtotal_original}</span></div>
+                  {lastDocumento.descuento_porcentaje > 0 && (
+                    <div className="flex justify-between" style={{ color: "var(--danger)" }}>
+                      <span>Descuento ({lastDocumento.descuento_porcentaje}%)</span>
+                      <span>-${lastDocumento.subtotal_original - lastDocumento.total}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
                   <div className="flex justify-between font-bold" style={{ color: "#1a1a1a" }}><span>Total</span><span>${lastDocumento.total}</span></div>
