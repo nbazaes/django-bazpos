@@ -194,13 +194,13 @@ export default function FacturaFormPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Producto no encontrado</h5>
-                <button type="button" className="modal-close" onClick={() => setShowCreatePrompt(false)}>&times;</button>
+                <button type="button" className="modal-close" onClick={() => { setShowCreatePrompt(false); setSearchCodigo(""); }}>&times;</button>
               </div>
               <div className="modal-body">
                 <p className="mb-0 text-secondary">No existe ese código. ¿Desea crear un producto ahora?</p>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreatePrompt(false)}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreatePrompt(false); setSearchCodigo(""); }}>Cancelar</button>
                 <button type="button" className="btn btn-primary" onClick={abrirCrearProducto}>Crear producto</button>
               </div>
             </div>
