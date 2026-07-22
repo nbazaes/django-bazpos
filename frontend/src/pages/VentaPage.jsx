@@ -34,10 +34,9 @@ export default function VentaPage() {
   const factor = 1 + taxPercent / 100;
   const netoFromBruto = (monto) => Math.round(Number(monto || 0) / factor);
   const subtotalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
-  const totalNetoCarro = carro.reduce((sum, item) => sum + netoFromBruto(item.precio * item.cantidad), 0);
   const discount = descuentoPorcentaje > 0 ? descuentoPorcentaje : 0;
   const discountedTotal = Math.round(subtotalCarro * (1 - discount / 100));
-  const totalConDescuento = roundTotal(discountedTotal);
+  const totalConDescuento = discount > 0 ? roundTotal(discountedTotal) : subtotalCarro;
 
   async function buscarProducto(texto) {
     if (!texto.trim()) {
@@ -281,7 +280,7 @@ export default function VentaPage() {
     try {
       const subtotal = subtotalCarro;
       const discounted = Math.round(subtotal * (1 - discount / 100));
-      const total = roundTotal(discounted);
+      const total = discount > 0 ? roundTotal(discounted) : subtotal;
       await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
       const result = await apiRequest("/ventas/", {
         method: "POST",
@@ -468,31 +467,62 @@ export default function VentaPage() {
           </table>
         </div>
         <div className="flex justify-end mb-4 text-right">
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-              <label className="text-sm text-secondary" style={{ whiteSpace: "nowrap" }}>Desc. %:</label>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--bg-elevated)",
+              border: `1px solid ${discount > 0 ? "var(--border-accent)" : "var(--border-default)"}`,
+              borderRadius: "var(--radius)",
+              padding: "3px 10px",
+              fontSize: "0.825rem",
+              color: "var(--text-secondary)",
+              transition: "border-color var(--transition)",
+              cursor: "text",
+            }}>
               <input
                 type="number"
-                className="form-control form-control-sm"
-                style={{ width: 70 }}
+                style={{
+                  width: 40,
+                  border: "none",
+                  background: "transparent",
+                  color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
+                  fontSize: "0.85rem",
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 600,
+                  textAlign: "right",
+                  outline: "none",
+                  padding: 0,
+                  MozAppearance: "textfield",
+                }}
                 min="0"
                 max="100"
+                placeholder="0"
                 value={descuentoPorcentaje || ""}
                 onChange={(e) => {
                   const val = parseInt(e.target.value, 10);
                   setDescuentoPorcentaje(isNaN(val) || val < 0 ? 0 : val > 100 ? 100 : val);
                 }}
               />
-            </div>
+              <span style={{ fontWeight: 500, whiteSpace: "nowrap", userSelect: "none" }}>% desc.</span>
+            </label>
           </div>
           {discount > 0 && (
-            <div className="text-sm text-secondary mb-1">
-              Subtotal: ${subtotalCarro} &rarr; Descuento ({discount}%): -${subtotalCarro - totalConDescuento}
+            <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 4 }}>
+              <span style={{ fontFamily: "var(--font-mono)" }}>Subtotal ${subtotalCarro.toLocaleString()}</span>
+              <span style={{ color: "var(--danger)", marginLeft: 12, fontFamily: "var(--font-mono)" }}>
+                -${(subtotalCarro - totalConDescuento).toLocaleString()}
+              </span>
             </div>
           )}
           <div>
-            <div className="text-sm text-secondary mb-1">Total neto: ${netoFromBruto(totalConDescuento)}</div>
-            <div className="text-xl font-display font-bold">Total: ${totalConDescuento}</div>
+            <div className="text-sm text-secondary mb-1" style={{ fontFamily: "var(--font-mono)" }}>
+              Total neto: ${netoFromBruto(totalConDescuento).toLocaleString()}
+            </div>
+            <div className="text-xl font-display font-bold" style={{ fontFamily: "var(--font-mono)", fontSize: "1.6rem" }}>
+              Total: ${totalConDescuento.toLocaleString()}
+            </div>
           </div>
         </div>
         <div className="btn-group">
@@ -538,12 +568,19 @@ export default function VentaPage() {
                 </div>
                 <div className="text-right mt-3">
                   {discount > 0 && (
-                    <div className="text-sm text-secondary mb-1">
-                      Subtotal: ${subtotalCarro} &rarr; Descuento ({discount}%): -${subtotalCarro - totalConDescuento}
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 4 }}>
+                      <span style={{ fontFamily: "var(--font-mono)" }}>Subtotal ${subtotalCarro.toLocaleString()}</span>
+                      <span style={{ color: "var(--danger)", marginLeft: 12, fontFamily: "var(--font-mono)" }}>
+                        -${(subtotalCarro - totalConDescuento).toLocaleString()}
+                      </span>
                     </div>
                   )}
-                  <div className="text-sm text-secondary mb-1">Total neto: ${netoFromBruto(totalConDescuento)}</div>
-                  <div className="text-xl font-display font-bold">Total: ${totalConDescuento}</div>
+                  <div className="text-sm text-secondary mb-1" style={{ fontFamily: "var(--font-mono)" }}>
+                    Total neto: ${netoFromBruto(totalConDescuento).toLocaleString()}
+                  </div>
+                  <div className="text-xl font-display font-bold" style={{ fontFamily: "var(--font-mono)", fontSize: "1.6rem" }}>
+                    Total: ${totalConDescuento.toLocaleString()}
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">
