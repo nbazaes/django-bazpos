@@ -61,6 +61,8 @@ class Producto(models.Model):
     stock_maximo = models.IntegerField()
     margen_utilidad = models.DecimalField(max_digits=5, decimal_places=2)
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
+    ignorar_stock_permanente = models.BooleanField(default=False)
+    recordar_stock_desde = models.DateTimeField(null=True, blank=True)
 
     objects = ProductoManager()
 

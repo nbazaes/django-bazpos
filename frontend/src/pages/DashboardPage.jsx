@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
 import { getUser } from "../lib/auth";
-import { useDashboardStats } from "../lib/queries";
+import { apiRequest } from "../lib/api";
+import { queryKeys, useDashboardStats } from "../lib/queries";
 import { useToast } from "../lib/toast";
 
 function StatCard({ title, value, variant }) {
@@ -23,6 +25,26 @@ export default function DashboardPage() {
   usePageTitle("Dashboard");
   const didToast = useRef(false);
   const { data, error } = useDashboardStats();
+  const queryClient = useQueryClient();
+
+  const ignorarMutation = useMutation({
+    mutationFn: ({ productoId, accion }) =>
+      apiRequest(`/productos/${productoId}/ignorar-stock/`, {
+        method: "POST",
+        body: { accion },
+      }),
+    onSuccess: (_, variables) => {
+      const mensaje =
+        variables.accion === "recordar_manana"
+          ? "Producto recordado para mañana"
+          : "Producto ignorado permanentemente";
+      showToast(mensaje, "success");
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+    onError: (err) => {
+      showToast(err.message || "No se pudo actualizar el producto", "danger");
+    },
+  });
 
   useEffect(() => {
     if (!didToast.current && location.state?.welcome) {
@@ -92,14 +114,97 @@ export default function DashboardPage() {
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Nombre</th><th>Stock actual</th><th>Stock mínimo</th></tr>
+                      <tr>
+                        <th style={{ width: "40px" }}></th>
+                        <th>Código</th>
+                        <th>OEM</th>
+                        <th>Proveedor</th>
+                        <th>Stock actual</th>
+                        <th>Stock mínimo</th>
+                        <th>Acciones</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {data.stock.bajo_minimo.map((p) => (
                         <tr key={p.producto_id}>
-                          <td>{p.nombre}</td>
+                          <td className="text-center">
+                            {p.oem_productos && p.oem_productos.length > 0 && (
+                              <span
+                                className="stock-hover warning-icon"
+                                title="Existen productos con el mismo OEM que tienen stock"
+                              >
+                                <i className="bi bi-exclamation-triangle-fill"></i>
+                                <span className="stock-popover">
+                                  <div className="popover-header">
+                                    Productos con mismo OEM en stock
+                                  </div>
+                                  {p.oem_productos.map((op) => (
+                                    <div key={op.producto_id} className="popover-row">
+                                      <div className="popover-row-main">
+                                        <span>{op.nombre}</span>
+                                        <strong>{op.stock_actual}</strong>
+                                      </div>
+                                      <div className="popover-row-meta">
+                                        {op.codigo_producto}
+                                      </div>
+                                      {op.ubicaciones && op.ubicaciones.length > 0 && (
+                                        <div className="popover-row-ubicaciones">
+                                          {op.ubicaciones.map((u) => (
+                                            <span key={u.nombre}>
+                                              {u.nombre}: {u.cantidad}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </span>
+                              </span>
+                            )}
+                          </td>
+                          <td>{p.codigo_producto}</td>
+                          <td>{p.oem}</td>
+                          <td>{p.proveedor_nombre}</td>
                           <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
                           <td>{p.stock_minimo}</td>
+                          <td>
+                            <div className="btn-group flex-wrap">
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() =>
+                                  ignorarMutation.mutate({
+                                    productoId: p.producto_id,
+                                    accion: "recordar_manana",
+                                  })
+                                }
+                                disabled={ignorarMutation.isPending}
+                              >
+                                Recordar mañana
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() =>
+                                  ignorarMutation.mutate({
+                                    productoId: p.producto_id,
+                                    accion: "ignorar_permanente",
+                                  })
+                                }
+                                disabled={ignorarMutation.isPending}
+                              >
+                                Ignorar permanentemente
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline"
+                                onClick={() => {
+                                  // TODO: agregar a pedido
+                                }}
+                                disabled
+                                title="Próximamente"
+                              >
+                                Agregar a pedido
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

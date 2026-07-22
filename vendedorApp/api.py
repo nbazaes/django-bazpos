@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db.models import Count, F, Q, Sum
 from django.db import transaction
 from django.utils import timezone
@@ -78,11 +80,54 @@ class DashboardStatsView(APIView):
                 }
             ]
 
-        bajo_minimo = list(
-            Producto.objects.filter(stock_actual__lt=F("stock_minimo"), stock_minimo__gt=0)
-            .values("producto_id", "nombre", "stock_actual", "stock_minimo")
+        now = timezone.now()
+        bajo_minimo_qs = (
+            Producto.objects.filter(
+                stock_actual__lt=F("stock_minimo"),
+                stock_minimo__gt=0,
+                ignorar_stock_permanente=False,
+            )
+            .filter(Q(recordar_stock_desde__isnull=True) | Q(recordar_stock_desde__lte=now))
+            .values(
+                "producto_id",
+                "codigo_producto",
+                "oem",
+                "nombre",
+                "proveedor__nombre",
+                "stock_actual",
+                "stock_minimo",
+            )
             .order_by("stock_actual")[:10]
         )
+        bajo_minimo = list(bajo_minimo_qs)
+
+        # Find related products by OEM that have active stock.
+        if bajo_minimo:
+            oems = [p["oem"] for p in bajo_minimo]
+            producto_ids = [p["producto_id"] for p in bajo_minimo]
+            oem_productos = (
+                Producto.objects.filter(oem__in=oems, stock_actual__gt=0)
+                .exclude(producto_id__in=producto_ids)
+                .prefetch_related("stocks_ubicacion__ubicacion")
+            )
+            oem_map = {}
+            for p in oem_productos:
+                oem_map.setdefault(p.oem, []).append(
+                    {
+                        "producto_id": p.producto_id,
+                        "codigo_producto": p.codigo_producto,
+                        "nombre": p.nombre,
+                        "stock_actual": p.stock_actual,
+                        "ubicaciones": [
+                            {"nombre": s.ubicacion.nombre, "cantidad": s.cantidad}
+                            for s in p.stocks_ubicacion.all()
+                            if s.cantidad > 0
+                        ],
+                    }
+                )
+            for p in bajo_minimo:
+                p["proveedor_nombre"] = p.pop("proveedor__nombre")
+                p["oem_productos"] = oem_map.get(p["oem"], [])
 
         return Response(
             {
@@ -116,6 +161,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         "por_codigo": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "ignorar_stock": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
@@ -198,6 +244,25 @@ class ProductoViewSet(viewsets.ModelViewSet):
         ajustes = producto.ajustes_stock.select_related("ubicacion", "usuario").all()
         serializer = AjusteStockSerializer(ajustes, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="ignorar-stock")
+    def ignorar_stock(self, request, pk=None):
+        producto = self.get_object()
+        accion = request.data.get("accion")
+
+        if accion == "recordar_manana":
+            producto.recordar_stock_desde = timezone.now().date() + timedelta(days=1)
+            producto.save(update_fields=["recordar_stock_desde"])
+        elif accion == "ignorar_permanente":
+            producto.ignorar_stock_permanente = True
+            producto.save(update_fields=["ignorar_stock_permanente"])
+        else:
+            return Response(
+                {"error": "Acción inválida. Use 'recordar_manana' o 'ignorar_permanente'."},
+                status=400,
+            )
+
+        return Response({"ok": True})
 
 
 class DeducirStockInputSerializer(serializers.Serializer):
