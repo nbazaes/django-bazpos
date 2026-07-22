@@ -116,6 +116,7 @@ export default function DashboardPage() {
                     <thead>
                       <tr>
                         <th style={{ width: "40px" }}></th>
+                        <th>Nombre</th>
                         <th>Código</th>
                         <th>OEM</th>
                         <th>Proveedor</th>
@@ -162,6 +163,7 @@ export default function DashboardPage() {
                               </span>
                             )}
                           </td>
+                          <td>{p.nombre}</td>
                           <td>{p.codigo_producto}</td>
                           <td>{p.oem}</td>
                           <td>{p.proveedor_nombre}</td>
