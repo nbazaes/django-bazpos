@@ -50,7 +50,10 @@ class DashboardStatsView(APIView):
             user.groups.filter(name__in=["Gerente", "Encargado"]).exists() or user.is_superuser
         )
 
-        ventas_hoy = Venta.objects.filter(fecha_venta__date=hoy, estado=Venta.Estado.COMPLETADA)
+        ventas_hoy = (
+            Venta.objects.filter(fecha_venta__date=hoy, estado=Venta.Estado.COMPLETADA)
+            .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
+        )
 
         if es_gerente:
             total_dia = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
