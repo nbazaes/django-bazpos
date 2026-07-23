@@ -198,7 +198,7 @@ export default function PedidosHistorial() {
                     {p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
                     )}
-                    <button className="btn btn-sm btn-danger" onClick={() => setDesactivarId(p.id)}>Eliminar retiro</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => setDesactivarId(p.id)}>Eliminar pedido</button>
                   </td>
                 </tr>
               );
