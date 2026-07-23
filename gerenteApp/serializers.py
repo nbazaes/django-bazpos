@@ -110,6 +110,7 @@ class DetalleFacturaSerializer(serializers.ModelSerializer):
     marca = serializers.CharField(source="producto.marca", read_only=True)
     codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
     codigo_oem = serializers.CharField(source="producto.oem", read_only=True)
+    margen_utilidad = serializers.DecimalField(source="producto.margen_utilidad", max_digits=5, decimal_places=2, read_only=True)
 
     class Meta:
         model = DetalleFactura
@@ -122,6 +123,7 @@ class DetalleFacturaSerializer(serializers.ModelSerializer):
             "codigo_oem",
             "cantidad",
             "costo_compra",
+            "margen_utilidad",
         ]
 
 

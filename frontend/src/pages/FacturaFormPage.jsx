@@ -11,6 +11,7 @@ import {
   useProveedores,
   useUpdateFactura,
 } from "../lib/queries";
+import { calcularPrecioVenta } from "../lib/tax";
 
 function todayLocal() {
   const now = new Date();
@@ -47,7 +48,7 @@ export default function FacturaFormPage() {
     if (!productoSearchData) return;
     if (productoSearchData.encontrado) {
       const p = productoSearchData.producto;
-      setItems((prev) => [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1 }]);
+      setItems((prev) => [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1, margen_utilidad: Number(p.margen_utilidad) || 0 }]);
       setProductoId("");
       setSearchCodigo("");
       setError("");
@@ -77,6 +78,7 @@ export default function FacturaFormPage() {
           nombre: d.nombre,
           precio: d.costo_compra,
           cantidad: d.cantidad,
+          margen_utilidad: Number(d.margen_utilidad) || 0,
         }))
       );
     }
@@ -89,7 +91,7 @@ export default function FacturaFormPage() {
     setItems((prev) => {
       const exists = prev.find((it) => it.producto_id === p.producto_id);
       if (exists) return prev;
-      return [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1 }];
+      return [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1, margen_utilidad: Number(p.margen_utilidad) || 0 }];
     });
     setProductoId("");
     setError("");
@@ -160,7 +162,7 @@ export default function FacturaFormPage() {
 
           <div className="table-responsive">
             <table className="table table-sm table-bordered">
-              <thead><tr><th>Código</th><th>Nombre</th><th>Precio costo</th><th>Precio con IVA</th><th>Cantidad</th><th></th></tr></thead>
+              <thead><tr><th>Código</th><th>Nombre</th><th>Precio costo</th><th>Precio con IVA</th><th>Cantidad</th><th style={{ whiteSpace: "nowrap" }}>Margen utilidad (%)</th><th>Precio venta</th><th></th></tr></thead>
               <tbody>
                 {items.map((it, idx) => (
                   <tr key={`${it.producto_id}-${idx}`}>
@@ -182,7 +184,9 @@ export default function FacturaFormPage() {
                         incrementLabel={`Aumentar cantidad de ${it.nombre}`}
                       />
                     </td>
-                    <td><button type="button" className="btn btn-sm btn-danger" onClick={() => setItems(items.filter((_, i) => i !== idx))}>X</button></td>
+                    <td><input className="form-control form-control-sm" type="number" step="0.01" style={{ width: 80 }} value={it.margen_utilidad} onChange={(e) => { const next = [...items]; next[idx].margen_utilidad = e.target.value; setItems(next); }} /></td>
+                    <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, whiteSpace: "nowrap" }}>${calcularPrecioVenta(it.precio, it.margen_utilidad).toLocaleString()}</td>
+                    <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}></i></td>
                   </tr>
                 ))}
               </tbody>

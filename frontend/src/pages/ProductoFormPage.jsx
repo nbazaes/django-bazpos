@@ -9,14 +9,7 @@ import {
   useProveedores,
   useUpdateProducto,
 } from "../lib/queries";
-
-function calcularPrecioVenta(precioCosto, margenUtilidad) {
-  const costo = Number(precioCosto) || 0;
-  const pct = Number(margenUtilidad) || 0;
-  const base = costo * (1 + pct / 100);
-  const baseIva = Math.trunc(base * 1.19);
-  return Math.ceil(baseIva / 100) * 100;
-}
+import { calcularPrecioVenta } from "../lib/tax";
 
 const initialState = {
   codigo_producto: "",

@@ -142,6 +142,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
                     "marca": producto.marca,
                     "stock_actual": producto.stock_actual,
                     "precio_costo": producto.precio_costo,
+                    "margen_utilidad": float(producto.margen_utilidad),
                     "precio_venta": producto.precio,
                 },
             }
