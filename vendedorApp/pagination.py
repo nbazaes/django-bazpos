@@ -17,3 +17,7 @@ class VentaPagination(DefaultPagination):
 
 class DevolucionPagination(DefaultPagination):
     pass
+
+
+class PedidoPagination(DefaultPagination):
+    pass

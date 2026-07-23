@@ -46,6 +46,11 @@ export const queryKeys = {
     list: (params) => ["ubicaciones", "list", params],
     detail: (id) => ["ubicaciones", "detail", id],
   },
+  pedidos: {
+    all: ["pedidos"],
+    list: (params) => ["pedidos", "list", params],
+    detail: (id) => ["pedidos", "detail", id],
+  },
   dashboard: ["dashboard", "stats"],
 };
 
@@ -202,6 +207,51 @@ export function useDevolucion(id) {
     queryKey: queryKeys.devoluciones.detail(id),
     queryFn: () => apiRequest(`/devoluciones/${id}/`),
     enabled: !!id,
+  });
+}
+
+// ── Pedidos ──
+
+export function usePedidos(params = {}) {
+  return useQuery({
+    queryKey: queryKeys.pedidos.list(params),
+    queryFn: () => apiRequest(`/pedidos/${buildQuery(params)}`),
+    placeholderData: placeholderData(),
+    staleTime: 30_000,
+  });
+}
+
+export function usePedido(id) {
+  return useQuery({
+    queryKey: queryKeys.pedidos.detail(id),
+    queryFn: () => apiRequest(`/pedidos/${id}/`),
+    enabled: !!id,
+  });
+}
+
+export function useCreatePedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => apiRequest("/pedidos/", { method: "POST", body: data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.ventas.all });
+    },
+  });
+}
+
+export function useCambiarEstadoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pedidoId, estado, estado_documento }) =>
+      apiRequest(`/pedidos/${pedidoId}/cambiar-estado/`, {
+        method: "POST",
+        body: { estado, estado_documento },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+    },
   });
 }
 

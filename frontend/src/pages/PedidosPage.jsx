@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
+import PedidosHistorial from "../components/PedidosHistorial";
 import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../components/Shell";
 import {
@@ -181,16 +182,26 @@ export default function PedidosPage() {
             >
               Devoluciones
             </button>
+            <button
+              className={`btn btn-sm ${tab === "pedidos" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => handleTabChange("pedidos")}
+            >
+              Pedidos
+            </button>
           </div>
         </div>
-        <div className="table-responsive">
-          <table className="table table-sm table-bordered">
-            <thead>
-              <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
-            </thead>
-            <tbody>
-              {tab === "ventas"
-                ? rows.map((v) => (
+
+        {tab === "pedidos" ? (
+          <PedidosHistorial />
+        ) : (
+          <>
+            <div className="table-responsive">
+              <table className="table table-sm table-bordered">
+                <thead>
+                  <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {tab === "ventas" && rows.map((v) => (
                     <tr key={v.id}>
                       <td>{v.id}</td>
                       <td>{v.fecha_venta}</td>
@@ -208,8 +219,8 @@ export default function PedidosPage() {
                         )}
                       </td>
                     </tr>
-                  ))
-                : rows.map((d) => (
+                  ))}
+                  {tab === "devoluciones" && rows.map((d) => (
                     <tr key={d.id} className="table-warning">
                       <td>D#{d.id}</td>
                       <td>{d.fecha_devolucion}</td>
@@ -222,16 +233,18 @@ export default function PedidosPage() {
                       </td>
                     </tr>
                   ))}
-              {rows.length === 0 && (
-                <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
-          <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
-        </div>
+                  {rows.length === 0 && (
+                    <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+              <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
+            </div>
+          </>
+        )}
       </PageCard>
 
       {detalleVentaId && detalleVentaData && (

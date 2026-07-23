@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import VentaPage from "./pages/VentaPage";
 import PedidosPage from "./pages/PedidosPage";
+import PedidosCrearPage from "./pages/PedidosCrearPage";
 import InventarioPage from "./pages/InventarioPage";
 import ProductosPage from "./pages/ProductosPage";
 import ProductoFormPage from "./pages/ProductoFormPage";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           { path: "ventas", element: <VentaPage /> },
+          { path: "ventas/pedidos", element: <PedidosCrearPage /> },
           { path: "ventas/historial", element: <PedidosPage /> },
           { path: "ventas/inventario", element: <InventarioPage /> },
           {

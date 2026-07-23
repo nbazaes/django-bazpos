@@ -9,20 +9,23 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Pedido, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AjustarStockInputSerializer,
     AjusteStockSerializer,
     AnulacionInputSerializer,
     AnulacionSerializer,
+    CrearPedidoSerializer,
     DevolucionInputSerializer,
     DevolucionSerializer,
+    PedidoSerializer,
     ProductoSerializer,
     RegistrarVentaSerializer,
     VentaSerializer,
 )
 from vendedorApp.pagination import (
     DevolucionPagination,
+    PedidoPagination,
     ProductoPagination,
     VentaPagination,
 )
@@ -587,3 +590,69 @@ class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset
         return queryset.filter(venta__usuario=user)
+
+
+class CambiarEstadoPedidoSerializer(serializers.Serializer):
+    estado = serializers.ChoiceField(choices=Pedido.Estado.choices, required=False)
+    estado_documento = serializers.ChoiceField(choices=Pedido.EstadoDocumento.choices, required=False)
+
+
+class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
+    queryset = Pedido.objects.select_related("usuario", "venta").prefetch_related("detalles__proveedor", "detalles__producto").all().order_by("-fecha_creacion")
+    serializer_class = PedidoSerializer
+    pagination_class = PedidoPagination
+    role_action_map = {
+        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "cambiar_estado": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+    }
+
+    def create(self, request, *args, **kwargs):
+        serializer = CrearPedidoSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        pedido = serializer.save()
+        output = PedidoSerializer(pedido, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    def _descontar_stock_pedido(self, pedido):
+        for detalle in pedido.detalles.filter(producto__isnull=False):
+            producto = detalle.producto
+            cantidad = 1
+            stocks = StockProductoUbicacion.objects.select_for_update().filter(
+                producto=producto, cantidad__gt=0
+            ).order_by("-cantidad")
+
+            restante = cantidad
+            for stock in stocks:
+                if restante <= 0:
+                    break
+                disponible = min(stock.cantidad, restante)
+                stock.cantidad -= disponible
+                stock.save()
+                restante -= disponible
+
+            if restante > 0:
+                raise serializers.ValidationError(
+                    {"estado": f"Stock insuficiente para {producto.nombre}"}
+                )
+        pedido.stock_descontado = True
+
+    @action(detail=True, methods=["post"], url_path="cambiar-estado")
+    def cambiar_estado(self, request, pk=None):
+        pedido = self.get_object()
+        serializer = CambiarEstadoPedidoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            if "estado" in data:
+                pedido.estado = data["estado"]
+                if pedido.estado == Pedido.Estado.RETIRADO and not pedido.stock_descontado:
+                    self._descontar_stock_pedido(pedido)
+            if "estado_documento" in data:
+                pedido.estado_documento = data["estado_documento"]
+            pedido.save(update_fields=["estado", "estado_documento", "stock_descontado"])
+
+        return Response(PedidoSerializer(pedido, context={"request": request}).data)

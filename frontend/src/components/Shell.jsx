@@ -17,6 +17,7 @@ export function usePageTitle(title) {
 const vendedorLinks = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/ventas", label: "Ventas" },
+  { to: "/ventas/pedidos", label: "Pedidos" },
   { to: "/ventas/historial", label: "Historial" },
   { to: "/ventas/inventario", label: "Inventario" },
 ];
