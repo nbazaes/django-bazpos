@@ -230,7 +230,10 @@ class Pedido(models.Model):
         choices=EstadoDocumento.choices,
         default=EstadoDocumento.SIN_BOLETEAR,
     )
+    persona_retiro = models.CharField(max_length=200, blank=True, default="")
+    fecha_retiro = models.DateTimeField(null=True, blank=True)
     stock_descontado = models.BooleanField(default=False)
+    activo = models.BooleanField(default=True)
     venta = models.ForeignKey(
         Venta,
         on_delete=models.SET_NULL,
