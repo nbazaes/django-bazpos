@@ -245,7 +245,7 @@ export default function PedidosHistorial() {
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Cód. Prov.</th><th>Proveedor</th><th>OEM</th><th>Nombre</th><th>Precio costo</th><th>% Utilidad</th><th>Total</th></tr>
+                      <tr><th>Cód. Prov.</th><th>Proveedor</th><th>OEM</th><th>Nombre</th><th>Precio costo</th><th>% Utilidad</th><th>Envío</th><th>Stellantis</th><th>Total</th></tr>
                     </thead>
                     <tbody>
                       {(detalleData.detalles || []).map((d) => (
@@ -256,6 +256,8 @@ export default function PedidosHistorial() {
                           <td>{d.nombre}</td>
                           <td>${d.precio_costo}</td>
                           <td>{d.porcentaje_utilidad}%</td>
+                          <td>{d.sumar_envio ? "Sí" : "No"}</td>
+                          <td>{d.stellantis ? "Sí" : "No"}</td>
                           <td>${d.precio_final}</td>
                         </tr>
                       ))}
