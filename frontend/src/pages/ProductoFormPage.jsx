@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
@@ -9,6 +9,14 @@ import {
   useProveedores,
   useUpdateProducto,
 } from "../lib/queries";
+
+function calcularPrecioVenta(precioCosto, margenUtilidad) {
+  const costo = Number(precioCosto) || 0;
+  const pct = Number(margenUtilidad) || 0;
+  const base = costo * (1 + pct / 100);
+  const baseIva = Math.trunc(base * 1.19);
+  return Math.ceil(baseIva / 100) * 100;
+}
 
 const initialState = {
   codigo_producto: "",
@@ -42,6 +50,11 @@ export default function ProductoFormPage() {
   const updateMutation = useUpdateProducto();
 
   const proveedores = proveedoresData?.results ?? [];
+
+  const precioVenta = useMemo(
+    () => calcularPrecioVenta(data.precio_costo, data.margen_utilidad),
+    [data.precio_costo, data.margen_utilidad],
+  );
 
   useEffect(() => {
     if (productoData && id) {
@@ -159,6 +172,28 @@ export default function ProductoFormPage() {
             </select>
           </div>
         </div>
+
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          width: "100%",
+          marginTop: "1.2rem",
+          paddingTop: "0.6rem",
+          borderTop: "2px solid var(--border-default)",
+        }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>Precio de venta</span>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "2.1rem",
+            fontWeight: 800,
+            color: "var(--text-primary)",
+            letterSpacing: "-0.02em",
+          }}>
+            ${precioVenta.toLocaleString()}
+          </span>
+        </div>
+
         <button className="btn btn-primary" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar"}
         </button>
