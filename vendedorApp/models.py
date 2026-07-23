@@ -105,6 +105,7 @@ class Venta(models.Model):
     class TipoDocumento(models.TextChoices):
         VENTA = 'VE', 'Venta'
         COTIZACION = 'CO', 'Cotizacion'
+        PEDIDO = 'PE', 'Pedido'
 
     class Estado(models.TextChoices):
         PENDIENTE = 'PE', 'Pendiente'
@@ -196,3 +197,56 @@ class AjusteStock(models.Model):
 
     def __str__(self):
         return f"Ajuste {self.producto.nombre} en {self.ubicacion.nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"
+
+
+class Pedido(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    nombre_cliente = models.CharField(max_length=200)
+    telefono_cliente = models.CharField(max_length=50)
+    monto_subtotal = models.IntegerField()
+    monto_total = models.IntegerField()
+    costo_envio = models.IntegerField(default=4500)
+    metodo_pago = models.CharField(
+        max_length=2,
+        choices=[("EF", "Efectivo"), ("TJ", "Tarjeta")],
+        default="EF",
+    )
+    facturado = models.BooleanField(default=False)
+    venta = models.ForeignKey(
+        Venta,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pedido",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pedidos"
+        ordering = ["-fecha_creacion", "-id"]
+
+    def __str__(self):
+        return f"Pedido #{self.id} — {self.nombre_cliente}"
+
+
+class PedidoDetalle(models.Model):
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name="detalles")
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    codigo_proveedor = models.CharField(max_length=50)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
+    oem = models.CharField(max_length=50)
+    nombre = models.CharField(max_length=200)
+    precio_costo = models.IntegerField()
+    porcentaje_utilidad = models.DecimalField(max_digits=5, decimal_places=2)
+    precio_final = models.IntegerField()
+
+    class Meta:
+        db_table = "pedido_detalles"
+
+    def __str__(self):
+        return f"{self.nombre} x1"

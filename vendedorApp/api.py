@@ -9,20 +9,23 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Pedido, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AjustarStockInputSerializer,
     AjusteStockSerializer,
     AnulacionInputSerializer,
     AnulacionSerializer,
+    CrearPedidoSerializer,
     DevolucionInputSerializer,
     DevolucionSerializer,
+    PedidoSerializer,
     ProductoSerializer,
     RegistrarVentaSerializer,
     VentaSerializer,
 )
 from vendedorApp.pagination import (
     DevolucionPagination,
+    PedidoPagination,
     ProductoPagination,
     VentaPagination,
 )
@@ -587,3 +590,29 @@ class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset
         return queryset.filter(venta__usuario=user)
+
+
+class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
+    queryset = Pedido.objects.select_related("usuario", "venta").prefetch_related("detalles__proveedor").all().order_by("-fecha_creacion")
+    serializer_class = PedidoSerializer
+    pagination_class = PedidoPagination
+    role_action_map = {
+        "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+    }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            return queryset
+        return queryset.filter(usuario=user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = CrearPedidoSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        pedido = serializer.save()
+        output = PedidoSerializer(pedido, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)

@@ -1,8 +1,21 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
-from vendedorApp.models import AjusteStock, Anulacion, DetalleDevolucion, DetalleVenta, Devolucion, Producto, Ubicacion, Venta
+from vendedorApp.models import (
+    AjusteStock,
+    Anulacion,
+    DetalleDevolucion,
+    DetalleVenta,
+    Devolucion,
+    Pedido,
+    PedidoDetalle,
+    Producto,
+    Ubicacion,
+    Venta,
+)
 
 
 class UbicacionSerializer(serializers.ModelSerializer):
@@ -293,3 +306,142 @@ class AjusteStockSerializer(serializers.ModelSerializer):
             "fecha_ajuste",
             "usuario_nombre",
         ]
+
+
+class PedidoDetalleSerializer(serializers.ModelSerializer):
+    proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
+    producto_id = serializers.IntegerField(source="producto.producto_id", read_only=True)
+
+    class Meta:
+        model = PedidoDetalle
+        fields = [
+            "id",
+            "producto_id",
+            "codigo_proveedor",
+            "proveedor",
+            "proveedor_nombre",
+            "oem",
+            "nombre",
+            "precio_costo",
+            "porcentaje_utilidad",
+            "precio_final",
+        ]
+
+
+class PedidoSerializer(serializers.ModelSerializer):
+    detalles = PedidoDetalleSerializer(many=True, read_only=True)
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    metodo_pago_display = serializers.CharField(source="get_metodo_pago_display", read_only=True)
+
+    class Meta:
+        model = Pedido
+        fields = [
+            "id",
+            "usuario",
+            "usuario_nombre",
+            "nombre_cliente",
+            "telefono_cliente",
+            "monto_subtotal",
+            "monto_total",
+            "costo_envio",
+            "metodo_pago",
+            "metodo_pago_display",
+            "facturado",
+            "venta",
+            "fecha_creacion",
+            "detalles",
+        ]
+
+
+class PedidoDetalleInputSerializer(serializers.Serializer):
+    producto_id = serializers.IntegerField(required=False, allow_null=True)
+    codigo_proveedor = serializers.CharField(max_length=50)
+    proveedor_id = serializers.IntegerField()
+    oem = serializers.CharField(max_length=50)
+    nombre = serializers.CharField(max_length=200)
+    precio_costo = serializers.IntegerField(min_value=0)
+    porcentaje_utilidad = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal(0))
+
+
+class CrearPedidoSerializer(serializers.Serializer):
+    nombre_cliente = serializers.CharField(max_length=200)
+    telefono_cliente = serializers.CharField(max_length=50)
+    metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
+    facturado = serializers.BooleanField(default=False)
+    items = PedidoDetalleInputSerializer(many=True)
+
+    def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio):
+        from decimal import ROUND_HALF_UP, ROUND_UP
+        costo = Decimal(precio_costo)
+        utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
+        base = costo * (Decimal(1) + utilidad)
+        con_iva = base * Decimal("1.19")
+        con_envio = con_iva + Decimal(costo_envio)
+        item_total = int((con_envio / Decimal(100)).to_integral_value(rounding=ROUND_UP) * Decimal(100))
+        return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
+
+    @transaction.atomic
+    def create(self, validated_data):
+        request = self.context["request"]
+        items = validated_data["items"]
+        costo_envio = 4500
+
+        monto_subtotal = 0
+        monto_total = 0
+        for item in items:
+            base, item_total = self._calcular_item(
+                item["precio_costo"],
+                item["porcentaje_utilidad"],
+                costo_envio,
+            )
+            monto_subtotal += base
+            monto_total += item_total
+
+        pedido = Pedido.objects.create(
+            usuario=request.user,
+            nombre_cliente=validated_data["nombre_cliente"],
+            telefono_cliente=validated_data["telefono_cliente"],
+            monto_subtotal=monto_subtotal,
+            monto_total=monto_total,
+            costo_envio=costo_envio,
+            metodo_pago=validated_data["metodo_pago"],
+            facturado=validated_data["facturado"],
+        )
+
+        for item in items:
+            base, item_total = self._calcular_item(
+                item["precio_costo"],
+                item["porcentaje_utilidad"],
+                costo_envio,
+            )
+            producto_id = item.get("producto_id")
+            producto = None
+            if producto_id:
+                try:
+                    producto = Producto.objects.get(producto_id=producto_id)
+                except Producto.DoesNotExist:
+                    producto = None
+
+            PedidoDetalle.objects.create(
+                pedido=pedido,
+                producto=producto,
+                codigo_proveedor=item["codigo_proveedor"],
+                proveedor_id=item["proveedor_id"],
+                oem=item["oem"],
+                nombre=item["nombre"],
+                precio_costo=item["precio_costo"],
+                porcentaje_utilidad=item["porcentaje_utilidad"],
+                precio_final=item_total,
+            )
+
+        venta = Venta.objects.create(
+            usuario=request.user,
+            monto_total=monto_total,
+            monto_subtotal=monto_subtotal,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.PEDIDO,
+        )
+        pedido.venta = venta
+        pedido.save(update_fields=["venta"])
+
+        return pedido

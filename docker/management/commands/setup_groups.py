@@ -65,6 +65,16 @@ class Command(BaseCommand):
             content_type__model='user',
         )
 
+        # vendedorApp: Pedido, PedidoDetalle
+        pedido_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='pedido',
+        )
+        detalle_pedido_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='pedidodetalle',
+        )
+
         # vendedorApp: AjusteStock, StockProductoUbicacion, Ubicacion
         ajuste_stock_perms = Permission.objects.filter(
             content_type__app_label='vendedorApp',
@@ -87,6 +97,8 @@ class Command(BaseCommand):
             *producto_perms.filter(codename='view_producto'),
             *venta_perms,
             *detalle_venta_perms,
+            *pedido_perms,
+            *detalle_pedido_perms,
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Vendedor' {status} con permisos."))
@@ -96,6 +108,7 @@ class Command(BaseCommand):
         encargado.permissions.clear()
         # Puede vender
         encargado.permissions.add(*venta_perms, *detalle_venta_perms, *anulacion_perms, *devolucion_perms, *detalle_devolucion_perms)
+        encargado.permissions.add(*pedido_perms, *detalle_pedido_perms)
         # Puede gestionar productos (inventario)
         encargado.permissions.add(*producto_perms)
         # Puede gestionar facturas
@@ -114,6 +127,7 @@ class Command(BaseCommand):
             *producto_perms.filter(codename__in=['view_producto', 'add_producto', 'change_producto']),
         )
         bodeguero.permissions.add(*venta_perms, *detalle_venta_perms)
+        bodeguero.permissions.add(*pedido_perms, *detalle_pedido_perms)
         bodeguero.permissions.add(*ajuste_stock_perms)
         bodeguero.permissions.add(*stock_ubicacion_perms)
         bodeguero.permissions.add(*ubicacion_perms)
@@ -131,6 +145,8 @@ class Command(BaseCommand):
             *anulacion_perms,
             *devolucion_perms,
             *detalle_devolucion_perms,
+            *pedido_perms,
+            *detalle_pedido_perms,
             *proveedor_perms,
             *factura_perms,
             *detalle_factura_perms,
