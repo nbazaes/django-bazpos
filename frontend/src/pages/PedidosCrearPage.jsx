@@ -7,13 +7,16 @@ import { formatDateTime } from "../lib/format";
 import { STORE_NAME } from "../lib/config";
 import { useToast } from "../lib/toast";
 
-function calcularItemTotal(precioCosto, porcentajeUtilidad) {
+function calcularItemSubtotal(precioCosto, porcentajeUtilidad) {
   const costo = Number(precioCosto) || 0;
   const pct = Number(porcentajeUtilidad) || 0;
   const base = costo * (1 + pct / 100);
-  const conIva = base * 1.19;
-  const conEnvio = conIva + 4500;
-  return Math.ceil(conEnvio / 100) * 100;
+  return Math.round(base * 1.19);
+}
+
+function calcularItemTotal(precioCosto, porcentajeUtilidad) {
+  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad);
+  return Math.ceil((subtotal + 4500) / 100) * 100;
 }
 
 const productoVacio = {
@@ -51,12 +54,11 @@ export default function PedidosCrearPage() {
     const subtotal = items.reduce((sum, it) => {
       const costo = Number(it.precio_costo) || 0;
       const pct = Number(it.porcentaje_utilidad) || 0;
-      return sum + costo * (1 + pct / 100);
+      return sum + Math.round(costo * (1 + pct / 100) * 1.19);
     }, 0);
-    const iva = subtotal * 0.19;
     const envio = items.length * 4500;
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
-    return { subtotal, iva, envio, total };
+    return { subtotal, envio, total };
   }, [items]);
 
   useEffect(() => {
@@ -414,8 +416,10 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
-              <div className="text-lg font-bold">
-                Total producto: ${itemTotalPreview}
+              <div className="text-right">
+                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad)}</div>
+                <div className="text-secondary">Envío +$4.500</div>
+                <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
               </div>
               <button
                 type="button"
@@ -472,9 +476,8 @@ export default function PedidosCrearPage() {
           <div className="card-body">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="text-right">
-                <div className="text-secondary">Subtotal: ${Math.round(totales.subtotal)}</div>
-                <div className="text-secondary">IVA (19%): ${Math.round(totales.iva)}</div>
-                <div className="text-secondary">Envío ({items.length} × $4.500): ${totales.envio}</div>
+                <div className="text-secondary">Subtotal: ${totales.subtotal}</div>
+                <div className="text-secondary">Envío +$4.500 {items.length > 1 ? `(${items.length} × $4.500)` : ""}</div>
                 <div className="text-xl font-bold mt-1">Total: ${totales.total}</div>
               </div>
               <div className="form-group mb-0">
