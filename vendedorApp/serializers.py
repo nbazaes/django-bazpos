@@ -332,6 +332,8 @@ class PedidoSerializer(serializers.ModelSerializer):
     detalles = PedidoDetalleSerializer(many=True, read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
     metodo_pago_display = serializers.CharField(source="get_metodo_pago_display", read_only=True)
+    estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+    estado_documento_display = serializers.CharField(source="get_estado_documento_display", read_only=True)
 
     class Meta:
         model = Pedido
@@ -346,7 +348,11 @@ class PedidoSerializer(serializers.ModelSerializer):
             "costo_envio",
             "metodo_pago",
             "metodo_pago_display",
-            "facturado",
+            "estado",
+            "estado_display",
+            "estado_documento",
+            "estado_documento_display",
+            "stock_descontado",
             "venta",
             "fecha_creacion",
             "detalles",
@@ -367,7 +373,6 @@ class CrearPedidoSerializer(serializers.Serializer):
     nombre_cliente = serializers.CharField(max_length=200)
     telefono_cliente = serializers.CharField(max_length=50)
     metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
-    facturado = serializers.BooleanField(default=False)
     items = PedidoDetalleInputSerializer(many=True)
 
     def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio):
@@ -405,7 +410,8 @@ class CrearPedidoSerializer(serializers.Serializer):
             monto_total=monto_total,
             costo_envio=costo_envio,
             metodo_pago=validated_data["metodo_pago"],
-            facturado=validated_data["facturado"],
+            estado=Pedido.Estado.PENDIENTE_RETIRAR,
+            estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
         )
 
         for item in items:

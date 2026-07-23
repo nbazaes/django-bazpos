@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
+import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../components/Shell";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
+import { formatDateTime } from "../lib/format";
 import { STORE_NAME } from "../lib/config";
 import { useToast } from "../lib/toast";
 
@@ -25,7 +27,8 @@ const productoVacio = {
 };
 
 export default function PedidosCrearPage() {
-  usePageTitle("Nuevo pedido");
+  const [tab, setTab] = useState("nuevo");
+  usePageTitle(tab === "nuevo" ? "Nuevo pedido" : "Historial de pedidos");
   const addToast = useToast();
   const { data: proveedoresData } = useProveedores({ page_size: 200 });
   const { data: productosData } = useProductos({ page_size: 200 });
@@ -36,7 +39,6 @@ export default function PedidosCrearPage() {
   const [producto, setProducto] = useState({ ...productoVacio });
   const [items, setItems] = useState([]);
   const [metodoPago, setMetodoPago] = useState("EF");
-  const [facturado, setFacturado] = useState(false);
   const [productoTexto, setProductoTexto] = useState("");
   const [mostrarProductos, setMostrarProductos] = useState(false);
   const productosRef = useRef(null);
@@ -140,7 +142,6 @@ export default function PedidosCrearPage() {
       nombre_cliente: cliente.nombre.trim(),
       telefono_cliente: cliente.telefono.trim(),
       metodo_pago: metodoPago,
-      facturado,
       items: items.map((it) => ({
         producto_id: it.producto_id,
         codigo_proveedor: it.codigo_proveedor,
@@ -159,7 +160,6 @@ export default function PedidosCrearPage() {
         setCliente({ nombre: "", telefono: "" });
         setItems([]);
         setMetodoPago("EF");
-        setFacturado(false);
         limpiarProducto();
       },
       onError: (err) => {
@@ -181,15 +181,10 @@ export default function PedidosCrearPage() {
       </tr>
     `).join("");
 
-    const fecha = new Date(pedido.fecha_creacion).toLocaleString("es-CL", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const fecha = formatDateTime(pedido.fecha_creacion);
     const metodo = pedido.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
-    const facturadoCheck = pedido.facturado ? "☑" : "☐";
+    const estado = pedido.estado_display || pedido.estado;
+    const documento = pedido.estado_documento_display || pedido.estado_documento;
 
     win.document.write(`
       <!DOCTYPE html>
@@ -219,7 +214,9 @@ export default function PedidosCrearPage() {
         <div class="info">
           <strong>Fecha:</strong> ${fecha}<br />
           <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
-          <strong>Teléfono:</strong> ${pedido.telefono_cliente}
+          <strong>Teléfono:</strong> ${pedido.telefono_cliente}<br />
+          <strong>Estado:</strong> ${estado}<br />
+          <strong>Documento:</strong> ${documento}
         </div>
         <table>
           <thead>
@@ -229,8 +226,7 @@ export default function PedidosCrearPage() {
         </table>
         <div class="total">Total: $${pedido.monto_total}</div>
         <div class="check-row">
-          <strong>Método de pago:</strong> ${metodo}<br />
-          <strong>${facturadoCheck} Facturado</strong>
+          <strong>Método de pago:</strong> ${metodo}
         </div>
         <div class="footer">
           El abono del producto constituye garantía por repuestos solicitados.
@@ -247,11 +243,32 @@ export default function PedidosCrearPage() {
 
   return (
     <>
-      <PageCard title="Nuevo pedido">
-        <div className="row mb-4">
-          <div className="col-md-6">
-            <div className="form-group">
-              <label>Nombre cliente</label>
+      <PageCard title={tab === "nuevo" ? "Nuevo pedido" : "Historial de pedidos"}>
+        <div className="page-actions mb-4">
+          <div className="btn-group">
+            <button
+              className={`btn btn-sm ${tab === "nuevo" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setTab("nuevo")}
+            >
+              Nuevo pedido
+            </button>
+            <button
+              className={`btn btn-sm ${tab === "historial" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setTab("historial")}
+            >
+              Historial
+            </button>
+          </div>
+        </div>
+
+        {tab === "historial" ? (
+          <PedidosHistorial />
+        ) : (
+          <>
+            <div className="row mb-4">
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label>Nombre cliente</label>
               <input
                 type="text"
                 className="form-control"
@@ -460,18 +477,12 @@ export default function PedidosCrearPage() {
                 <div className="text-secondary">Envío ({items.length} × $4.500): ${totales.envio}</div>
                 <div className="text-xl font-bold mt-1">Total: ${totales.total}</div>
               </div>
-              <div className="flex flex-col gap-2">
-                <div className="form-group mb-0">
-                  <label>Método de pago</label>
-                  <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                    <option value="EF">Efectivo</option>
-                    <option value="TJ">Tarjeta</option>
-                  </select>
-                </div>
-                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-                  <input type="checkbox" checked={facturado} onChange={(e) => setFacturado(e.target.checked)} />
-                  <span>Facturado</span>
-                </label>
+              <div className="form-group mb-0">
+                <label>Método de pago</label>
+                <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+                  <option value="EF">Efectivo</option>
+                  <option value="TJ">Tarjeta</option>
+                </select>
               </div>
             </div>
           </div>
@@ -487,6 +498,8 @@ export default function PedidosCrearPage() {
             {createPedido.isPending ? "Generando..." : "Generar pedido"}
           </button>
         </div>
+            </>
+          )}
       </PageCard>
     </>
   );

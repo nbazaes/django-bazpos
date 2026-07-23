@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
+import PedidosHistorial from "../components/PedidosHistorial";
 import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../components/Shell";
 import {
@@ -10,14 +11,11 @@ import {
   useDevolucion,
   useDevoluciones,
   useDevolverProductos,
-  usePedido,
-  usePedidos,
   useUbicaciones,
   useVenta,
   useVentas,
 } from "../lib/queries";
 import { getUser, isGerente } from "../lib/auth";
-import { STORE_NAME } from "../lib/config";
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
@@ -29,7 +27,6 @@ export default function PedidosPage() {
 
   const [detalleVentaId, setDetalleVentaId] = useState(null);
   const [detalleDevolucionId, setDetalleDevolucionId] = useState(null);
-  const [detallePedidoId, setDetallePedidoId] = useState(null);
 
   const [anularVentaId, setAnularVentaId] = useState(null);
   const [anularMotivo, setAnularMotivo] = useState("");
@@ -49,10 +46,8 @@ export default function PedidosPage() {
   const params = { page, page_size: pageSize };
   const { data: ventasData } = useVentas(params);
   const { data: devolucionesData } = useDevoluciones(params);
-  const { data: pedidosData } = usePedidos(params);
   const { data: detalleVentaData } = useVenta(detalleVentaId);
   const { data: detalleDevolucionData } = useDevolucion(detalleDevolucionId);
-  const { data: detallePedidoData } = usePedido(detallePedidoId);
   const { data: anularVentaData } = useVenta(anularVentaId);
   const { data: devolverVentaData } = useVenta(devolverVentaId);
   const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
@@ -61,8 +56,7 @@ export default function PedidosPage() {
   const anularMutation = useAnularVenta();
   const devolverMutation = useDevolverProductos();
 
-  const activeData =
-    tab === "ventas" ? ventasData : tab === "devoluciones" ? devolucionesData : pedidosData;
+  const activeData = tab === "ventas" ? ventasData : devolucionesData;
   const rows = activeData?.results ?? [];
   const count = activeData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
@@ -171,83 +165,6 @@ export default function PedidosPage() {
   const closeDevolverModal = () => setDevolverVentaId(null);
   const anularDisabled = anularMutation.isPending;
 
-  function imprimirPedidoDetalle(pedido) {
-    const win = window.open("", "_blank", "width=420,height=700");
-    if (!win) return;
-
-    const filas = (pedido.detalles || []).map((d) => `
-      <tr>
-        <td>${d.codigo_proveedor || "—"}</td>
-        <td>${d.oem || "—"}</td>
-        <td>${d.nombre}</td>
-        <td style="text-align:right;">$${d.precio_final}</td>
-      </tr>
-    `).join("");
-
-    const fecha = new Date(pedido.fecha_creacion).toLocaleString("es-CL", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const metodo = pedido.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
-    const facturadoCheck = pedido.facturado ? "☑" : "☐";
-
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Pedido #${pedido.id}</title>
-        <style>
-          body { font-family: sans-serif; font-size: 12px; margin: 16px; color: #000; }
-          .center { text-align: center; }
-          .store { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
-          .title { font-size: 14px; margin-bottom: 8px; }
-          .info { margin-bottom: 8px; }
-          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-          th, td { border-bottom: 1px solid #ccc; padding: 4px 2px; text-align: left; }
-          th { font-weight: bold; }
-          .total { text-align: right; font-weight: bold; font-size: 14px; margin-top: 8px; }
-          .footer { margin-top: 16px; font-size: 10px; text-align: justify; }
-          .check-row { margin-top: 8px; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="center">
-          <div class="store">${STORE_NAME}</div>
-          <div class="title">Pedido #${pedido.id}</div>
-        </div>
-        <div class="info">
-          <strong>Fecha:</strong> ${fecha}<br />
-          <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
-          <strong>Teléfono:</strong> ${pedido.telefono_cliente}
-        </div>
-        <table>
-          <thead>
-            <tr><th>Cód. Prov.</th><th>OEM</th><th>Producto</th><th style="text-align:right;">Total</th></tr>
-          </thead>
-          <tbody>${filas}</tbody>
-        </table>
-        <div class="total">Total: $${pedido.monto_total}</div>
-        <div class="check-row">
-          <strong>Método de pago:</strong> ${metodo}<br />
-          <strong>${facturadoCheck} Facturado</strong>
-        </div>
-        <div class="footer">
-          El abono del producto constituye garantía por repuestos solicitados.
-          Al desistir del producto el abono sera para saldar costos y gestión.
-        </div>
-        <script>
-          window.onload = function() { window.print(); };
-        </script>
-      </body>
-      </html>
-    `);
-    win.document.close();
-  }
-
   return (
     <>
       <PageCard title="Historial de ventas">
@@ -273,74 +190,61 @@ export default function PedidosPage() {
             </button>
           </div>
         </div>
-        <div className="table-responsive">
-          <table className="table table-sm table-bordered">
-            <thead>
-              {tab === "pedidos" ? (
-                <tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Teléfono</th><th>Total</th><th></th></tr>
-              ) : (
-                <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
-              )}
-            </thead>
-            <tbody>
-              {tab === "ventas" && rows.map((v) => (
-                <tr key={v.id}>
-                  <td>{v.id}</td>
-                  <td>{v.fecha_venta}</td>
-                  <td>{v.usuario_nombre}</td>
-                  <td>${v.monto_total}</td>
-                  <td>{v.tipo_documento_display || v.tipo_documento}</td>
-                  <td>{v.estado_display || v.estado}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
-                    {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
-                      <>
-                        <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
-                        <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {tab === "devoluciones" && rows.map((d) => (
-                <tr key={d.id} className="table-warning">
-                  <td>D#{d.id}</td>
-                  <td>{d.fecha_devolucion}</td>
-                  <td>{d.usuario_nombre}</td>
-                  <td style={{ color: "var(--danger)" }}>-${d.monto_devuelto}</td>
-                  <td><span className="badge badge-warning">Devolución</span></td>
-                  <td>—</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn btn-sm btn-info" onClick={() => setDetalleDevolucionId(d.id)}>Ver</button>
-                  </td>
-                </tr>
-              ))}
-              {tab === "pedidos" && rows.map((p) => (
-                <tr key={p.id}>
-                  <td>P#{p.id}</td>
-                  <td>{p.fecha_creacion}</td>
-                  <td>{p.nombre_cliente}</td>
-                  <td>{p.telefono_cliente}</td>
-                  <td>${p.monto_total}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn btn-sm btn-info" onClick={() => setDetallePedidoId(p.id)}>Ver</button>
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={tab === "pedidos" ? 6 : 7} className="text-center text-muted">
-                    No hay transacciones
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
-          <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
-        </div>
+
+        {tab === "pedidos" ? (
+          <PedidosHistorial />
+        ) : (
+          <>
+            <div className="table-responsive">
+              <table className="table table-sm table-bordered">
+                <thead>
+                  <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {tab === "ventas" && rows.map((v) => (
+                    <tr key={v.id}>
+                      <td>{v.id}</td>
+                      <td>{v.fecha_venta}</td>
+                      <td>{v.usuario_nombre}</td>
+                      <td>${v.monto_total}</td>
+                      <td>{v.tipo_documento_display || v.tipo_documento}</td>
+                      <td>{v.estado_display || v.estado}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
+                        {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
+                          <>
+                            <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
+                            <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {tab === "devoluciones" && rows.map((d) => (
+                    <tr key={d.id} className="table-warning">
+                      <td>D#{d.id}</td>
+                      <td>{d.fecha_devolucion}</td>
+                      <td>{d.usuario_nombre}</td>
+                      <td style={{ color: "var(--danger)" }}>-${d.monto_devuelto}</td>
+                      <td><span className="badge badge-warning">Devolución</span></td>
+                      <td>—</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="btn btn-sm btn-info" onClick={() => setDetalleDevolucionId(d.id)}>Ver</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+              <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
+              <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
+            </div>
+          </>
+        )}
       </PageCard>
 
       {detalleVentaId && detalleVentaData && (
@@ -422,57 +326,6 @@ export default function PedidosPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalleDevolucionId(null)}>Cerrar</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {detallePedidoId && detallePedidoData && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetallePedidoId(null)}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Detalle de pedido #{detallePedidoData.id}</h5>
-                <button type="button" className="modal-close" onClick={() => setDetallePedidoId(null)}>&times;</button>
-              </div>
-              <div className="modal-body">
-                <div className="row mb-4">
-                  <div className="col-md-4"><strong>Fecha:</strong> {detallePedidoData.fecha_creacion}</div>
-                  <div className="col-md-4"><strong>Cliente:</strong> {detallePedidoData.nombre_cliente}</div>
-                  <div className="col-md-4"><strong>Teléfono:</strong> {detallePedidoData.telefono_cliente}</div>
-                </div>
-                <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Cód. Prov.</th><th>Proveedor</th><th>OEM</th><th>Nombre</th><th>Precio costo</th><th>% Utilidad</th><th>Total</th></tr>
-                    </thead>
-                    <tbody>
-                      {(detallePedidoData.detalles || []).map((d) => (
-                        <tr key={d.id}>
-                          <td>{d.codigo_proveedor}</td>
-                          <td>{d.proveedor_nombre}</td>
-                          <td>{d.oem}</td>
-                          <td>{d.nombre}</td>
-                          <td>${d.precio_costo}</td>
-                          <td>{d.porcentaje_utilidad}%</td>
-                          <td>${d.precio_final}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-                  <div>
-                    <strong>Método de pago:</strong> {detallePedidoData.metodo_pago_display || detallePedidoData.metodo_pago}<br />
-                    <strong>Facturado:</strong> {detallePedidoData.facturado ? "Sí" : "No"}
-                  </div>
-                  <div className="text-lg font-bold">Total: ${detallePedidoData.monto_total}</div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDetallePedidoId(null)}>Cerrar</button>
-                <button type="button" className="btn btn-primary" onClick={() => imprimirPedidoDetalle(detallePedidoData)}>Imprimir</button>
               </div>
             </div>
           </div>

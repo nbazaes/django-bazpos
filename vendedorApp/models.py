@@ -200,6 +200,15 @@ class AjusteStock(models.Model):
 
 
 class Pedido(models.Model):
+    class Estado(models.TextChoices):
+        PENDIENTE_RETIRAR = "PR", "Pendiente por retirar"
+        RETIRADO = "RE", "Retirado"
+
+    class EstadoDocumento(models.TextChoices):
+        SIN_BOLETEAR = "SB", "Sin boletear"
+        BOLETEADO = "BO", "Boleteado"
+        FACTURADO = "FA", "Facturado"
+
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     nombre_cliente = models.CharField(max_length=200)
     telefono_cliente = models.CharField(max_length=50)
@@ -211,7 +220,17 @@ class Pedido(models.Model):
         choices=[("EF", "Efectivo"), ("TJ", "Tarjeta")],
         default="EF",
     )
-    facturado = models.BooleanField(default=False)
+    estado = models.CharField(
+        max_length=2,
+        choices=Estado.choices,
+        default=Estado.PENDIENTE_RETIRAR,
+    )
+    estado_documento = models.CharField(
+        max_length=2,
+        choices=EstadoDocumento.choices,
+        default=EstadoDocumento.SIN_BOLETEAR,
+    )
+    stock_descontado = models.BooleanField(default=False)
     venta = models.ForeignKey(
         Venta,
         on_delete=models.SET_NULL,

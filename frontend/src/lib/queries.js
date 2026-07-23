@@ -240,6 +240,21 @@ export function useCreatePedido() {
   });
 }
 
+export function useCambiarEstadoPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pedidoId, estado, estado_documento }) =>
+      apiRequest(`/pedidos/${pedidoId}/cambiar-estado/`, {
+        method: "POST",
+        body: { estado, estado_documento },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+    },
+  });
+}
+
 // ── Proveedores ──
 
 export function useProveedores(params = {}) {
