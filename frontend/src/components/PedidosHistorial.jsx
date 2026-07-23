@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { formatDateTime } from "../lib/format";
-import { useCambiarEstadoPedido, usePedido, usePedidos } from "../lib/queries";
+import {
+  useCambiarEstadoPedido,
+  useDesactivarPedido,
+  useMarcarRetiro,
+  usePedido,
+  usePedidos,
+} from "../lib/queries";
 import { STORE_NAME } from "../lib/config";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
-
-const ESTADO_OPCIONES = [
-  { value: "PR", label: "Pendiente por retirar" },
-  { value: "RE", label: "Retirado" },
-];
 
 const DOCUMENTO_OPCIONES = [
   { value: "SB", label: "Sin boletear" },
@@ -16,14 +17,26 @@ const DOCUMENTO_OPCIONES = [
   { value: "FA", label: "Facturado" },
 ];
 
+const ESTADO_BADGE = {
+  PR: { className: "badge badge-warning", label: "Pendiente por retirar" },
+  RE: { className: "badge badge-success", label: "Retirado" },
+};
+
 export default function PedidosHistorial() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [detalleId, setDetalleId] = useState(null);
+  const [retiroId, setRetiroId] = useState(null);
+  const [retiroPersona, setRetiroPersona] = useState("");
+  const [retiroMismoUsuario, setRetiroMismoUsuario] = useState(false);
+  const [desactivarId, setDesactivarId] = useState(null);
 
   const { data: pedidosData } = usePedidos({ page, page_size: pageSize });
   const { data: detalleData } = usePedido(detalleId);
-  const cambiarEstado = useCambiarEstadoPedido();
+  const { data: retiroData } = usePedido(retiroId);
+  const cambiarDocumento = useCambiarEstadoPedido();
+  const marcarRetiro = useMarcarRetiro();
+  const desactivarPedido = useDesactivarPedido();
 
   const rows = pedidosData?.results ?? [];
   const count = pedidosData?.count ?? 0;
@@ -38,18 +51,27 @@ export default function PedidosHistorial() {
     setPage(1);
   }
 
-  function handleEstadoChange(pedido, nuevoEstado) {
-    cambiarEstado.mutate(
-      { pedidoId: pedido.id, estado: nuevoEstado },
-      { onError: () => setPage((p) => p) },
+  function handleDocumentoChange(pedido, nuevoDocumento) {
+    cambiarDocumento.mutate({ pedidoId: pedido.id, estado_documento: nuevoDocumento });
+  }
+
+  function abrirRetiro(pedido) {
+    setRetiroId(pedido.id);
+    setRetiroPersona("");
+    setRetiroMismoUsuario(false);
+  }
+
+  function confirmarRetiro() {
+    const persona = retiroPersona.trim() || (retiroMismoUsuario ? retiroData?.usuario_nombre : "");
+    if (!persona) return;
+    marcarRetiro.mutate(
+      { pedidoId: retiroId, persona_retiro: persona },
+      { onSuccess: () => setRetiroId(null) },
     );
   }
 
-  function handleDocumentoChange(pedido, nuevoDocumento) {
-    cambiarEstado.mutate(
-      { pedidoId: pedido.id, estado_documento: nuevoDocumento },
-      { onError: () => setPage((p) => p) },
-    );
+  function confirmarDesactivar() {
+    desactivarPedido.mutate(desactivarId, { onSuccess: () => setDesactivarId(null) });
   }
 
   function imprimirPedido(pedido) {
@@ -66,8 +88,10 @@ export default function PedidosHistorial() {
     `).join("");
 
     const fecha = formatDateTime(pedido.fecha_creacion);
+    const fechaRetiro = formatDateTime(pedido.fecha_retiro);
     const metodo = pedido.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
     const estadoDoc = pedido.estado_documento_display || pedido.estado_documento;
+    const estado = pedido.estado_display || pedido.estado;
 
     win.document.write(`
       <!DOCTYPE html>
@@ -98,7 +122,9 @@ export default function PedidosHistorial() {
           <strong>Fecha:</strong> ${fecha}<br />
           <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
           <strong>Teléfono:</strong> ${pedido.telefono_cliente}<br />
-          <strong>Estado:</strong> ${pedido.estado_display || pedido.estado}<br />
+          <strong>Estado:</strong> ${estado}<br />
+          ${pedido.fecha_retiro ? `<strong>Fecha retiro:</strong> ${fechaRetiro}<br />` : ""}
+          ${pedido.persona_retiro ? `<strong>Retiró:</strong> ${pedido.persona_retiro}<br />` : ""}
           <strong>Documento:</strong> ${estadoDoc}
         </div>
         <table>
@@ -136,50 +162,50 @@ export default function PedidosHistorial() {
               <th>Teléfono</th>
               <th>Estado</th>
               <th>Documento</th>
+              <th>Persona que retiró</th>
+              <th>Fecha retiro</th>
               <th>Total</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
-              <tr key={p.id} className={p.estado === "RE" ? "table-success" : ""}>
-                <td>P#{p.id}</td>
-                <td>{formatDateTime(p.fecha_creacion)}</td>
-                <td>{p.nombre_cliente}</td>
-                <td>{p.telefono_cliente}</td>
-                <td>
-                  <select
-                    className="form-control form-control-sm"
-                    value={p.estado}
-                    onChange={(e) => handleEstadoChange(p, e.target.value)}
-                    disabled={cambiarEstado.isPending}
-                  >
-                    {ESTADO_OPCIONES.map((op) => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <select
-                    className="form-control form-control-sm"
-                    value={p.estado_documento}
-                    onChange={(e) => handleDocumentoChange(p, e.target.value)}
-                    disabled={cambiarEstado.isPending}
-                  >
-                    {DOCUMENTO_OPCIONES.map((op) => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>${p.monto_total}</td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="btn btn-sm btn-info" onClick={() => setDetalleId(p.id)}>Ver</button>
-                </td>
-              </tr>
-            ))}
+            {rows.map((p) => {
+              const estadoInfo = ESTADO_BADGE[p.estado] || { className: "badge", label: p.estado };
+              return (
+                <tr key={p.id}>
+                  <td>P#{p.id}</td>
+                  <td>{formatDateTime(p.fecha_creacion)}</td>
+                  <td>{p.nombre_cliente}</td>
+                  <td>{p.telefono_cliente}</td>
+                  <td><span className={estadoInfo.className}>{estadoInfo.label}</span></td>
+                  <td>
+                    <select
+                      className="form-control form-control-sm"
+                      value={p.estado_documento}
+                      onChange={(e) => handleDocumentoChange(p, e.target.value)}
+                      disabled={cambiarDocumento.isPending}
+                    >
+                      {DOCUMENTO_OPCIONES.map((op) => (
+                        <option key={op.value} value={op.value}>{op.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
+                  <td>{formatDateTime(p.fecha_retiro)}</td>
+                  <td>${p.monto_total}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>
+                    {p.estado === "PR" && (
+                      <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
+                    )}
+                    <button className="btn btn-sm btn-danger" onClick={() => setDesactivarId(p.id)}>Eliminar pedido</button>
+                  </td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan="8" className="text-center text-muted">No hay pedidos</td>
+                <td colSpan="10" className="text-center text-muted">No hay pedidos</td>
               </tr>
             )}
           </tbody>
@@ -210,6 +236,12 @@ export default function PedidosHistorial() {
                   <div className="col-md-4"><strong>Documento:</strong> {detalleData.estado_documento_display || detalleData.estado_documento}</div>
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleData.usuario_nombre}</div>
                 </div>
+                {detalleData.fecha_retiro && (
+                  <div className="row mb-4">
+                    <div className="col-md-4"><strong>Fecha retiro:</strong> {formatDateTime(detalleData.fecha_retiro)}</div>
+                    <div className="col-md-4"><strong>Retiró:</strong> {detalleData.persona_retiro || "—"}</div>
+                  </div>
+                )}
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
@@ -235,6 +267,89 @@ export default function PedidosHistorial() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalleId(null)}>Cerrar</button>
                 <button type="button" className="btn btn-primary" onClick={() => imprimirPedido(detalleData)}>Imprimir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {retiroId && retiroData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setRetiroId(null)}>
+          <div className="modal-dialog" style={{ maxWidth: 420 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Retiro de pedido #{retiroData.id}</h5>
+                <button type="button" className="modal-close" onClick={() => setRetiroId(null)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Nombre de quien retira</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={retiroPersona}
+                    onChange={(e) => {
+                      setRetiroPersona(e.target.value);
+                      setRetiroMismoUsuario(false);
+                    }}
+                    placeholder="Nombre completo"
+                    disabled={retiroMismoUsuario}
+                  />
+                </div>
+                <label className="flex items-center gap-2 mt-2" style={{ cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={retiroMismoUsuario}
+                    onChange={(e) => {
+                      setRetiroMismoUsuario(e.target.checked);
+                      if (e.target.checked) {
+                        setRetiroPersona(retiroData.nombre_cliente || "");
+                      } else {
+                        setRetiroPersona("");
+                      }
+                    }}
+                  />
+                  <span>Misma persona que pidió (cliente)</span>
+                </label>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setRetiroId(null)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={confirmarRetiro}
+                  disabled={marcarRetiro.isPending || !retiroPersona.trim()}
+                >
+                  {marcarRetiro.isPending ? "Guardando..." : "Confirmar retiro"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {desactivarId && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDesactivarId(null)}>
+          <div className="modal-dialog" style={{ maxWidth: 420 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Eliminar retiro</h5>
+                <button type="button" className="modal-close" onClick={() => setDesactivarId(null)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <p>¿Estás seguro de que deseas eliminar este pedido de la lista?</p>
+                <p className="text-sm text-muted">El pedido quedará oculto pero seguirá registrado en la base de datos.</p>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setDesactivarId(null)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={confirmarDesactivar}
+                  disabled={desactivarPedido.isPending}
+                >
+                  {desactivarPedido.isPending ? "Eliminando..." : "Eliminar retiro"}
+                </button>
               </div>
             </div>
           </div>

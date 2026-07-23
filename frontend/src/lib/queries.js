@@ -255,6 +255,34 @@ export function useCambiarEstadoPedido() {
   });
 }
 
+export function useMarcarRetiro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pedidoId, persona_retiro }) =>
+      apiRequest(`/pedidos/${pedidoId}/marcar-retiro/`, {
+        method: "POST",
+        body: { persona_retiro },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.ventas.all });
+    },
+  });
+}
+
+export function useDesactivarPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pedidoId) =>
+      apiRequest(`/pedidos/${pedidoId}/desactivar/`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.ventas.all });
+    },
+  });
+}
+
 // ── Proveedores ──
 
 export function useProveedores(params = {}) {

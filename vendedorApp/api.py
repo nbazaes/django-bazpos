@@ -50,7 +50,10 @@ class DashboardStatsView(APIView):
             user.groups.filter(name__in=["Gerente", "Encargado"]).exists() or user.is_superuser
         )
 
-        ventas_hoy = Venta.objects.filter(fecha_venta__date=hoy, estado=Venta.Estado.COMPLETADA)
+        ventas_hoy = (
+            Venta.objects.filter(fecha_venta__date=hoy, estado=Venta.Estado.COMPLETADA)
+            .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
+        )
 
         if es_gerente:
             total_dia = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
@@ -301,6 +304,10 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        queryset = queryset.exclude(
+            tipo_documento=Venta.TipoDocumento.PEDIDO,
+            pedido__activo=False,
+        )
         user = self.request.user
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset
@@ -597,9 +604,12 @@ class CambiarEstadoPedidoSerializer(serializers.Serializer):
     estado_documento = serializers.ChoiceField(choices=Pedido.EstadoDocumento.choices, required=False)
 
 
+class MarcarRetiroSerializer(serializers.Serializer):
+    persona_retiro = serializers.CharField(max_length=200, trim_whitespace=True)
+
+
 class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
-    queryset = Pedido.objects.select_related("usuario", "venta").prefetch_related("detalles__proveedor", "detalles__producto").all().order_by("-fecha_creacion")
     serializer_class = PedidoSerializer
     pagination_class = PedidoPagination
     role_action_map = {
@@ -607,7 +617,14 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "cambiar_estado": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "marcar_retiro": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "desactivar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
+
+    def get_queryset(self):
+        return Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
+            "detalles__proveedor", "detalles__producto"
+        ).order_by("-fecha_creacion")
 
     def create(self, request, *args, **kwargs):
         serializer = CrearPedidoSerializer(data=request.data, context={"request": request})
@@ -656,3 +673,30 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             pedido.save(update_fields=["estado", "estado_documento", "stock_descontado"])
 
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="marcar-retiro")
+    def marcar_retiro(self, request, pk=None):
+        pedido = self.get_object()
+        if pedido.estado == Pedido.Estado.RETIRADO:
+            return Response({"error": "El pedido ya fue retirado"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = MarcarRetiroSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        persona_retiro = serializer.validated_data["persona_retiro"]
+
+        with transaction.atomic():
+            pedido.estado = Pedido.Estado.RETIRADO
+            pedido.persona_retiro = persona_retiro
+            pedido.fecha_retiro = timezone.now()
+            if not pedido.stock_descontado:
+                self._descontar_stock_pedido(pedido)
+            pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado"])
+
+        return Response(PedidoSerializer(pedido, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="desactivar")
+    def desactivar(self, request, pk=None):
+        pedido = self.get_object()
+        pedido.activo = False
+        pedido.save(update_fields=["activo"])
+        return Response({"ok": True})
