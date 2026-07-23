@@ -56,9 +56,8 @@ export default function PedidosCrearPage() {
       const pct = Number(it.porcentaje_utilidad) || 0;
       return sum + Math.round(costo * (1 + pct / 100) * 1.19);
     }, 0);
-    const envio = items.length * 4500;
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
-    return { subtotal, envio, total };
+    return { subtotal, total };
   }, [items]);
 
   useEffect(() => {
@@ -477,7 +476,6 @@ export default function PedidosCrearPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="text-right">
                 <div className="text-secondary">Subtotal: ${totales.subtotal}</div>
-                <div className="text-secondary">Envío +$4.500 {items.length > 1 ? `(${items.length} × $4.500)` : ""}</div>
                 <div className="text-xl font-bold mt-1">Total: ${totales.total}</div>
               </div>
               <div className="form-group mb-0">
