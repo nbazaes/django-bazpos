@@ -303,13 +303,13 @@ export default function PedidosHistorial() {
                     onChange={(e) => {
                       setRetiroMismoUsuario(e.target.checked);
                       if (e.target.checked) {
-                        setRetiroPersona(retiroData.usuario_nombre || "");
+                        setRetiroPersona(retiroData.nombre_cliente || "");
                       } else {
                         setRetiroPersona("");
                       }
                     }}
                   />
-                  <span>Misma persona que pidió</span>
+                  <span>Misma persona que pidió (cliente)</span>
                 </label>
               </div>
               <div className="modal-footer">
