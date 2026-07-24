@@ -14,6 +14,7 @@ import { calcularPrecioVenta } from "../lib/tax";
 const initialState = {
   codigo_producto: "",
   oem: "",
+  oem_alternativo: "",
   nombre: "",
   marca: "",
   descripcion: "",
@@ -102,6 +103,7 @@ export default function ProductoFormPage() {
           <div className="col-md-4 form-group"><label>Código Producto</label><input className="form-control" value={data.codigo_producto} onChange={(e) => setData({ ...data, codigo_producto: e.target.value })} required /></div>
           <div className="col-md-4 form-group"><label>Código OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
           <div className="col-md-4 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
+          <div className="col-12 form-group"><label>OEM alternativos</label><textarea className="form-control" value={data.oem_alternativo} onChange={(e) => setData({ ...data, oem_alternativo: e.target.value })} rows={2} /></div>
           <div className="col-md-4 form-group"><label>Marca</label><input className="form-control" value={data.marca} onChange={(e) => setData({ ...data, marca: e.target.value })} /></div>
           <div className="col-12 form-group"><label>Descripción</label><textarea className="form-control" value={data.descripcion} onChange={(e) => setData({ ...data, descripcion: e.target.value })} /></div>
           <div className="col-md-3 form-group"><label>Precio costo</label><input type="number" className="form-control" value={data.precio_costo} onChange={(e) => setData({ ...data, precio_costo: e.target.value })} required /></div>

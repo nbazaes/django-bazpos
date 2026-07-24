@@ -176,7 +176,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         proveedor = self.request.query_params.get("proveedor", "").strip()
 
         if texto:
-            queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto))
+            queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto))
         if proveedor:
             queryset = queryset.filter(proveedor_id=proveedor)
         return queryset

@@ -53,6 +53,7 @@ class Producto(models.Model):
     nombre = models.CharField(max_length=100)
     codigo_producto = models.CharField(max_length=50, unique=True)
     oem = models.CharField(max_length=50)
+    oem_alternativo = models.TextField(null=True, blank=True, verbose_name="OEM alternativos")
     marca = models.CharField(max_length=100, blank=True, default='')
     descripcion = models.TextField()
     precio = models.IntegerField(blank=True, null=True)
