@@ -55,7 +55,11 @@ class ProductoSerializer(serializers.ModelSerializer):
         if stocks is None:
             stocks = obj.stocks_ubicacion.select_related("ubicacion").all()
         return [
-            {"ubicacion_id": s.ubicacion.id, "nombre": s.ubicacion.nombre, "cantidad": s.cantidad}
+            {
+                "ubicacion_id": s.ubicacion.id if s.ubicacion else None,
+                "nombre": s.ubicacion.nombre if s.ubicacion else "Sin ubicación",
+                "cantidad": s.cantidad,
+            }
             for s in stocks
             if s.cantidad > 0
         ]

@@ -604,6 +604,8 @@ textarea.form-control, textarea.input {
 
 .modal-body {
   padding: 1.35rem;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .modal-footer {

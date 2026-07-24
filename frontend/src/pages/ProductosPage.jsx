@@ -5,14 +5,16 @@ import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../components/Shell";
+import AjusteStockModal from "../components/AjusteStockModal";
 import { useDeleteProducto, useProductos } from "../lib/queries";
+import { getUser, isBodeguero } from "../lib/auth";
 
 function renderUbicacion(row) {
   const ubicaciones = row.ubicaciones_stock || [];
   if (ubicaciones.length === 0) return "—";
 
   const desktop = ubicaciones.map((u, i) => (
-    <span key={u.nombre}>
+    <span key={u.ubicacion_id ?? `null-${i}`}>
       {i > 0 && <span className="text-muted">, </span>}
       {u.nombre} ({u.cantidad})
     </span>
@@ -24,8 +26,8 @@ function renderUbicacion(row) {
       <span className="stock-hover">
         Múltiples
         <span className="stock-popover">
-          {ubicaciones.map((u) => (
-            <div key={u.nombre} className="popover-row">
+          {ubicaciones.map((u, i) => (
+            <div key={u.ubicacion_id ?? `null-${i}`} className="popover-row">
               <span>{u.nombre}</span>
               <strong>{u.cantidad}</strong>
             </div>
@@ -55,6 +57,10 @@ export default function ProductosPage() {
   const params = { texto, page, page_size: pageSize };
   const { data, isFetching } = useProductos(params);
   const deleteMutation = useDeleteProducto();
+
+  const user = getUser();
+  const puedeAjustar = isBodeguero(user);
+  const [ajusteProducto, setAjusteProducto] = useState(null);
 
   const rows = data?.results ?? [];
   const count = data?.count ?? 0;
@@ -103,7 +109,8 @@ export default function ProductosPage() {
   }
 
   return (
-    <PageCard title="Listado de productos">
+    <>
+      <PageCard title="Listado de productos">
       <div className="page-actions">
         <input
           className="form-control"
@@ -127,7 +134,18 @@ export default function ProductosPage() {
           { key: "marca", label: "Marca" },
           { key: "descripcion", label: "Descripción" },
           { key: "precio", label: "Precio", width: "1px" },
-          { key: "stock_actual", label: "Stock", width: "1px" },
+          { key: "stock_actual", label: "Stock", width: "1px", render: (row) => (
+            puedeAjustar ? (
+              <button
+                className="btn btn-link btn-sm"
+                style={{ padding: 0, fontSize: "inherit", fontWeight: 600 }}
+                onClick={() => setAjusteProducto(row)}
+                title="Ajustar stock"
+              >
+                {row.stock_actual}
+              </button>
+            ) : row.stock_actual
+          ) },
           { key: "ubicaciones_stock", label: "Ubicación", render: renderUbicacion },
         ]}
         onEdit={(row) => {
@@ -146,5 +164,12 @@ export default function ProductosPage() {
         />
       </div>
     </PageCard>
+    {ajusteProducto && (
+      <AjusteStockModal
+        producto={ajusteProducto}
+        onClose={() => setAjusteProducto(null)}
+      />
+    )}
+    </>
   );
 }

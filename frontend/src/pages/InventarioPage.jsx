@@ -15,12 +15,12 @@ function UbicacionCell({ ubicaciones }) {
   return (
     <>
       <span className="ubicacion-desktop">
-        {ubicaciones.map((u, i) => (
-          <span key={u.nombre}>
-            {i > 0 && <span className="text-muted">, </span>}
-            {u.nombre} ({u.cantidad})
-          </span>
-        ))}
+          {ubicaciones.map((u, i) => (
+            <span key={u.ubicacion_id ?? `null-${i}`}>
+              {i > 0 && <span className="text-muted">, </span>}
+              {u.nombre} ({u.cantidad})
+            </span>
+          ))}
       </span>
       <span className="ubicacion-mobile">
         {ubicaciones.length === 1

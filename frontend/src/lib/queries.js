@@ -484,7 +484,10 @@ export function useDeleteUbicacion() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id) => apiRequest(`/ubicaciones/${id}/`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.ubicaciones.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.ubicaciones.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+    },
   });
 }
 

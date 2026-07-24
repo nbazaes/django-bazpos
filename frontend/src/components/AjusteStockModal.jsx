@@ -11,7 +11,7 @@ function todayInputValue() {
 }
 
 export default function AjusteStockModal({ producto, onClose }) {
-  const { data: ubicacionesData } = useUbicaciones();
+  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
   const todasUbicaciones = ubicacionesData?.results ?? [];
   const mutation = useAjustarStock();
 

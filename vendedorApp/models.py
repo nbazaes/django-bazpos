@@ -25,7 +25,7 @@ def fecha_hoy():
 
 class StockProductoUbicacion(models.Model):
     producto = models.ForeignKey("Producto", on_delete=models.CASCADE, related_name="stocks_ubicacion")
-    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE)
+    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.SET_NULL, null=True, blank=True)
     cantidad = models.IntegerField(default=0)
 
     class Meta:
@@ -33,7 +33,8 @@ class StockProductoUbicacion(models.Model):
         unique_together = ("producto", "ubicacion")
 
     def __str__(self):
-        return f"{self.producto.nombre} en {self.ubicacion.nombre}: {self.cantidad}"
+        ubicacion_nombre = self.ubicacion.nombre if self.ubicacion else "Sin ubicación"
+        return f"{self.producto.nombre} en {ubicacion_nombre}: {self.cantidad}"
 
 
 class ProductoQuerySet(models.QuerySet):
@@ -185,7 +186,7 @@ class DetalleDevolucion(models.Model):
 
 class AjusteStock(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="ajustes_stock")
-    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE)
+    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.SET_NULL, null=True, blank=True)
     usuario = models.ForeignKey(User, on_delete=models.PROTECT)
     cantidad_anterior = models.IntegerField()
     cantidad_nueva = models.IntegerField()
@@ -197,7 +198,8 @@ class AjusteStock(models.Model):
         ordering = ["-fecha_ajuste", "-id"]
 
     def __str__(self):
-        return f"Ajuste {self.producto.nombre} en {self.ubicacion.nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"
+        ubicacion_nombre = self.ubicacion.nombre if self.ubicacion else "Sin ubicación"
+        return f"Ajuste {self.producto.nombre} en {ubicacion_nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"
 
 
 class Pedido(models.Model):
