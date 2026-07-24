@@ -325,6 +325,8 @@ class PedidoDetalleSerializer(serializers.ModelSerializer):
             "precio_costo",
             "porcentaje_utilidad",
             "precio_final",
+            "sumar_envio",
+            "stellantis",
         ]
 
 
@@ -370,6 +372,8 @@ class PedidoDetalleInputSerializer(serializers.Serializer):
     nombre = serializers.CharField(max_length=200)
     precio_costo = serializers.IntegerField(min_value=0)
     porcentaje_utilidad = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal(0))
+    sumar_envio = serializers.BooleanField(default=True)
+    stellantis = serializers.BooleanField(default=False)
 
 
 class CrearPedidoSerializer(serializers.Serializer):
@@ -378,13 +382,18 @@ class CrearPedidoSerializer(serializers.Serializer):
     metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
     items = PedidoDetalleInputSerializer(many=True)
 
-    def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio):
+    def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import ROUND_HALF_UP, ROUND_UP
         costo = Decimal(precio_costo)
+        if stellantis:
+            costo = costo * Decimal("0.80")
         utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
         base = costo * (Decimal(1) + utilidad)
         con_iva = base * Decimal("1.19")
-        con_envio = con_iva + Decimal(costo_envio)
+        if sumar_envio:
+            con_envio = con_iva + Decimal(costo_envio)
+        else:
+            con_envio = con_iva
         item_total = int((con_envio / Decimal(100)).to_integral_value(rounding=ROUND_UP) * Decimal(100))
         return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
 
@@ -401,6 +410,8 @@ class CrearPedidoSerializer(serializers.Serializer):
                 item["precio_costo"],
                 item["porcentaje_utilidad"],
                 costo_envio,
+                sumar_envio=item.get("sumar_envio", True),
+                stellantis=item.get("stellantis", False),
             )
             monto_subtotal += base
             monto_total += item_total
@@ -422,6 +433,8 @@ class CrearPedidoSerializer(serializers.Serializer):
                 item["precio_costo"],
                 item["porcentaje_utilidad"],
                 costo_envio,
+                sumar_envio=item.get("sumar_envio", True),
+                stellantis=item.get("stellantis", False),
             )
             producto_id = item.get("producto_id")
             producto = None
@@ -441,6 +454,8 @@ class CrearPedidoSerializer(serializers.Serializer):
                 precio_costo=item["precio_costo"],
                 porcentaje_utilidad=item["porcentaje_utilidad"],
                 precio_final=item_total,
+                sumar_envio=item.get("sumar_envio", True),
+                stellantis=item.get("stellantis", False),
             )
 
         venta = Venta.objects.create(

@@ -7,16 +7,18 @@ import { formatDateTime } from "../lib/format";
 import { STORE_NAME } from "../lib/config";
 import { useToast } from "../lib/toast";
 
-function calcularItemSubtotal(precioCosto, porcentajeUtilidad) {
+function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
   const costo = Number(precioCosto) || 0;
   const pct = Number(porcentajeUtilidad) || 0;
-  const base = costo * (1 + pct / 100);
+  const costoBase = stellantis ? costo * 0.8 : costo;
+  const base = costoBase * (1 + pct / 100);
   return Math.round(base * 1.19);
 }
 
-function calcularItemTotal(precioCosto, porcentajeUtilidad) {
-  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad);
-  return Math.ceil((subtotal + 4500) / 100) * 100;
+function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, stellantis = false) {
+  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis);
+  const conEnvio = sumarEnvio ? subtotal + 4500 : subtotal;
+  return Math.ceil(conEnvio / 100) * 100;
 }
 
 const productoVacio = {
@@ -27,6 +29,8 @@ const productoVacio = {
   nombre: "",
   precio_costo: "",
   porcentaje_utilidad: "",
+  sumar_envio: true,
+  stellantis: false,
 };
 
 export default function PedidosCrearPage() {
@@ -47,14 +51,17 @@ export default function PedidosCrearPage() {
   const productosRef = useRef(null);
 
   const itemTotalPreview = useMemo(() => {
-    return calcularItemTotal(producto.precio_costo, producto.porcentaje_utilidad);
-  }, [producto.precio_costo, producto.porcentaje_utilidad]);
+    return calcularItemTotal(
+      producto.precio_costo,
+      producto.porcentaje_utilidad,
+      producto.sumar_envio,
+      producto.stellantis,
+    );
+  }, [producto.precio_costo, producto.porcentaje_utilidad, producto.sumar_envio, producto.stellantis]);
 
   const totales = useMemo(() => {
     const subtotal = items.reduce((sum, it) => {
-      const costo = Number(it.precio_costo) || 0;
-      const pct = Number(it.porcentaje_utilidad) || 0;
-      return sum + Math.round(costo * (1 + pct / 100) * 1.19);
+      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.stellantis);
     }, 0);
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
     return { subtotal, total };
@@ -84,7 +91,8 @@ export default function PedidosCrearPage() {
   }, [productoTexto, productosData]);
 
   function seleccionarProductoExistente(p) {
-    setProducto({
+    setProducto((prev) => ({
+      ...prev,
       producto_id: p.producto_id,
       codigo_proveedor: p.codigo_producto || "",
       proveedor_id: String(p.proveedor ?? ""),
@@ -92,7 +100,7 @@ export default function PedidosCrearPage() {
       nombre: p.nombre || "",
       precio_costo: p.precio_costo ?? "",
       porcentaje_utilidad: p.margen_utilidad ?? "",
-    });
+    }));
     setProductoTexto(`${p.codigo_producto} — ${p.nombre}`);
     setMostrarProductos(false);
   }
@@ -111,7 +119,12 @@ export default function PedidosCrearPage() {
       addToast("Completa los datos del producto antes de agregar", "danger");
       return;
     }
-    const precioFinal = calcularItemTotal(producto.precio_costo, producto.porcentaje_utilidad);
+    const precioFinal = calcularItemTotal(
+      producto.precio_costo,
+      producto.porcentaje_utilidad,
+      producto.sumar_envio,
+      producto.stellantis,
+    );
     setItems((prev) => [
       ...prev,
       {
@@ -151,6 +164,8 @@ export default function PedidosCrearPage() {
         nombre: it.nombre,
         precio_costo: it.precio_costo,
         porcentaje_utilidad: it.porcentaje_utilidad,
+        sumar_envio: it.sumar_envio,
+        stellantis: it.stellantis,
       })),
     };
 
@@ -414,10 +429,29 @@ export default function PedidosCrearPage() {
               </div>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3 mt-3 mb-3">
+              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={producto.sumar_envio}
+                  onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
+                />
+                <span>Sumar envío (+$4.500)</span>
+              </label>
+              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={producto.stellantis}
+                  onChange={(e) => handleProductoChange("stellantis", e.target.checked)}
+                />
+                <span>Pedido Stellantis</span>
+              </label>
+            </div>
+
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
               <div className="text-right">
-                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad)}</div>
-                <div className="text-secondary">Envío +$4.500</div>
+                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis)}</div>
+                {producto.sumar_envio && <div className="text-secondary">Envío +$4.500</div>}
                 <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
               </div>
               <button

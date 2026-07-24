@@ -266,6 +266,8 @@ class PedidoDetalle(models.Model):
     precio_costo = models.IntegerField()
     porcentaje_utilidad = models.DecimalField(max_digits=5, decimal_places=2)
     precio_final = models.IntegerField()
+    sumar_envio = models.BooleanField(default=True)
+    stellantis = models.BooleanField(default=False)
 
     class Meta:
         db_table = "pedido_detalles"
