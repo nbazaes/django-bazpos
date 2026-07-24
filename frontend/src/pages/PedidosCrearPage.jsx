@@ -209,6 +209,7 @@ export default function PedidosCrearPage() {
         <meta charset="utf-8" />
         <title>Pedido #${pedido.id}</title>
         <style>
+          @page { size: letter; }
           body { font-family: sans-serif; font-size: 12px; margin: 16px; color: #000; }
           .center { text-align: center; }
           .store { font-weight: bold; font-size: 16px; margin-bottom: 4px; }

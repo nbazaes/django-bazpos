@@ -1020,7 +1020,7 @@ textarea.form-control, textarea.input {
   font-family: var(--font-mono);
   padding: 1.25rem;
   border-radius: var(--radius);
-  max-width: 380px;
+  max-width: 650px;
   margin: 0 auto;
   font-size: 0.8rem;
   line-height: 1.5;

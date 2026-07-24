@@ -185,50 +185,63 @@ export default function VentaPage() {
   }
 
   function imprimirDocumento(documento) {
-    const win = window.open("", "_blank", "width=420,height=700");
+    const win = window.open("", "_blank", "width=800,height=600");
     if (!win) return;
 
-    const rows = documento.items.map((item) => `
-      <tr>
-        <td>${item.cantidad}</td>
-        <td>${item.codigo_producto}</td>
-        <td>${item.nombre}</td>
-        <td style="text-align:right;">$${item.subtotal}</td>
-      </tr>
-    `).join("");
+    const esCotizacion = documento.tipo_documento === "CO";
+
+    const rows = documento.items.map((item) => {
+      const label = esCotizacion
+        ? `${item.cantidad} x ${item.nombre}`
+        : `${item.cantidad} x ${item.codigo_producto} - ${item.nombre}`;
+      return `
+        <div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;">
+          <span>${label}</span>
+          <span>$${item.subtotal}</span>
+        </div>
+      `;
+    }).join("");
 
     win.document.write(`
       <html>
         <head>
-          <title>${documento.tipo_documento}</title>
+          <meta charset="utf-8" />
+          <title>${esCotizacion ? "COTIZACION" : "COMPROBANTE DE VENTA"}</title>
           <style>
-            body { font-family: monospace; width: 58mm; margin: 0; padding: 8px; font-size: 11px; }
-            h1, h2, p { margin: 0; text-align: center; }
-            .line { border-top: 1px dashed #000; margin: 6px 0; }
-            table { width: 100%; border-collapse: collapse; }
-            td { vertical-align: top; padding: 2px 0; }
-            .right { text-align: right; }
-            .small { font-size: 10px; }
+            @page { size: letter; margin: 12mm; }
+            body {
+              font-family: "JetBrains Mono", monospace;
+              margin: 0;
+              padding: 1.25rem;
+              font-size: 0.8rem;
+              line-height: 1.5;
+              color: #1a1a1a;
+              background: #faf9f6;
+            }
+            h1 { margin: 0 0 4px; text-align: center; font-size: 1rem; }
+            .subtitle { text-align: center; margin: 0 0 4px; }
+            .doc-number { text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 4px; }
+            .date { text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 8px; }
+            hr { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+            .totals-row { display: flex; justify-content: space-between; }
+            .disclaimer { text-align: center; color: #999; font-size: 0.7rem; margin-top: 8px; }
+            .bold { font-weight: bold; }
           </style>
         </head>
         <body>
           <h1>${documento.tienda}</h1>
-          <p>${documento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}</p>
-          <p style="font-weight:bold;">#${documento.ventaId}</p>
-          <p class="small">${documento.fecha}</p>
-          <div class="line"></div>
-          <table>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-          <div class="line"></div>
-          <p class="right">Subtotal: $${documento.subtotal_original}</p>
-          ${documento.descuento_porcentaje > 0 ? `<p class="right">Descuento (${documento.descuento_porcentaje}%): -$${documento.subtotal_original - documento.total}</p>` : ""}
-          <p class="right">Neto: $${documento.total_neto}</p>
-          <p class="right">Impuesto: $${documento.impuesto}</p>
-          <p class="right"><strong>Total: $${documento.total}</strong></p>
-          <p class="small" style="text-align:center;margin-top:10px;">Documento carece de validez legal</p>
+          <p class="subtitle">${esCotizacion ? "COTIZACION" : "COMPROBANTE DE VENTA"}</p>
+          <p class="doc-number">#${documento.ventaId}</p>
+          <p class="date">${documento.fecha}</p>
+          <hr />
+          ${rows}
+          <hr />
+          <div class="totals-row"><span>Subtotal</span><span>$${documento.subtotal_original}</span></div>
+          ${documento.descuento_porcentaje > 0 ? `<div class="totals-row"><span>Descuento (${documento.descuento_porcentaje}%)</span><span>-$${documento.subtotal_original - documento.total}</span></div>` : ""}
+          <div class="totals-row"><span>Neto</span><span>$${documento.total_neto}</span></div>
+          <div class="totals-row"><span>Impuesto</span><span>$${documento.impuesto}</span></div>
+          <div class="totals-row"><span class="bold">Total</span><span class="bold">$${documento.total}</span></div>
+          <p class="disclaimer">Documento carece de validez legal</p>
         </body>
       </html>
     `);
