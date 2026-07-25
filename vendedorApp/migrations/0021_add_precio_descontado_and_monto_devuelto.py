@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vendedorApp', '0011_venta_descuento_porcentaje_venta_monto_subtotal'),
+        ('vendedorApp', '0020_remove_stockproductoubicacion_unique_producto_ubicacion_and_more'),
     ]
 
     operations = [

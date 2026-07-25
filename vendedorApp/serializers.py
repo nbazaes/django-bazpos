@@ -144,15 +144,15 @@ def _distribute_discount(monto_subtotal, monto_total, descuento_porcentaje, item
 
     n = len(items_data)
     shares = [sub * monto_total / monto_subtotal for _, _, _, sub in items_data]
-    floored = [int(s) for s in shares]
+    floored = [int(s // 1000) * 1000 for s in shares]
     remainders = [shares[i] - floored[i] for i in range(n)]
 
     total_floor = sum(floored)
-    gap = monto_total - total_floor
+    gap = (monto_total - total_floor) // 1000
 
     sorted_idx = sorted(range(n), key=lambda i: remainders[i], reverse=True)
     for k in range(gap):
-        floored[sorted_idx[k % n]] += 1
+        floored[sorted_idx[k % n]] += 1000
 
     return [floored[i] // items_data[i][0] for i in range(n)]
 
