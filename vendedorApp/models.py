@@ -136,6 +136,7 @@ class DetalleVenta(models.Model):
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
     cantidad = models.IntegerField()
     precio_unitario = models.IntegerField()
+    precio_descontado = models.IntegerField(default=0)
     subtotal = models.IntegerField()
 
     class Meta:
@@ -163,6 +164,7 @@ class Devolucion(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.PROTECT)
     motivo = models.TextField()
     fecha_devolucion = models.DateTimeField(auto_now_add=True)
+    monto_devuelto = models.IntegerField(default=0)
 
     class Meta:
         db_table = 'devoluciones'

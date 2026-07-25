@@ -511,10 +511,8 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        detalles_map = {
-            d.producto_id: d.cantidad
-            for d in venta.detalleventa_set.all()
-        }
+        detalles_venta = {d.producto_id: d for d in venta.detalleventa_set.all()}
+        detalles_map = {pid: d.cantidad for pid, d in detalles_venta.items()}
 
         devueltos = {}
         for dd in DetalleDevolucion.objects.filter(
@@ -528,6 +526,8 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 usuario=request.user,
                 motivo=data["motivo"],
             )
+
+            monto_devuelto = 0
 
             for item in data["productos"]:
                 pid = item["producto_id"]
@@ -548,6 +548,10 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                         {"error": f"Solo {disponible} de producto {pid} están disponibles para devolver"},
                         status=400,
                     )
+
+                dv = detalles_venta[pid]
+                price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
+                monto_devuelto += cantidad * price
 
                 if reponer:
                     ubicacion_id = item.get("ubicacion_id")
@@ -577,6 +581,9 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                     cantidad=cantidad,
                     reponer_stock=reponer,
                 )
+
+            devolucion.monto_devuelto = monto_devuelto
+            devolucion.save(update_fields=["monto_devuelto"])
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
@@ -93,6 +93,22 @@ export default function PedidosPage() {
     setDevolverReponer(rep);
     setDevolverUbicacion(ubi);
   }, [devolverVentaData, ubicacionesList]);
+
+  const devolverTotalCalculado = useMemo(() => {
+    if (!devolverVentaData?.detalles?.length) return 0;
+    let total = 0;
+    const prodDevueltos = devolverVentaData.productos_devueltos || {};
+    for (const d of devolverVentaData.detalles) {
+      const devuelto = prodDevueltos[d.producto] || 0;
+      const disponible = d.cantidad - devuelto;
+      if (disponible <= 0) continue;
+      if (!devolverSeleccion[d.producto]) continue;
+      const cant = devolverCantidades[d.producto] || 1;
+      const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
+      total += cant * effPrice;
+    }
+    return total;
+  }, [devolverVentaData, devolverSeleccion, devolverCantidades]);
 
   const syncURL = (t, p, ps) => {
     setSearchParams({ tab: t, page: String(p), page_size: String(ps) }, { replace: true });
@@ -398,13 +414,15 @@ export default function PedidosPage() {
                 <p className="mb-3">Seleccione los productos a devolver y si se repone el stock:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead><tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Cant. a devolver</th><th>Reponer stock</th><th>Ubicación</th></tr></thead>
+                    <thead><tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Precio efect.</th><th>Cant.</th><th>Reponer</th><th>Ubicación</th></tr></thead>
                     <tbody>
                       {(devolverVentaData.detalles || []).map((d) => {
                         const devuelto = (devolverVentaData.productos_devueltos || {})[d.producto] || 0;
                         const disponible = d.cantidad - devuelto;
                         if (disponible <= 0) return null;
                         const sel = devolverSeleccion[d.producto] || false;
+                        const cant = devolverCantidades[d.producto] || 1;
+                        const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
                         return (
                           <tr key={d.producto}>
                             <td><input type="checkbox" checked={sel} onChange={(e) => setDevolverSeleccion({ ...devolverSeleccion, [d.producto]: e.target.checked })} disabled={devolverMutation.isPending} /></td>
@@ -412,9 +430,14 @@ export default function PedidosPage() {
                             <td>{d.producto_nombre}</td>
                             <td>{d.cantidad}</td>
                             <td>{disponible}</td>
+                            <td className="text-right font-weight-bold">
+                              {devolverVentaData.descuento_porcentaje > 0
+                                ? <><span className="text-muted" style={{textDecoration: "line-through", fontSize: "0.8rem", marginRight: 4}}>${d.precio_unitario}</span> ${effPrice}</>
+                                : <>${effPrice}</>}
+                            </td>
                             <td>
                               <StepperInput
-                                value={devolverCantidades[d.producto] || 1}
+                                value={cant}
                                 onChange={(val) => setDevolverCantidades({ ...devolverCantidades, [d.producto]: val })}
                                 min={1}
                                 max={disponible}
@@ -435,6 +458,12 @@ export default function PedidosPage() {
                       })}
                     </tbody>
                   </table>
+                  {devolverTotalCalculado > 0 && (
+                    <div className="text-right mt-2 mb-3">
+                      <span className="font-weight-bold">Total a devolver: </span>
+                      <span className="text-danger font-weight-bold" style={{fontSize: "1.1rem"}}>${devolverTotalCalculado}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group mt-3">
                   <label className="font-weight-bold">Motivo de devolución:</label>
