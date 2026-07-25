@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
@@ -38,6 +39,38 @@ export default function VentaPage() {
   const discount = descuentoPorcentaje > 0 ? descuentoPorcentaje : 0;
   const discountedTotal = Math.round(subtotalCarro * (1 - discount / 100));
   const totalConDescuento = discount > 0 ? roundTotal(discountedTotal) : subtotalCarro;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const cotizacionParam = searchParams.get("cotizacion");
+  const cotizacionOrigenId = cotizacionParam ? parseInt(cotizacionParam) : null;
+
+  useEffect(() => {
+    if (!cotizacionOrigenId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const cot = await apiRequest(`/ventas/${cotizacionOrigenId}/`);
+        if (cancelled) return;
+        const items = (cot.detalles || []).map((d) => ({
+          producto_id: d.producto,
+          codigo_producto: d.codigo_producto,
+          oem: d.producto_oem || "",
+          nombre: d.producto_nombre,
+          precio: d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario,
+          cantidad: d.cantidad,
+          stock_actual: 99999,
+        }));
+        if (items.length > 0) {
+          setCarro(items);
+        }
+      } catch (err) {
+        setError("No se pudo cargar la cotización: " + (err.message || "error desconocido"));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [cotizacionOrigenId]);
 
   async function buscarProducto(texto) {
     if (!texto.trim()) {
@@ -241,6 +274,7 @@ export default function VentaPage() {
           <div class="totals-row"><span>Neto</span><span>$${documento.total_neto}</span></div>
           <div class="totals-row"><span>Impuesto</span><span>$${documento.impuesto}</span></div>
           <div class="totals-row"><span class="bold">Total</span><span class="bold">$${documento.total}</span></div>
+          ${esCotizacion ? `<p class="disclaimer">Cotización válida hasta agotar stock</p>` : ""}
           <p class="disclaimer">Documento carece de validez legal</p>
         </body>
       </html>
@@ -304,6 +338,7 @@ export default function VentaPage() {
           monto_subtotal: subtotal,
           tipo_documento: tipoDocumento,
           productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
+          ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
         },
       });
       const documento = buildDocumento(tipoDocumento);
@@ -315,6 +350,9 @@ export default function VentaPage() {
       setShowConfirmVenta(false);
       setShowPreview(true);
       setShowVentaSuccess(true);
+      if (cotizacionOrigenId) {
+        setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+      }
       setTimeout(() => setShowVentaSuccess(false), 1300);
     } catch (err) {
       setError(err.message);
@@ -331,6 +369,15 @@ export default function VentaPage() {
   return (
     <>
       {error && <div className="alert alert-danger">{error}</div>}
+      {cotizacionOrigenId && (
+        <div className="alert alert-info" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Convirtiendo cotización <strong>#{cotizacionOrigenId}</strong> a venta — los productos se han cargado en el carrito.</span>
+          <button className="btn btn-sm btn-outline" onClick={() => {
+            setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+            setCarro([]);
+          }}>Cancelar</button>
+        </div>
+      )}
       <PageCard title="Buscar producto">
         <div className="row mb-3">
           <div className="col-md-5">
@@ -733,6 +780,9 @@ export default function VentaPage() {
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
                   <div className="flex justify-between font-bold" style={{ color: "#1a1a1a" }}><span>Total</span><span>${lastDocumento.total}</span></div>
+                  {lastDocumento.tipo_documento === "CO" && (
+                    <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Cotización válida hasta agotar stock</div>
+                  )}
                   <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Documento carece de validez legal</div>
                 </div>
               </div>

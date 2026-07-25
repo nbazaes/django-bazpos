@@ -124,6 +124,14 @@ class Venta(models.Model):
         choices=TipoDocumento.choices,
         default=TipoDocumento.VENTA,
     )
+    venta_origen = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ventas_derivadas',
+        verbose_name='Venta origen',
+    )
 
     class Meta:
         db_table = 'ventas'

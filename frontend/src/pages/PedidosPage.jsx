@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
@@ -42,6 +42,7 @@ export default function PedidosPage() {
 
   const user = getUser();
   const esAdmin = isGerente(user);
+  const navigate = useNavigate();
 
   const params = { page, page_size: pageSize };
   const { data: ventasData } = useVentas(params);
@@ -227,6 +228,9 @@ export default function PedidosPage() {
                       <td>{v.estado_display || v.estado}</td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
+                        {v.tipo_documento === "CO" && v.estado === "PE" && (
+                          <button className="btn btn-sm btn-success me-1" onClick={() => navigate(`/ventas?cotizacion=${v.id}`)}>Convertir a venta</button>
+                        )}
                         {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
                           <>
                             <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>

@@ -74,6 +74,7 @@ class VentaDetalleInputSerializer(serializers.Serializer):
 class DetalleVentaSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
     codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
+    producto_oem = serializers.CharField(source="producto.oem", read_only=True)
 
     class Meta:
         model = DetalleVenta
@@ -81,6 +82,7 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
             "id",
             "producto",
             "codigo_producto",
+            "producto_oem",
             "producto_nombre",
             "cantidad",
             "precio_unitario",
@@ -112,6 +114,7 @@ class VentaSerializer(serializers.ModelSerializer):
             "estado_display",
             "tipo_documento",
             "tipo_documento_display",
+            "venta_origen",
             "detalles",
             "productos_devueltos",
         ]
@@ -167,6 +170,18 @@ class RegistrarVentaSerializer(serializers.Serializer):
         default=Venta.TipoDocumento.VENTA,
         required=False,
     )
+    venta_origen = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_venta_origen(self, value):
+        if value is None:
+            return None
+        try:
+            origen = Venta.objects.get(id=value)
+        except Venta.DoesNotExist:
+            raise serializers.ValidationError("La cotización de origen no existe")
+        if origen.tipo_documento != Venta.TipoDocumento.COTIZACION:
+            raise serializers.ValidationError("El origen debe ser una cotización")
+        return value
 
     def validate(self, data):
         subtotal = data.get("monto_subtotal")
@@ -223,6 +238,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
             descuento_porcentaje=descuento_porcentaje,
             estado=estado,
             tipo_documento=tipo_documento,
+            venta_origen_id=validated_data.get("venta_origen"),
         )
 
         for i, (cantidad, producto, subtotal) in enumerate(items_data):
