@@ -84,6 +84,7 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
             "producto_nombre",
             "cantidad",
             "precio_unitario",
+            "precio_descontado",
             "subtotal",
         ]
 
@@ -137,6 +138,25 @@ def _round_total(amount):
     return (amount // 1000) * 1000
 
 
+def _distribute_discount(monto_subtotal, monto_total, descuento_porcentaje, items_data):
+    if descuento_porcentaje == 0:
+        return [precio_unit for _, _, precio_unit, _ in items_data]
+
+    n = len(items_data)
+    shares = [sub * monto_total / monto_subtotal for _, _, _, sub in items_data]
+    floored = [int(s // 1000) * 1000 for s in shares]
+    remainders = [shares[i] - floored[i] for i in range(n)]
+
+    total_floor = sum(floored)
+    gap = (monto_total - total_floor) // 1000
+
+    sorted_idx = sorted(range(n), key=lambda i: remainders[i], reverse=True)
+    for k in range(gap):
+        floored[sorted_idx[k % n]] += 1000
+
+    return [floored[i] // items_data[i][0] for i in range(n)]
+
+
 class RegistrarVentaSerializer(serializers.Serializer):
     productos = VentaDetalleInputSerializer(many=True)
     total = serializers.IntegerField(min_value=0)
@@ -178,15 +198,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
         tipo_documento = validated_data.get("tipo_documento", Venta.TipoDocumento.VENTA)
         estado = Venta.Estado.COMPLETADA if tipo_documento == Venta.TipoDocumento.VENTA else Venta.Estado.PENDIENTE
 
-        venta = Venta.objects.create(
-            usuario=request.user,
-            monto_total=total,
-            monto_subtotal=monto_subtotal,
-            descuento_porcentaje=descuento_porcentaje,
-            estado=estado,
-            tipo_documento=tipo_documento,
-        )
-
+        items_data = []
         for item in productos:
             producto = Producto.objects.select_for_update().get(producto_id=item["producto_id"])
             cantidad = item["cantidad"]
@@ -197,11 +209,29 @@ class RegistrarVentaSerializer(serializers.Serializer):
                     {"productos": f"Stock insuficiente para {producto.nombre}"}
                 )
 
+            items_data.append((cantidad, producto, subtotal))
+
+        precios_descontados = _distribute_discount(
+            monto_subtotal, total, descuento_porcentaje,
+            [(cant, producto.precio, producto.precio, subtotal) for cant, producto, subtotal in items_data],
+        )
+
+        venta = Venta.objects.create(
+            usuario=request.user,
+            monto_total=total,
+            monto_subtotal=monto_subtotal,
+            descuento_porcentaje=descuento_porcentaje,
+            estado=estado,
+            tipo_documento=tipo_documento,
+        )
+
+        for i, (cantidad, producto, subtotal) in enumerate(items_data):
             DetalleVenta.objects.create(
                 venta=venta,
                 producto=producto,
                 cantidad=cantidad,
                 precio_unitario=producto.precio,
+                precio_descontado=precios_descontados[i],
                 subtotal=subtotal,
             )
 
@@ -250,16 +280,17 @@ class DevolucionSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "fecha_devolucion"]
 
     def get_monto_devuelto(self, obj):
-        detalles = obj.detalles.all()
-        if not hasattr(obj, "_prefetched_detalles"):
-            pass
+        if obj.monto_devuelto > 0:
+            return obj.monto_devuelto
+
         total = 0
-        for detalle in detalles:
+        for detalle in obj.detalles.all():
             dv = DetalleVenta.objects.filter(
                 venta=obj.venta, producto_id=detalle.producto_id
             ).first()
-            precio = dv.precio_unitario if dv else 0
-            total += detalle.cantidad * precio
+            if dv:
+                price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
+                total += detalle.cantidad * price
         return total
 
 
