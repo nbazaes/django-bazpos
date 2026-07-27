@@ -389,6 +389,9 @@ class PedidoSerializer(serializers.ModelSerializer):
     metodo_pago_display = serializers.CharField(source="get_metodo_pago_display", read_only=True)
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     estado_documento_display = serializers.CharField(source="get_estado_documento_display", read_only=True)
+    es_cotizacion = serializers.BooleanField(read_only=True)
+    pedido_origen = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    convertido = serializers.SerializerMethodField()
 
     class Meta:
         model = Pedido
@@ -412,9 +415,17 @@ class PedidoSerializer(serializers.ModelSerializer):
             "stock_descontado",
             "activo",
             "venta",
+            "es_cotizacion",
+            "pedido_origen",
+            "convertido",
             "fecha_creacion",
             "detalles",
         ]
+
+    def get_convertido(self, obj):
+        if not obj.es_cotizacion:
+            return False
+        return Pedido.objects.filter(pedido_origen=obj, activo=True).exists()
 
 
 class PedidoDetalleInputSerializer(serializers.Serializer):
@@ -434,6 +445,7 @@ class CrearPedidoSerializer(serializers.Serializer):
     telefono_cliente = serializers.CharField(max_length=50)
     metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
     items = PedidoDetalleInputSerializer(many=True)
+    es_cotizacion = serializers.BooleanField(default=False)
 
     def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import ROUND_HALF_UP, ROUND_UP
@@ -455,6 +467,7 @@ class CrearPedidoSerializer(serializers.Serializer):
         request = self.context["request"]
         items = validated_data["items"]
         costo_envio = 4500
+        es_cotizacion = validated_data.get("es_cotizacion", False)
 
         monto_subtotal = 0
         monto_total = 0
@@ -479,6 +492,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             metodo_pago=validated_data["metodo_pago"],
             estado=Pedido.Estado.PENDIENTE_RETIRAR,
             estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+            es_cotizacion=es_cotizacion,
         )
 
         for item in items:
@@ -511,14 +525,15 @@ class CrearPedidoSerializer(serializers.Serializer):
                 stellantis=item.get("stellantis", False),
             )
 
-        venta = Venta.objects.create(
-            usuario=request.user,
-            monto_total=monto_total,
-            monto_subtotal=monto_subtotal,
-            estado=Venta.Estado.COMPLETADA,
-            tipo_documento=Venta.TipoDocumento.PEDIDO,
-        )
-        pedido.venta = venta
-        pedido.save(update_fields=["venta"])
+        if not es_cotizacion:
+            venta = Venta.objects.create(
+                usuario=request.user,
+                monto_total=monto_total,
+                monto_subtotal=monto_subtotal,
+                estado=Venta.Estado.COMPLETADA,
+                tipo_documento=Venta.TipoDocumento.PEDIDO,
+            )
+            pedido.venta = venta
+            pedido.save(update_fields=["venta"])
 
         return pedido

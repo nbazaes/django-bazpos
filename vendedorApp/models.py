@@ -255,6 +255,15 @@ class Pedido(models.Model):
         blank=True,
         related_name="pedido",
     )
+    es_cotizacion = models.BooleanField(default=False, verbose_name="Es cotización")
+    pedido_origen = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pedidos_derivados",
+        verbose_name="Pedido origen (cotización)",
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -9,7 +9,7 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Pedido, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AjustarStockInputSerializer,
     AjusteStockSerializer,
@@ -615,6 +615,13 @@ class MarcarRetiroSerializer(serializers.Serializer):
     persona_retiro = serializers.CharField(max_length=200, trim_whitespace=True)
 
 
+class ConvertirCotizacionSerializer(serializers.Serializer):
+    detalle_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+    )
+
+
 class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     serializer_class = PedidoSerializer
@@ -626,6 +633,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         "cambiar_estado": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "marcar_retiro": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "desactivar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "convertir_a_pedido": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
@@ -707,3 +715,100 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         pedido.activo = False
         pedido.save(update_fields=["activo"])
         return Response({"ok": True})
+
+    def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
+        from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
+        costo = Decimal(precio_costo)
+        if stellantis:
+            costo = costo * Decimal("0.80")
+        utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
+        base = costo * (Decimal(1) + utilidad)
+        con_iva = base * Decimal("1.19")
+        if sumar_envio:
+            con_envio = con_iva + Decimal(costo_envio)
+        else:
+            con_envio = con_iva
+        item_total = int((con_envio / Decimal(100)).to_integral_value(rounding=ROUND_UP) * Decimal(100))
+        return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
+
+    @action(detail=True, methods=["post"], url_path="convertir-a-pedido")
+    def convertir_a_pedido(self, request, pk=None):
+        cotizacion = self.get_object()
+
+        if not cotizacion.es_cotizacion:
+            return Response({"error": "Este pedido no es una cotización"}, status=400)
+        if Pedido.objects.filter(pedido_origen=cotizacion, activo=True).exists():
+            return Response({"error": "Esta cotización ya fue convertida a pedido"}, status=400)
+
+        serializer = ConvertirCotizacionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        detalle_ids = serializer.validated_data["detalle_ids"]
+
+        detalles_originales = cotizacion.detalles.filter(id__in=detalle_ids)
+        if not detalles_originales.exists():
+            return Response({"error": "Ninguno de los items seleccionados pertenece a esta cotización"}, status=400)
+
+        costo_envio = 4500
+        monto_subtotal = 0
+        monto_total = 0
+        nuevos_items = []
+        for detalle in detalles_originales:
+            base, item_total = self._calcular_item_view(
+                detalle.precio_costo,
+                detalle.porcentaje_utilidad,
+                costo_envio,
+                sumar_envio=detalle.sumar_envio,
+                stellantis=detalle.stellantis,
+            )
+            monto_subtotal += base
+            monto_total += item_total
+            nuevos_items.append({
+                "detalle": detalle,
+                "item_total": item_total,
+            })
+
+        with transaction.atomic():
+            nuevo_pedido = Pedido.objects.create(
+                usuario=request.user,
+                nombre_cliente=cotizacion.nombre_cliente,
+                telefono_cliente=cotizacion.telefono_cliente,
+                monto_subtotal=monto_subtotal,
+                monto_total=monto_total,
+                costo_envio=costo_envio,
+                metodo_pago=cotizacion.metodo_pago,
+                estado=Pedido.Estado.PENDIENTE_RETIRAR,
+                estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+                es_cotizacion=False,
+                pedido_origen=cotizacion,
+            )
+
+            for item in nuevos_items:
+                d = item["detalle"]
+                PedidoDetalle.objects.create(
+                    pedido=nuevo_pedido,
+                    producto=d.producto,
+                    codigo_proveedor=d.codigo_proveedor,
+                    proveedor=d.proveedor,
+                    oem=d.oem,
+                    nombre=d.nombre,
+                    precio_costo=d.precio_costo,
+                    porcentaje_utilidad=d.porcentaje_utilidad,
+                    precio_final=item["item_total"],
+                    sumar_envio=d.sumar_envio,
+                    stellantis=d.stellantis,
+                )
+
+            venta = Venta.objects.create(
+                usuario=request.user,
+                monto_total=monto_total,
+                monto_subtotal=monto_subtotal,
+                estado=Venta.Estado.COMPLETADA,
+                tipo_documento=Venta.TipoDocumento.PEDIDO,
+            )
+            nuevo_pedido.venta = venta
+            nuevo_pedido.save(update_fields=["venta"])
+
+        return Response(
+            PedidoSerializer(nuevo_pedido, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )

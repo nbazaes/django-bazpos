@@ -287,6 +287,22 @@ export function useDesactivarPedido() {
   });
 }
 
+export function useConvertirCotizacion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pedidoId, detalle_ids }) =>
+      apiRequest(`/pedidos/${pedidoId}/convertir-a-pedido/`, {
+        method: "POST",
+        body: { detalle_ids },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.ventas.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+    },
+  });
+}
+
 // ── Proveedores ──
 
 export function useProveedores(params = {}) {

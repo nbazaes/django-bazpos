@@ -148,6 +148,14 @@ export default function PedidosCrearPage() {
   }
 
   function generarPedido() {
+    guardarPedido(false);
+  }
+
+  function generarCotizacion() {
+    guardarPedido(true);
+  }
+
+  function guardarPedido(esCotizacion) {
     if (!cliente.nombre.trim() || !cliente.telefono.trim()) {
       addToast("Ingresa nombre y teléfono del cliente", "danger");
       return;
@@ -172,29 +180,30 @@ export default function PedidosCrearPage() {
         sumar_envio: it.sumar_envio,
         stellantis: it.stellantis,
       })),
+      es_cotizacion: esCotizacion,
     };
 
     createPedido.mutate(payload, {
       onSuccess: (data) => {
-        addToast("Pedido generado correctamente", "success");
-        imprimirPedido(data);
+        addToast(esCotizacion ? "Cotización generada correctamente" : "Pedido generado correctamente", "success");
+        imprimirDocumento(data, esCotizacion);
         setCliente({ nombre: "", telefono: "" });
         setItems([]);
         setMetodoPago("EF");
         limpiarProducto();
       },
       onError: (err) => {
-        addToast(err.message || "Error al generar el pedido", "danger");
+        addToast(err.message || (esCotizacion ? "Error al generar la cotización" : "Error al generar el pedido"), "danger");
       },
     });
   }
 
-  function imprimirPedido(pedido) {
+  function imprimirDocumento(documento, esCotizacion) {
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) return;
     const storeConfig = getStoreConfig();
 
-    const filas = (pedido.detalles || []).map((d) => `
+    const filas = (documento.detalles || []).map((d) => `
       <tr>
         <td>${d.codigo_proveedor || "—"}</td>
         <td>${d.oem || "—"}</td>
@@ -203,17 +212,25 @@ export default function PedidosCrearPage() {
       </tr>
     `).join("");
 
-    const fecha = formatDateTime(pedido.fecha_creacion);
-    const metodo = pedido.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
-    const estado = pedido.estado_display || pedido.estado;
-    const documento = pedido.estado_documento_display || pedido.estado_documento;
+    const fecha = formatDateTime(documento.fecha_creacion);
+    const metodo = documento.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
+    const estado = documento.estado_display || documento.estado;
+    const documentoLabel = documento.estado_documento_display || documento.estado_documento;
+
+    const titulo = esCotizacion
+      ? `Cotización #${documento.id}`
+      : `Pedido #${documento.id}`;
+
+    const disclaimer = esCotizacion
+      ? `<div class="disclaimer">Cotización válida hasta 3 días o hasta agotar stock</div>`
+      : `<div class="footer">El abono del producto constituye garantía por repuestos solicitados. Al desistir del producto el abono sera para saldar costos y gestión.</div>`;
 
     win.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
-        <title>Pedido #${pedido.id}</title>
+        <title>${titulo}</title>
         <style>
           @page { size: letter; }
           body { font-family: sans-serif; font-size: 12px; margin: 16px; color: #000; }
@@ -227,6 +244,7 @@ export default function PedidosCrearPage() {
           th { font-weight: bold; }
           .total { text-align: right; font-weight: bold; font-size: 14px; margin-top: 8px; }
           .footer { margin-top: 16px; font-size: 10px; text-align: justify; }
+          .disclaimer { margin-top: 16px; font-size: 12px; text-align: justify; font-weight: bold; color: #333; }
           .check-row { margin-top: 8px; font-size: 12px; }
         </style>
       </head>
@@ -235,14 +253,14 @@ export default function PedidosCrearPage() {
           <div class="store">${STORE_NAME}</div>
           ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
           ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
-          <div class="title">Pedido #${pedido.id}</div>
+          <div class="title">${titulo}</div>
         </div>
         <div class="info">
           <strong>Fecha:</strong> ${fecha}<br />
-          <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
-          <strong>Teléfono:</strong> ${pedido.telefono_cliente}<br />
-          <strong>Estado:</strong> ${estado}<br />
-          <strong>Documento:</strong> ${documento}
+          <strong>Cliente:</strong> ${documento.nombre_cliente}<br />
+          <strong>Teléfono:</strong> ${documento.telefono_cliente}<br />
+          ${!esCotizacion ? `<strong>Estado:</strong> ${estado}<br />` : ""}
+          ${!esCotizacion ? `<strong>Documento:</strong> ${documentoLabel}` : ""}
         </div>
         <table>
           <thead>
@@ -250,14 +268,11 @@ export default function PedidosCrearPage() {
           </thead>
           <tbody>${filas}</tbody>
         </table>
-        <div class="total">Total: $${pedido.monto_total}</div>
+        <div class="total">Total: $${documento.monto_total}</div>
         <div class="check-row">
           <strong>Método de pago:</strong> ${metodo}
         </div>
-        <div class="footer">
-          El abono del producto constituye garantía por repuestos solicitados.
-          Al desistir del producto el abono sera para saldar costos y gestión.
-        </div>
+        ${disclaimer}
         <script>
           window.onload = function() { window.print(); };
         </script>
@@ -533,7 +548,15 @@ export default function PedidosCrearPage() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            className="btn btn-secondary btn-lg"
+            onClick={generarCotizacion}
+            disabled={createPedido.isPending || items.length === 0}
+          >
+            {createPedido.isPending ? "Generando..." : "Generar cotización"}
+          </button>
           <button
             type="button"
             className="btn btn-success btn-lg"

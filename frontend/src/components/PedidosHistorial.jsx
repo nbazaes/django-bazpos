@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { formatDateTime } from "../lib/format";
 import {
   useCambiarEstadoPedido,
+  useConvertirCotizacion,
   useDesactivarPedido,
   useMarcarRetiro,
   usePedido,
@@ -9,6 +10,7 @@ import {
 } from "../lib/queries";
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+import { useToast } from "../lib/toast";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
 
@@ -31,13 +33,18 @@ export default function PedidosHistorial() {
   const [retiroPersona, setRetiroPersona] = useState("");
   const [retiroMismoUsuario, setRetiroMismoUsuario] = useState(false);
   const [desactivarId, setDesactivarId] = useState(null);
+  const [convertirId, setConvertirId] = useState(null);
+  const [convertirSeleccion, setConvertirSeleccion] = useState({});
 
+  const addToast = useToast();
   const { data: pedidosData } = usePedidos({ page, page_size: pageSize });
   const { data: detalleData } = usePedido(detalleId);
   const { data: retiroData } = usePedido(retiroId);
+  const { data: convertirData } = usePedido(convertirId);
   const cambiarDocumento = useCambiarEstadoPedido();
   const marcarRetiro = useMarcarRetiro();
   const desactivarPedido = useDesactivarPedido();
+  const convertirCotizacion = useConvertirCotizacion();
 
   useEffect(() => {
     fetchStoreConfig();
@@ -78,6 +85,44 @@ export default function PedidosHistorial() {
   function confirmarDesactivar() {
     desactivarPedido.mutate(desactivarId, { onSuccess: () => setDesactivarId(null) });
   }
+
+  function abrirConvertir(pedido) {
+    setConvertirId(pedido.id);
+    const sel = {};
+    (pedido.detalles || []).forEach((d) => {
+      sel[d.id] = true;
+    });
+    setConvertirSeleccion(sel);
+  }
+
+  function toggleItem(id) {
+    setConvertirSeleccion((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function confirmarConvertir() {
+    const ids = Object.entries(convertirSeleccion)
+      .filter(([, v]) => v)
+      .map(([k]) => Number(k));
+    if (ids.length === 0) {
+      addToast("Selecciona al menos un producto", "danger");
+      return;
+    }
+    convertirCotizacion.mutate(
+      { pedidoId: convertirId, detalle_ids: ids },
+      {
+        onSuccess: () => {
+          addToast("Cotización convertida a pedido", "success");
+          setConvertirId(null);
+          setConvertirSeleccion({});
+        },
+        onError: (err) => {
+          addToast(err.message || "Error al convertir cotización", "danger");
+        },
+      },
+    );
+  }
+
+  const algunaSeleccionada = Object.values(convertirSeleccion).some(Boolean);
 
   function imprimirPedido(pedido) {
     const win = window.open("", "_blank", "width=420,height=700");
@@ -181,31 +226,46 @@ export default function PedidosHistorial() {
           <tbody>
             {rows.map((p) => {
               const estadoInfo = ESTADO_BADGE[p.estado] || { className: "badge", label: p.estado };
+              const esCotizacion = p.es_cotizacion;
+              const yaConvertido = esCotizacion && p.convertido;
               return (
                 <tr key={p.id}>
                   <td>P#{p.id}</td>
                   <td>{formatDateTime(p.fecha_creacion)}</td>
                   <td>{p.nombre_cliente}</td>
                   <td>{p.telefono_cliente}</td>
-                  <td><span className={estadoInfo.className}>{estadoInfo.label}</span></td>
                   <td>
-                    <select
-                      className="form-control form-control-sm"
-                      value={p.estado_documento}
-                      onChange={(e) => handleDocumentoChange(p, e.target.value)}
-                      disabled={cambiarDocumento.isPending}
-                    >
-                      {DOCUMENTO_OPCIONES.map((op) => (
-                        <option key={op.value} value={op.value}>{op.label}</option>
-                      ))}
-                    </select>
+                    {esCotizacion ? (
+                      <span className="badge badge-info">Cotización</span>
+                    ) : (
+                      <span className={estadoInfo.className}>{estadoInfo.label}</span>
+                    )}
+                  </td>
+                  <td>
+                    {esCotizacion ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      <select
+                        className="form-control form-control-sm"
+                        value={p.estado_documento}
+                        onChange={(e) => handleDocumentoChange(p, e.target.value)}
+                        disabled={cambiarDocumento.isPending}
+                      >
+                        {DOCUMENTO_OPCIONES.map((op) => (
+                          <option key={op.value} value={op.value}>{op.label}</option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td>{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
                   <td>{formatDateTime(p.fecha_retiro)}</td>
                   <td>${p.monto_total}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>
-                    {p.estado === "PR" && (
+                    {esCotizacion && !yaConvertido && (
+                      <button className="btn btn-sm btn-warning me-1" onClick={() => abrirConvertir(p)}>Convertir a pedido</button>
+                    )}
+                    {!esCotizacion && p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
                     )}
                     <button className="btn btn-sm btn-danger" onClick={() => setDesactivarId(p.id)}>Eliminar pedido</button>
@@ -367,6 +427,66 @@ export default function PedidosHistorial() {
           </div>
         </div>
       )}
+
+      {convertirId && convertirData && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setConvertirId(null)}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Convertir cotización #{convertirData.id} a pedido</h5>
+                <button type="button" className="modal-close" onClick={() => setConvertirId(null)}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">Selecciona los productos que deseas incluir en el nuevo pedido:</p>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}>Incluir</th>
+                        <th>Cód. Prov.</th>
+                        <th>Proveedor</th>
+                        <th>OEM</th>
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(convertirData.detalles || []).map((d) => (
+                        <tr key={d.id}>
+                          <td className="text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!convertirSeleccion[d.id]}
+                              onChange={() => toggleItem(d.id)}
+                            />
+                          </td>
+                          <td>{d.codigo_proveedor}</td>
+                          <td>{d.proveedor_nombre}</td>
+                          <td>{d.oem}</td>
+                          <td>{d.nombre}</td>
+                          <td>${d.precio_final}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setConvertirId(null)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarConvertir}
+                  disabled={convertirCotizacion.isPending || !algunaSeleccionada}
+                >
+                  {convertirCotizacion.isPending ? "Convirtiendo..." : "Convertir a pedido"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }
