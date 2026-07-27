@@ -174,14 +174,15 @@ class ProductoViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
-        sin_stock = self.request.query_params.get("sin_stock", "false").lower() == "true"
 
         if texto:
             queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto))
         if proveedor:
             queryset = queryset.filter(proveedor_id=proveedor)
-        if not sin_stock:
-            queryset = queryset.filter(stock_actual__gt=0)
+        if "sin_stock" in self.request.query_params:
+            sin_stock = self.request.query_params["sin_stock"].lower() == "true"
+            if not sin_stock:
+                queryset = queryset.filter(stock_actual__gt=0)
         return queryset
 
     @action(detail=False, methods=["get"], url_path="por-codigo")
