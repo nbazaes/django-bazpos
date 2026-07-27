@@ -240,4 +240,4 @@ class FacturaUpsertSerializer(serializers.Serializer):
 class StoreConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = StoreConfig
-        fields = ["id", "telefono", "direccion", "tax_percent"]
+        fields = ["id", "telefono", "direccion", "tax_percent", "timezone"]

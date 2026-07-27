@@ -12,7 +12,8 @@ export default function ConfiguracionPage() {
   const updateMutation = useUpdateStoreConfig();
   const addToast = useToast();
 
-  const [data, setData] = useState({ telefono: "", direccion: "", tax_percent: "" });
+  const [data, setData] = useState({ telefono: "", direccion: "", tax_percent: "", timezone: "America/Santiago" });
+
 
   useEffect(() => {
     if (configData?.length) {
@@ -22,6 +23,7 @@ export default function ConfiguracionPage() {
         telefono: cfg.telefono || "",
         direccion: cfg.direccion || "",
         tax_percent: cfg.tax_percent != null ? String(cfg.tax_percent) : "19",
+        timezone: cfg.timezone || "America/Santiago",
       });
     }
   }, [configData]);
@@ -36,6 +38,7 @@ export default function ConfiguracionPage() {
           telefono: data.telefono,
           direccion: data.direccion,
           tax_percent: data.tax_percent,
+          timezone: data.timezone,
         },
       },
       {
@@ -76,6 +79,33 @@ export default function ConfiguracionPage() {
               onChange={(e) => setData({ ...data, tax_percent: e.target.value })}
               required
             />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-md-6 form-group">
+            <label>Zona horaria</label>
+            <input
+              className="form-control"
+              value={data.timezone}
+              onChange={(e) => setData({ ...data, timezone: e.target.value })}
+              placeholder="America/Santiago"
+              list="timezone-list"
+            />
+            <datalist id="timezone-list">
+              <option value="America/Santiago" />
+              <option value="America/Punta_Arenas" />
+              <option value="Pacific/Easter" />
+              <option value="America/Argentina/Buenos_Aires" />
+              <option value="America/Lima" />
+              <option value="America/Bogota" />
+              <option value="America/Mexico_City" />
+              <option value="America/Sao_Paulo" />
+              <option value="America/New_York" />
+              <option value="America/Los_Angeles" />
+              <option value="Europe/Madrid" />
+              <option value="Europe/London" />
+              <option value="Etc/GMT+4" />
+            </datalist>
           </div>
         </div>
         <div className="form-group">

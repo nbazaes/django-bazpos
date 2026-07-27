@@ -16,7 +16,7 @@ export function usePageTitle(title) {
 
 const vendedorLinks = [
   { to: "/", label: "Dashboard", end: true },
-  { to: "/ventas", label: "Ventas" },
+  { to: "/ventas", label: "VENTAS", className: "nav-link--ventas", end: true },
   { to: "/ventas/pedidos", label: "Pedidos" },
   { to: "/ventas/historial", label: "Historial" },
   { to: "/ventas/inventario", label: "Inventario" },
@@ -80,7 +80,7 @@ export default function Shell() {
             {filteredVendedorLinks.map((link) => (
               <li className="nav-item" key={link.to}>
                 <NavLink
-                  className="nav-link"
+                  className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`}
                   to={link.to}
                   end={link.end}
                 >
@@ -97,7 +97,7 @@ export default function Shell() {
               <ul className="sidebar-nav">
                 {bodegueroLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
-                    <NavLink className="nav-link" to={link.to}>
+                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to}>
                       {link.label}
                     </NavLink>
                   </li>
@@ -113,7 +113,7 @@ export default function Shell() {
               <ul className="sidebar-nav">
                 {gerenteLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
-                    <NavLink className="nav-link" to={link.to}>
+                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to}>
                       {link.label}
                     </NavLink>
                   </li>

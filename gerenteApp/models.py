@@ -95,6 +95,7 @@ class StoreConfig(models.Model):
     telefono = models.CharField(max_length=20, blank=True, default="")
     direccion = models.TextField(blank=True, default="")
     tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=19)
+    timezone = models.CharField(max_length=100, blank=True, default="America/Santiago")
 
     class Meta:
         db_table = "store_config"

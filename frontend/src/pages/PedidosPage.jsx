@@ -16,6 +16,7 @@ import {
   useVentas,
 } from "../lib/queries";
 import { getUser, isGerente } from "../lib/auth";
+import { formatDateTime } from "../lib/format";
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
@@ -221,7 +222,7 @@ export default function PedidosPage() {
                   {tab === "ventas" && rows.map((v) => (
                     <tr key={v.id}>
                       <td>{v.id}</td>
-                      <td>{v.fecha_venta}</td>
+                      <td>{formatDateTime(v.fecha_venta)}</td>
                       <td>{v.usuario_nombre}</td>
                       <td>${v.monto_total}</td>
                       <td>{v.tipo_documento_display || v.tipo_documento}</td>
@@ -243,7 +244,7 @@ export default function PedidosPage() {
                   {tab === "devoluciones" && rows.map((d) => (
                     <tr key={d.id} className="table-warning">
                       <td>D#{d.id}</td>
-                      <td>{d.fecha_devolucion}</td>
+                      <td>{formatDateTime(d.fecha_devolucion)}</td>
                       <td>{d.usuario_nombre}</td>
                       <td style={{ color: "var(--danger)" }}>-${d.monto_devuelto}</td>
                       <td><span className="badge badge-warning">Devolución</span></td>
@@ -277,7 +278,7 @@ export default function PedidosPage() {
               </div>
               <div className="modal-body">
                 <div className="row mb-4">
-                  <div className="col-md-4"><strong>Fecha:</strong> {detalleVentaData.fecha_venta}</div>
+                  <div className="col-md-4"><strong>Fecha:</strong> {formatDateTime(detalleVentaData.fecha_venta)}</div>
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleVentaData.usuario_nombre}</div>
                   <div className="col-md-4"><strong>Tipo:</strong> {detalleVentaData.tipo_documento_display || detalleVentaData.tipo_documento}</div>
                 </div>
@@ -322,7 +323,7 @@ export default function PedidosPage() {
               </div>
               <div className="modal-body">
                 <div className="row mb-4">
-                  <div className="col-md-4"><strong>Fecha:</strong> {detalleDevolucionData.fecha_devolucion}</div>
+                  <div className="col-md-4"><strong>Fecha:</strong> {formatDateTime(detalleDevolucionData.fecha_devolucion)}</div>
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleDevolucionData.usuario_nombre}</div>
                   <div className="col-md-4"><strong>Venta original:</strong> #{detalleDevolucionData.venta}</div>
                 </div>

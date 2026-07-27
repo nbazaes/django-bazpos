@@ -8,6 +8,25 @@ import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import StepperInput from "../components/StepperInput";
 
+const VENTA_STORAGE_KEY = "bazpos_venta_pending";
+
+function readStoredVenta() {
+  try {
+    const saved = localStorage.getItem(VENTA_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        carro: Array.isArray(parsed.carro) ? parsed.carro : [],
+        descuentoPorcentaje: parsed.descuentoPorcentaje != null ? parsed.descuentoPorcentaje : 0,
+        oem: parsed.oem || "",
+      };
+    }
+  } catch {
+    localStorage.removeItem(VENTA_STORAGE_KEY);
+  }
+  return { carro: [], descuentoPorcentaje: 0, oem: "" };
+}
+
 function roundTotal(amount) {
   const remainder = amount % 1000;
   if (remainder >= 900) return (Math.floor(amount / 1000) + 1) * 1000;
@@ -16,12 +35,12 @@ function roundTotal(amount) {
 
 export default function VentaPage() {
   usePageTitle("Realizar venta");
-  const [oem, setOem] = useState("");
+  const [oem, setOem] = useState(() => readStoredVenta().oem);
   const [codigoBarra, setCodigoBarra] = useState("");
   const [barraFeedback, setBarraFeedback] = useState("");
   const [productosEncontrados, setProductosEncontrados] = useState([]);
   const [hayMasProductos, setHayMasProductos] = useState(false);
-  const [carro, setCarro] = useState([]);
+  const [carro, setCarro] = useState(() => readStoredVenta().carro);
   const [error, setError] = useState("");
   const [showConfirmVenta, setShowConfirmVenta] = useState(false);
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
@@ -30,7 +49,7 @@ export default function VentaPage() {
   const [showUbicacionDialog, setShowUbicacionDialog] = useState(false);
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
-  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0);
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
   const taxPercent = getTaxPercent();
@@ -76,6 +95,18 @@ export default function VentaPage() {
 
     return () => { cancelled = true; };
   }, [cotizacionOrigenId]);
+
+  useEffect(() => {
+    if (carro.length > 0 || descuentoPorcentaje > 0 || oem) {
+      localStorage.setItem(VENTA_STORAGE_KEY, JSON.stringify({
+        carro,
+        descuentoPorcentaje,
+        oem,
+      }));
+    } else {
+      localStorage.removeItem(VENTA_STORAGE_KEY);
+    }
+  }, [carro, descuentoPorcentaje, oem]);
 
   async function buscarProducto(texto) {
     if (!texto.trim()) {
@@ -335,6 +366,20 @@ export default function VentaPage() {
     }
   }
 
+  function limpiarVenta() {
+    setCarro([]);
+    setDescuentoPorcentaje(0);
+    setOem("");
+    setProductosEncontrados([]);
+    setHayMasProductos(false);
+    setError("");
+    setCodigoBarra("");
+    localStorage.removeItem(VENTA_STORAGE_KEY);
+    if (cotizacionOrigenId) {
+      setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+    }
+  }
+
   async function guardar(tipoDocumento = "VE") {
     try {
       const subtotal = subtotalCarro;
@@ -359,6 +404,7 @@ export default function VentaPage() {
       setOem("");
       setProductosEncontrados([]);
       setHayMasProductos(false);
+      localStorage.removeItem(VENTA_STORAGE_KEY);
       setShowConfirmVenta(false);
       setShowPreview(true);
       setShowVentaSuccess(true);
@@ -405,12 +451,38 @@ export default function VentaPage() {
         </div>
         <div className="row">
           <div className="col-md-5">
-            <input
-              className="form-control"
-              placeholder="Ingrese código OEM"
-              value={oem}
-              onChange={(e) => setOem(e.target.value)}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                className="form-control"
+                placeholder="Ingrese código OEM"
+                value={oem}
+                onChange={(e) => setOem(e.target.value)}
+                style={{ paddingRight: "2rem" }}
+              />
+              {oem && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => { setOem(""); setProductosEncontrados([]); setHayMasProductos(false); setError(""); }}
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    fontSize: "1.1rem",
+                    lineHeight: 1,
+                    padding: "0.15rem 0.4rem",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                  }}
+                  title="Limpiar búsqueda"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
           </div>
           <div className="col-md-3" style={{ display: "flex", alignItems: "flex-end" }}>
             <button className="btn btn-primary" onClick={() => buscarProducto(oem)}>Buscar</button>
@@ -659,6 +731,9 @@ export default function VentaPage() {
           </button>
           <button className="btn btn-outline" disabled={!carro.length} onClick={() => guardar("CO")}>
             Generar cotización
+          </button>
+          <button className="btn btn-danger" disabled={!carro.length && !oem} onClick={limpiarVenta}>
+            Limpiar venta
           </button>
         </div>
       </PageCard>

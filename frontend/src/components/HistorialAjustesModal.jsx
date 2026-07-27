@@ -1,10 +1,5 @@
 import { useHistorialAjustes } from "../lib/queries";
-
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  const parts = dateStr.split("-");
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
+import { formatDateTime } from "../lib/format";
 
 export default function HistorialAjustesModal({ producto, onClose }) {
   const { data: ajustes, isLoading } = useHistorialAjustes(producto.producto_id);
@@ -47,7 +42,7 @@ export default function HistorialAjustesModal({ producto, onClose }) {
                   ) : (
                     ajustes.map((a) => (
                       <tr key={a.id}>
-                        <td className="text-nowrap">{formatDate(a.fecha_ajuste)}</td>
+                        <td className="text-nowrap">{formatDateTime(a.fecha_ajuste)}</td>
                         <td>{a.ubicacion_nombre}</td>
                         <td className="text-center">{a.cantidad_anterior}</td>
                         <td className="text-center">{a.cantidad_nueva}</td>
