@@ -129,7 +129,7 @@ export default function StepperInput({
         ...style,
       }}
     >
-      <StepperButton onClick={disabled ? null : decrement} active={active} label={decrementLabel}>
+      <StepperButton onClick={disabled || (min !== undefined && numericValue <= min) ? null : decrement} active={active} label={decrementLabel}>
         −
       </StepperButton>
       <input
@@ -156,7 +156,7 @@ export default function StepperInput({
         onChange={handleChange}
         disabled={disabled}
       />
-      <StepperButton onClick={disabled ? null : increment} active={active} label={incrementLabel}>
+      <StepperButton onClick={disabled || (max !== undefined && numericValue >= max) ? null : increment} active={active} label={incrementLabel}>
         +
       </StepperButton>
     </div>

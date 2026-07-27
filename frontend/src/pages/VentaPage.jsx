@@ -427,7 +427,14 @@ export default function VentaPage() {
 
   return (
     <>
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && (
+        <div className="alert alert-danger" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          <button className="btn btn-sm btn-outline" onClick={() => setError("")} style={{ border: "none", fontSize: "1.2rem", lineHeight: 1, padding: "0 0.25rem" }}>
+            ×
+          </button>
+        </div>
+      )}
       {cotizacionOrigenId && (
         <div className="alert alert-info" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Convirtiendo cotización <strong>#{cotizacionOrigenId}</strong> a venta — los productos se han cargado en el carrito.</span>
@@ -588,16 +595,14 @@ export default function VentaPage() {
                     <StepperInput
                       value={i.cantidad}
                       onChange={(val) => {
-                        const maxStock = i.stock_actual || 1;
-                        const next = [...carro];
-                        const idx = next.findIndex((x) => x.producto_id === i.producto_id);
-                        next[idx].cantidad = val;
-                        setCarro(next);
-                        if (val >= maxStock) {
-                          setError(`Stock maximo para ${i.nombre}: ${maxStock}`);
-                        } else {
-                          setError("");
-                        }
+                        setCarro((prev) => {
+                          const idx = prev.findIndex((x) => x.producto_id === i.producto_id);
+                          if (idx === -1 || prev[idx].cantidad === val) return prev;
+                          const next = [...prev];
+                          next[idx] = { ...next[idx], cantidad: val };
+                          return next;
+                        });
+                        setError("");
                       }}
                       min={1}
                       max={i.stock_actual || 1}
