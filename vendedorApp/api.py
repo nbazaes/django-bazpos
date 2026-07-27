@@ -125,7 +125,7 @@ class DashboardStatsView(APIView):
                         "nombre": p.nombre,
                         "stock_actual": p.stock_actual,
                         "ubicaciones": [
-                            {"nombre": s.ubicacion.nombre, "cantidad": s.cantidad}
+                            {"nombre": s.ubicacion.nombre if s.ubicacion else "Sin ubicación", "cantidad": s.cantidad}
                             for s in p.stocks_ubicacion.all()
                             if s.cantidad > 0
                         ],
