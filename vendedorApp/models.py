@@ -55,6 +55,7 @@ class Producto(models.Model):
     codigo_producto = models.CharField(max_length=50, unique=True)
     oem = models.CharField(max_length=50)
     oem_alternativo = models.TextField(null=True, blank=True, verbose_name="OEM alternativos")
+    codigo_proveedor = models.CharField(max_length=50, blank=True, default="", verbose_name="Código proveedor")
     marca = models.CharField(max_length=100, blank=True, default='')
     descripcion = models.TextField()
     precio = models.IntegerField(blank=True, null=True)

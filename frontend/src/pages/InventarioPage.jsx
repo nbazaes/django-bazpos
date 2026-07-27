@@ -110,6 +110,7 @@ export default function InventarioPage() {
               <tr>
                 <th style={{ width: "1px" }}>Código</th>
                 <th style={{ width: "1px" }}>OEM</th>
+                <th style={{ width: "1px" }}>Cód. Proveedor</th>
                 <th>Nombre</th>
                 <th>Marca</th>
                 <th>Descripción</th>
@@ -122,14 +123,15 @@ export default function InventarioPage() {
             </thead>
             <tbody>
               {isFetching && !productos.length ? (
-                <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">Cargando...</td></tr>
+                <tr><td colSpan={puedeAjustar ? 11 : 10} className="text-center text-muted">Cargando...</td></tr>
               ) : productos.length === 0 ? (
-                <tr><td colSpan={puedeAjustar ? 10 : 9} className="text-center text-muted">No hay registros</td></tr>
+                <tr><td colSpan={puedeAjustar ? 11 : 10} className="text-center text-muted">No hay registros</td></tr>
               ) : (
                 productos.map((p) => (
                   <tr key={p.producto_id}>
                     <td className="text-nowrap">{p.codigo_producto}</td>
                     <td className="text-nowrap">{p.oem}</td>
+                    <td className="text-nowrap">{p.codigo_proveedor}</td>
                     <td>{p.nombre}</td>
                     <td>{p.marca}</td>
                     <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>

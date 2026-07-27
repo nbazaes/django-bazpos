@@ -130,6 +130,7 @@ export default function ProductosPage() {
         columns={[
           { key: "codigo_producto", label: "Código", width: "1px" },
           { key: "oem", label: "OEM" },
+          { key: "codigo_proveedor", label: "Cód. Proveedor" },
           { key: "nombre", label: "Nombre" },
           { key: "marca", label: "Marca" },
           { key: "descripcion", label: "Descripción" },

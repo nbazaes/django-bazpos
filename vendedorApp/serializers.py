@@ -37,6 +37,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "codigo_producto",
             "oem",
             "oem_alternativo",
+            "codigo_proveedor",
             "marca",
             "descripcion",
             "precio",
