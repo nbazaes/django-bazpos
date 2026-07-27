@@ -52,6 +52,7 @@ export default function VentaPage() {
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
+  const [mostrarSinStock, setMostrarSinStock] = useState(false);
   const taxPercent = getTaxPercent();
 
   useEffect(() => {
@@ -116,7 +117,7 @@ export default function VentaPage() {
       return;
     }
     try {
-      const result = await apiRequest(`/productos/?texto=${encodeURIComponent(texto)}`);
+      const result = await apiRequest(`/productos/?texto=${encodeURIComponent(texto)}&sin_stock=${mostrarSinStock}`);
       const productos = Array.isArray(result) ? result : result.results || [];
       setHayMasProductos(!Array.isArray(result) && result.count > productos.length);
       if (productos.length === 0) {
@@ -139,7 +140,7 @@ export default function VentaPage() {
       buscarProducto(query);
     }, 250);
     return () => clearTimeout(timeoutId);
-  }, [oem]);
+  }, [oem, mostrarSinStock]);
 
   async function escanearCodigoBarra() {
     const codigo = codigoBarra.trim();
@@ -487,6 +488,17 @@ export default function VentaPage() {
           <div className="col-md-3" style={{ display: "flex", alignItems: "flex-end" }}>
             <button className="btn btn-primary" onClick={() => buscarProducto(oem)}>Buscar</button>
           </div>
+        </div>
+        <div className="mt-2">
+          <label className="checkbox-custom">
+            <input
+              type="checkbox"
+              checked={mostrarSinStock}
+              onChange={(e) => setMostrarSinStock(e.target.checked)}
+            />
+            <span className="checkbox-custom__mark" />
+            <span className="checkbox-custom__label">Buscar productos sin stock</span>
+          </label>
         </div>
         {productosEncontrados.length > 0 && (
           <div className="mt-4">

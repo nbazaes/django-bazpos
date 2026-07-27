@@ -1248,6 +1248,52 @@ textarea.form-control, textarea.input {
   border-bottom: none;
 }
 
+.checkbox-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-custom input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-custom__mark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.checkbox-custom input:checked + .checkbox-custom__mark {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.checkbox-custom input:checked + .checkbox-custom__mark::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.checkbox-custom__label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .popover-row-main {
   display: flex;
   justify-content: space-between;
