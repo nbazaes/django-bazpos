@@ -205,8 +205,6 @@ export default function PedidosCrearPage() {
 
     const filas = (documento.detalles || []).map((d) => `
       <tr>
-        <td>${d.codigo_proveedor || "—"}</td>
-        <td>${d.oem || "—"}</td>
         <td>${d.nombre}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
@@ -264,7 +262,7 @@ export default function PedidosCrearPage() {
         </div>
         <table>
           <thead>
-            <tr><th>Cód. Prov.</th><th>OEM</th><th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr><th>Producto</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
