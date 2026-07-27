@@ -108,6 +108,16 @@ class FacturaViewSet(viewsets.ModelViewSet):
         return queryset
 
     def create(self, request, *args, **kwargs):
+        numero_factura = request.data.get("numero_factura")
+        proveedor_id = request.data.get("proveedor_id")
+        if numero_factura is not None and proveedor_id is not None:
+            existing = Factura.objects.filter(
+                numero_factura=numero_factura, proveedor_id=proveedor_id
+            ).first()
+            if existing:
+                out = FacturaDetalleSerializer(existing, context={"request": request})
+                return Response({"existing": True, **out.data}, status=status.HTTP_200_OK)
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         factura = serializer.save()

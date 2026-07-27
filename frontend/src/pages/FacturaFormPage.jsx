@@ -31,6 +31,7 @@ export default function FacturaFormPage() {
   const [searchCodigo, setSearchCodigo] = useState("");
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
@@ -127,6 +128,7 @@ export default function FacturaFormPage() {
   function guardar(event) {
     event.preventDefault();
     setError("");
+    setWarning("");
     const payload = {
       numero_factura: Number(header.numero_factura),
       proveedor_id: Number(header.proveedor_id),
@@ -135,7 +137,17 @@ export default function FacturaFormPage() {
     };
     const mutation = id ? updateMutation : createMutation;
     mutation.mutate(id ? { id, data: payload } : payload, {
-      onSuccess: () => navigate("/facturas"),
+      onSuccess: (data) => {
+        if (data?.existing) {
+          setWarning("Factura ya ingresada.");
+          setTimeout(() => {
+            setWarning("");
+            navigate(`/facturas/${data.id}/editar`);
+          }, 1500);
+        } else {
+          navigate("/facturas");
+        }
+      },
       onError: (err) => setError(err.message),
     });
   }
@@ -146,6 +158,7 @@ export default function FacturaFormPage() {
     <>
       <PageCard title={id ? "Editar factura" : "Crear factura"}>
         {error && <div className="alert alert-danger">{error}</div>}
+        {warning && <div className="alert alert-warning">{warning}</div>}
         <form onSubmit={guardar}>
           <div className="row">
             <div className="col-md-4 form-group"><label>Número factura</label><input disabled={Boolean(id)} className="form-control" value={header.numero_factura} onChange={(e) => setHeader({ ...header, numero_factura: e.target.value })} required /></div>
