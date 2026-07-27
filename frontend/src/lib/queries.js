@@ -39,6 +39,7 @@ export const queryKeys = {
     list: (params) => ["facturas", "list", params],
     detail: (id) => ["facturas", "detail", id],
     buscarProducto: (codigo) => ["facturas", "buscar-producto", codigo],
+    checkExists: (numero_factura, proveedor_id) => ["facturas", "check-exists", numero_factura, proveedor_id],
     impuesto: ["facturas", "impuesto"],
   },
   ubicaciones: {
@@ -436,6 +437,13 @@ export function useImpuesto() {
     queryKey: queryKeys.facturas.impuesto,
     queryFn: () => apiRequest("/facturas/impuesto/"),
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useCheckFacturaExiste() {
+  return useMutation({
+    mutationFn: ({ numero_factura, proveedor_id }) =>
+      apiRequest(`/facturas/check-exists/?numero_factura=${numero_factura}&proveedor_id=${proveedor_id}`),
   });
 }
 

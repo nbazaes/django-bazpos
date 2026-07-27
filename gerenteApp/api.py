@@ -91,6 +91,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
         "buscar_producto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "crear_producto_rapido": [ROLE_ENCARGADO, ROLE_GERENTE],
         "impuesto": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "check_exists": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_serializer_class(self):
@@ -131,6 +132,20 @@ class FacturaViewSet(viewsets.ModelViewSet):
         factura = serializer.save()
         out = FacturaDetalleSerializer(factura, context={"request": request})
         return Response(out.data)
+
+    @action(detail=False, methods=["get"], url_path="check-exists")
+    def check_exists(self, request):
+        numero_factura = request.query_params.get("numero_factura")
+        proveedor_id = request.query_params.get("proveedor_id")
+        if not numero_factura or not proveedor_id:
+            return Response({"exists": False})
+        factura = Factura.objects.filter(
+            numero_factura=numero_factura, proveedor_id=proveedor_id
+        ).first()
+        if factura:
+            out = FacturaDetalleSerializer(factura, context={"request": request})
+            return Response({"exists": True, **out.data})
+        return Response({"exists": False})
 
     @action(detail=False, methods=["get"], url_path="buscar-producto")
     def buscar_producto(self, request):
