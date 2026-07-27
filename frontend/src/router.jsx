@@ -16,6 +16,7 @@ import UsuarioFormPage from "./pages/UsuarioFormPage";
 import FacturasPage from "./pages/FacturasPage";
 import FacturaFormPage from "./pages/FacturaFormPage";
 import UbicacionPage from "./pages/UbicacionPage";
+import ConfiguracionPage from "./pages/ConfiguracionPage";
 import StaticPage from "./pages/StaticPage";
 
 export const router = createBrowserRouter([
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
               { path: "facturas", element: <FacturasPage /> },
               { path: "facturas/crear", element: <FacturaFormPage /> },
               { path: "facturas/:id/editar", element: <FacturaFormPage /> },
+              { path: "configuracion", element: <ConfiguracionPage /> },
             ],
           },
         ],

@@ -27,6 +27,7 @@ const gerenteLinks = [
   { to: "/proveedores", label: "Proveedores" },
   { to: "/usuarios", label: "Usuarios" },
   { to: "/facturas", label: "Facturas" },
+  { to: "/configuracion", label: "Configuración" },
 ];
 
 const bodegueroLinks = [

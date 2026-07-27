@@ -89,3 +89,32 @@ class Tax(models.Model):
         percent = cls.current_percent()
         total = Decimal(str(amount)) * (Decimal("1") + (percent / Decimal("100")))
         return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+class StoreConfig(models.Model):
+    telefono = models.CharField(max_length=20, blank=True, default="")
+    direccion = models.TextField(blank=True, default="")
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=19)
+
+    class Meta:
+        db_table = "store_config"
+
+    def __str__(self):
+        return "Configuración de la tienda"
+
+    @classmethod
+    def current(cls):
+        config = cls.objects.order_by("id").first()
+        if not config:
+            config = cls.objects.create()
+        return config
+
+    @classmethod
+    def current_percent(cls):
+        return cls.current().tax_percent
+
+    @classmethod
+    def apply_to_amount(cls, amount):
+        percent = cls.current_percent()
+        total = Decimal(str(amount)) * (Decimal("1") + (percent / Decimal("100")))
+        return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))

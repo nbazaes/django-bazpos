@@ -5,19 +5,20 @@ from rest_framework.decorators import action
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 
-from gerenteApp.models import Factura, Proveedor, Tax
+from gerenteApp.models import Factura, Proveedor, StoreConfig, Tax
 from gerenteApp.serializers import (
     FacturaDetalleSerializer,
     FacturaSerializer,
     FacturaUpsertSerializer,
     GroupSerializer,
     ProveedorSerializer,
+    StoreConfigSerializer,
     UserSerializer,
 )
 from vendedorApp.pagination import DefaultPagination
 from vendedorApp.models import Producto, Ubicacion
 from vendedorApp.serializers import UbicacionSerializer
-from bazpos.permissions import ROLE_BODEGUERO, ROLE_ENCARGADO, ROLE_GERENTE, RoleActionPermission
+from bazpos.permissions import ROLE_BODEGUERO, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_VENDEDOR, RoleActionPermission
 
 
 class ProveedorViewSet(viewsets.ModelViewSet):
@@ -150,7 +151,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="impuesto")
     def impuesto(self, request):
-        return Response({"tax_percent": float(Tax.current_percent())})
+        return Response({"tax_percent": float(StoreConfig.current_percent())})
 
     @action(detail=False, methods=["post"], url_path="crear-producto-rapido")
     def crear_producto_rapido(self, request):
@@ -228,3 +229,23 @@ class UbicacionViewSet(viewsets.ModelViewSet):
         "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
+
+
+class StoreConfigViewSet(viewsets.ModelViewSet):
+    serializer_class = StoreConfigSerializer
+    permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
+    pagination_class = None
+    role_action_map = {
+        "create": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "update": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "*": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+    }
+
+    def get_queryset(self):
+        StoreConfig.current()
+        return StoreConfig.objects.all()[:1]
+
+    def get_object(self):
+        return StoreConfig.current()

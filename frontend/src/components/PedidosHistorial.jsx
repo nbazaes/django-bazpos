@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDateTime } from "../lib/format";
 import {
   useCambiarEstadoPedido,
@@ -8,6 +8,7 @@ import {
   usePedidos,
 } from "../lib/queries";
 import { STORE_NAME } from "../lib/config";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
 
@@ -37,6 +38,10 @@ export default function PedidosHistorial() {
   const cambiarDocumento = useCambiarEstadoPedido();
   const marcarRetiro = useMarcarRetiro();
   const desactivarPedido = useDesactivarPedido();
+
+  useEffect(() => {
+    fetchStoreConfig();
+  }, []);
 
   const rows = pedidosData?.results ?? [];
   const count = pedidosData?.count ?? 0;
@@ -77,6 +82,7 @@ export default function PedidosHistorial() {
   function imprimirPedido(pedido) {
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) return;
+    const storeConfig = getStoreConfig();
 
     const filas = (pedido.detalles || []).map((d) => `
       <tr>
@@ -104,6 +110,7 @@ export default function PedidosHistorial() {
           body { font-family: sans-serif; font-size: 12px; margin: 16px; color: #000; }
           .center { text-align: center; }
           .store { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+          .address { font-size: 11px; color: #666; margin-bottom: 2px; }
           .title { font-size: 14px; margin-bottom: 8px; }
           .info { margin-bottom: 8px; }
           table { width: 100%; border-collapse: collapse; margin: 8px 0; }
@@ -117,6 +124,8 @@ export default function PedidosHistorial() {
       <body>
         <div class="center">
           <div class="store">${STORE_NAME}</div>
+          ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
+          ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
           <div class="title">Pedido #${pedido.id}</div>
         </div>
         <div class="info">

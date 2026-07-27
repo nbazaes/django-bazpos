@@ -89,6 +89,12 @@ class Command(BaseCommand):
             content_type__model='ubicacion',
         )
 
+        # gerenteApp: StoreConfig
+        store_config_perms = Permission.objects.filter(
+            content_type__app_label='gerenteApp',
+            content_type__model='storeconfig',
+        )
+
         # ── 1. Vendedor ──
         vendedor, created = Group.objects.get_or_create(name='Vendedor')
         vendedor.permissions.clear()
@@ -99,6 +105,7 @@ class Command(BaseCommand):
             *detalle_venta_perms,
             *pedido_perms,
             *detalle_pedido_perms,
+            *store_config_perms.filter(codename='view_storeconfig'),
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Vendedor' {status} con permisos."))
@@ -117,6 +124,8 @@ class Command(BaseCommand):
         encargado.permissions.add(*proveedor_perms.filter(codename='view_proveedor'))
         # Puede gestionar usuarios
         encargado.permissions.add(*user_perms)
+        # Puede gestionar configuracion de la tienda
+        encargado.permissions.add(*store_config_perms)
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Encargado' {status} con permisos."))
 
@@ -131,6 +140,7 @@ class Command(BaseCommand):
         bodeguero.permissions.add(*ajuste_stock_perms)
         bodeguero.permissions.add(*stock_ubicacion_perms)
         bodeguero.permissions.add(*ubicacion_perms)
+        bodeguero.permissions.add(*store_config_perms.filter(codename='view_storeconfig'))
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Bodeguero' {status} con permisos."))
 
@@ -152,6 +162,7 @@ class Command(BaseCommand):
             *detalle_factura_perms,
             *precio_historico_perms,
             *user_perms,
+            *store_config_perms,
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Gerente' {status} con permisos."))

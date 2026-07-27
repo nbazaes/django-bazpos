@@ -51,6 +51,9 @@ export const queryKeys = {
     list: (params) => ["pedidos", "list", params],
     detail: (id) => ["pedidos", "detail", id],
   },
+  configuracion: {
+    all: ["configuracion"],
+  },
   dashboard: ["dashboard", "stats"],
 };
 
@@ -517,6 +520,28 @@ export function useDashboardStats() {
     queryKey: queryKeys.dashboard,
     queryFn: () => apiRequest("/dashboard/stats/"),
     staleTime: 30_000,
+  });
+}
+
+// ── Configuración ──
+
+export function useStoreConfig() {
+  return useQuery({
+    queryKey: queryKeys.configuracion.all,
+    queryFn: () => apiRequest("/configuracion/"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useUpdateStoreConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) =>
+      apiRequest(`/configuracion/${payload.id}/`, { method: "PATCH", body: payload.data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.configuracion.all });
+      qc.invalidateQueries({ queryKey: queryKeys.facturas.impuesto });
+    },
   });
 }
 

@@ -2,7 +2,7 @@ from django.contrib.auth.models import Group, User
 from django.db import transaction
 from rest_framework import serializers
 
-from gerenteApp.models import DetalleFactura, Factura, PrecioHistorico, Proveedor
+from gerenteApp.models import DetalleFactura, Factura, PrecioHistorico, Proveedor, StoreConfig
 from vendedorApp.models import Producto, StockProductoUbicacion, Ubicacion
 
 
@@ -235,3 +235,9 @@ class FacturaUpsertSerializer(serializers.Serializer):
 
         self._apply_items(instance, productos)
         return instance
+
+
+class StoreConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StoreConfig
+        fields = ["id", "telefono", "direccion", "tax_percent"]

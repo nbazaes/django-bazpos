@@ -5,6 +5,7 @@ import { usePageTitle } from "../components/Shell";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
 import { STORE_NAME } from "../lib/config";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/toast";
 
 function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
@@ -38,6 +39,10 @@ export default function PedidosCrearPage() {
   usePageTitle(tab === "nuevo" ? "Nuevo pedido" : "Historial de pedidos");
   const addToast = useToast();
   const { data: proveedoresData } = useProveedores({ page_size: 200 });
+
+  useEffect(() => {
+    fetchStoreConfig();
+  }, []);
   const { data: productosData } = useProductos({ page_size: 200 });
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
@@ -187,6 +192,7 @@ export default function PedidosCrearPage() {
   function imprimirPedido(pedido) {
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) return;
+    const storeConfig = getStoreConfig();
 
     const filas = (pedido.detalles || []).map((d) => `
       <tr>
@@ -213,6 +219,7 @@ export default function PedidosCrearPage() {
           body { font-family: sans-serif; font-size: 12px; margin: 16px; color: #000; }
           .center { text-align: center; }
           .store { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+          .address { font-size: 11px; color: #666; margin-bottom: 2px; }
           .title { font-size: 14px; margin-bottom: 8px; }
           .info { margin-bottom: 8px; }
           table { width: 100%; border-collapse: collapse; margin: 8px 0; }
@@ -226,6 +233,8 @@ export default function PedidosCrearPage() {
       <body>
         <div class="center">
           <div class="store">${STORE_NAME}</div>
+          ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
+          ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
           <div class="title">Pedido #${pedido.id}</div>
         </div>
         <div class="info">

@@ -5,6 +5,7 @@ import { usePageTitle } from "../components/Shell";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import StepperInput from "../components/StepperInput";
 
 function roundTotal(amount) {
@@ -33,6 +34,10 @@ export default function VentaPage() {
   const barraRef = useRef(null);
   const processingRef = useRef(false);
   const taxPercent = getTaxPercent();
+
+  useEffect(() => {
+    fetchStoreConfig();
+  }, []);
   const factor = 1 + taxPercent / 100;
   const netoFromBruto = (monto) => Math.round(Number(monto || 0) / factor);
   const subtotalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
@@ -200,8 +205,11 @@ export default function VentaPage() {
   function buildDocumento(tipoDocumento) {
     const ahora = new Date();
     const total = totalConDescuento;
+    const config = getStoreConfig();
     return {
       tienda: STORE_NAME,
+      telefono: config.telefono,
+      direccion: config.direccion,
       tipo_documento: tipoDocumento,
       fecha: ahora.toLocaleString(),
       items: carro.map((item) => ({
@@ -253,6 +261,7 @@ export default function VentaPage() {
             }
             h1 { margin: 0 0 4px; text-align: center; font-size: 1rem; }
             .subtitle { text-align: center; margin: 0 0 4px; }
+            .address { text-align: center; font-size: 0.7rem; color: #666; margin: 0 0 4px; }
             .doc-number { text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 4px; }
             .date { text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 8px; }
             hr { border: none; border-top: 1px dashed #999; margin: 8px 0; }
@@ -263,6 +272,8 @@ export default function VentaPage() {
         </head>
         <body>
           <h1>${documento.tienda}</h1>
+          ${documento.direccion ? `<p class="address">${documento.direccion}</p>` : ""}
+          ${documento.telefono ? `<p class="address">${documento.telefono}</p>` : ""}
           <p class="subtitle">${esCotizacion ? "COTIZACION" : "COMPROBANTE DE VENTA"}</p>
           <p class="doc-number">#${documento.ventaId}</p>
           <p class="date">${documento.fecha}</p>
@@ -341,6 +352,7 @@ export default function VentaPage() {
           ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
         },
       });
+      await fetchStoreConfig();
       const documento = buildDocumento(tipoDocumento);
       setLastDocumento({ ...documento, ventaId: result.id, estado: result.estado_display, tipoDisplay: result.tipo_documento_display });
       setCarro([]);
@@ -757,6 +769,12 @@ export default function VentaPage() {
                   <h6 className="text-center mb-1" style={{ color: "#1a1a1a", fontFamily: "var(--font-mono)" }}>
                     {lastDocumento.tienda}
                   </h6>
+                  {lastDocumento.direccion && (
+                    <div className="text-center" style={{ color: "#666", fontSize: "0.7rem" }}>{lastDocumento.direccion}</div>
+                  )}
+                  {lastDocumento.telefono && (
+                    <div className="text-center mb-2" style={{ color: "#666", fontSize: "0.7rem" }}>{lastDocumento.telefono}</div>
+                  )}
                   <div className="text-center mb-2" style={{ color: "#1a1a1a" }}>
                     {lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}
                   </div>
