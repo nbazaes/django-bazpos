@@ -6,6 +6,7 @@ import PageSizeSelector from "../components/PageSizeSelector";
 import PedidosHistorial from "../components/PedidosHistorial";
 import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../lib/usePageTitle";
+import { useDebounce } from "../lib/hooks";
 import {
   useAnularVenta,
   useDevolucion,
@@ -25,6 +26,9 @@ export default function PedidosPage() {
   const [tab, setTab] = useState(searchParams.get("tab") || "ventas");
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const debouncedSearch = useDebounce(search.trim());
+  const [tipoFiltro, setTipoFiltro] = useState(searchParams.get("tipo") || "");
 
   const [detalleVentaId, setDetalleVentaId] = useState(null);
   const [detalleDevolucionId, setDetalleDevolucionId] = useState(null);
@@ -46,7 +50,10 @@ export default function PedidosPage() {
   const navigate = useNavigate();
 
   const params = { page, page_size: pageSize };
-  const { data: ventasData } = useVentas(params);
+  const ventasParams = { ...params };
+  if (debouncedSearch) ventasParams.codigo = debouncedSearch;
+  if (tipoFiltro) ventasParams.tipo_documento = tipoFiltro;
+  const { data: ventasData } = useVentas(ventasParams);
   const { data: devolucionesData } = useDevoluciones(params);
   const { data: detalleVentaData } = useVenta(detalleVentaId);
   const { data: detalleDevolucionData } = useDevolucion(detalleDevolucionId);
@@ -124,25 +131,40 @@ export default function PedidosPage() {
     return total;
   }, [devolverVentaData, devolverSeleccion, devolverCantidades]);
 
-  const syncURL = (t, p, ps) => {
-    setSearchParams({ tab: t, page: String(p), page_size: String(ps) }, { replace: true });
+  const syncURL = (t, p, ps, s, tf) => {
+    const params = { tab: t, page: String(p), page_size: String(ps) };
+    if (s) params.search = s;
+    if (tf) params.tipo = tf;
+    setSearchParams(params, { replace: true });
   };
 
   function handleTabChange(newTab) {
     setTab(newTab);
     setPage(1);
-    syncURL(newTab, 1, pageSize);
+    setSearch("");
+    setTipoFiltro("");
+    syncURL(newTab, 1, pageSize, "", "");
+  }
+
+  function handleSearchChange(val) {
+    setSearch(val);
+    setPage(1);
+  }
+
+  function handleTipoChange(val) {
+    setTipoFiltro(val);
+    setPage(1);
   }
 
   function handlePageChange(newPage) {
     setPage(newPage);
-    syncURL(tab, newPage, pageSize);
+    syncURL(tab, newPage, pageSize, debouncedSearch, tipoFiltro);
   }
 
   function handlePageSizeChange(newSize) {
     setPageSize(newSize);
     setPage(1);
-    syncURL(tab, 1, newSize);
+    syncURL(tab, 1, newSize, debouncedSearch, tipoFiltro);
   }
 
   function abrirAnular(venta) {
@@ -225,6 +247,28 @@ export default function PedidosPage() {
           <PedidosHistorial />
         ) : (
           <>
+            {tab === "ventas" && (
+              <div className="filter-bar flex flex-wrap items-center gap-3 mb-3">
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ maxWidth: 220 }}
+                  placeholder="Buscar por código..."
+                  value={search}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                />
+                <select
+                  className="form-control"
+                  style={{ maxWidth: 180 }}
+                  value={tipoFiltro}
+                  onChange={(e) => handleTipoChange(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  <option value="VE">Ventas</option>
+                  <option value="CO">Cotizaciones</option>
+                </select>
+              </div>
+            )}
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>

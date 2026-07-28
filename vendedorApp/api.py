@@ -349,6 +349,15 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             tipo_documento=Venta.TipoDocumento.PEDIDO,
             pedido__activo=False,
         )
+
+        codigo = self.request.query_params.get("codigo", "").strip()
+        tipo_documento = self.request.query_params.get("tipo_documento", "").strip()
+
+        if codigo:
+            queryset = queryset.filter(id__startswith=codigo)
+        if tipo_documento:
+            queryset = queryset.filter(tipo_documento=tipo_documento)
+
         user = self.request.user
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset

@@ -6,6 +6,7 @@ import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+import { useDebounce } from "../lib/hooks";
 import StepperInput from "../components/StepperInput";
 
 const VENTA_STORAGE_KEY = "bazpos_venta_pending";
@@ -53,6 +54,7 @@ export default function VentaPage() {
   const barraRef = useRef(null);
   const processingRef = useRef(false);
   const [mostrarSinStock, setMostrarSinStock] = useState(false);
+  const oemRequestRef = useRef(0);
   const taxPercent = getTaxPercent();
 
   useEffect(() => {
@@ -116,8 +118,10 @@ export default function VentaPage() {
       setError("");
       return;
     }
+    const requestId = ++oemRequestRef.current;
     try {
       const result = await apiRequest(`/productos/?texto=${encodeURIComponent(texto)}&sin_stock=${mostrarSinStock}`);
+      if (requestId !== oemRequestRef.current) return;
       const productos = Array.isArray(result) ? result : result.results || [];
       setHayMasProductos(!Array.isArray(result) && result.count > productos.length);
       if (productos.length === 0) {
@@ -128,19 +132,18 @@ export default function VentaPage() {
         setError("");
       }
     } catch (err) {
+      if (requestId !== oemRequestRef.current) return;
       setError(err.message);
       setProductosEncontrados([]);
       setHayMasProductos(false);
     }
   }, [mostrarSinStock]);
 
+  const debouncedOem = useDebounce(oem.trim());
+
   useEffect(() => {
-    const query = oem.trim();
-    const timeoutId = setTimeout(() => {
-      buscarProducto(query);
-    }, 250);
-    return () => clearTimeout(timeoutId);
-  }, [oem, buscarProducto, mostrarSinStock]);
+    buscarProducto(debouncedOem);
+  }, [debouncedOem]);
 
   async function escanearCodigoBarra() {
     const codigo = codigoBarra.trim();
