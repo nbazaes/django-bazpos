@@ -7,8 +7,10 @@ import {
   usePedidoProveedorDia,
   useToggleItemPedidoProveedor,
   useEliminarItemPedidoProveedor,
-  useTransferirPedidoProveedor,
 } from "../lib/queries";
+import { apiRequest } from "../lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryKeysPedidoProveedor } from "../lib/queries";
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return "";
@@ -29,7 +31,7 @@ function formatCLP(n) {
   }).format(n);
 }
 
-function ProveedorTable({ proveedores, diaId, editable, onToggle, onDelete }) {
+function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelete }) {
   return proveedores.map((prov) => (
     <div key={prov.proveedor_id} className="proveedor-group" style={{ marginBottom: "2rem" }}>
       <h3 style={{ marginBottom: "0.5rem", fontSize: "1.1rem", fontWeight: 600 }}>
@@ -59,22 +61,17 @@ function ProveedorTable({ proveedores, diaId, editable, onToggle, onDelete }) {
                 <td>{formatCLP(item.precio_costo)}</td>
                 <td>{item.stock_maximo}</td>
                 <td>
-                  <label className="checkbox-cell" style={{ display: "flex", justifyContent: "center" }}>
-                    {editable ? (
+                  {editable ? (
+                    <label className="checkbox-cell" style={{ display: "flex", justifyContent: "center" }}>
                       <input
                         type="checkbox"
                         checked={item.pedido}
                         onChange={() => onToggle(diaId, item.id)}
-                        className="no-print"
-                        style={{ width: 18, height: 18, cursor: "pointer", accentColor: "var(--primary)" }}
                       />
-                    ) : (
-                      <span className="only-print" style={{ display: "none" }}>
-                        {item.pedido ? "Sí" : "No"}
-                      </span>
-                    )}
-                    {!editable && (item.pedido ? "Sí" : "No")}
-                  </label>
+                    </label>
+                  ) : (
+                    item.pedido ? "Sí" : "No"
+                  )}
                 </td>
                 {editable && (
                   <td className="no-print">
@@ -96,11 +93,60 @@ function ProveedorTable({ proveedores, diaId, editable, onToggle, onDelete }) {
   ));
 }
 
+function ProveedorCardsMobile({ proveedores, diaId, editable, onToggle, onDelete }) {
+  return proveedores.map((prov) => (
+    <div key={prov.proveedor_id} className="proveedor-mobile-group">
+      <h4 className="proveedor-mobile-title">{prov.proveedor_nombre} ({prov.items.length})</h4>
+      {prov.items.map((item) => (
+        <div key={item.id} className={`item-mobile-card ${item.pedido ? "row-pedido" : ""}`}>
+          <div className="item-mobile-main">
+            <span className="item-mobile-nombre">{item.nombre}</span>
+            <div className="item-mobile-meta">
+              <span>Cód: {item.codigo_producto}</span>
+              <span>OEM: {item.oem}</span>
+              {item.codigo_proveedor && <span>Prov: {item.codigo_proveedor}</span>}
+            </div>
+            <div className="item-mobile-meta">
+              <span>Precio: {formatCLP(item.precio_costo)}</span>
+              <span>Stock máx: {item.stock_maximo}</span>
+            </div>
+          </div>
+          <div className="item-mobile-actions">
+            {editable ? (
+              <label className="checkbox-cell">
+                <input
+                  type="checkbox"
+                  checked={item.pedido}
+                  onChange={() => onToggle(diaId, item.id)}
+                />
+                <span>Pedido</span>
+              </label>
+            ) : (
+              <span className="item-mobile-pedido-label">
+                {item.pedido ? "Pedido" : "Pendiente"}
+              </span>
+            )}
+            {editable && (
+              <button
+                className="btn btn-sm btn-danger item-mobile-delete"
+                onClick={() => onDelete(diaId, item.id, item.nombre)}
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  ));
+}
+
 export default function PedidosProveedoresPage() {
+  const queryClient = useQueryClient();
   const [view, setView] = useState("hoy");
   const [historialDiaId, setHistorialDiaId] = useState(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(null);
-  const [showConfirmTransfer, setShowConfirmTransfer] = useState(false);
+  const [showConfirmFinalizar, setShowConfirmFinalizar] = useState(false);
 
   usePageTitle("Pedidos a proveedores");
 
@@ -109,11 +155,21 @@ export default function PedidosProveedoresPage() {
   const { data: dataDia, isLoading: loadingDia } = usePedidoProveedorDia(historialDiaId);
   const toggleMutation = useToggleItemPedidoProveedor();
   const eliminarMutation = useEliminarItemPedidoProveedor();
-  const transferirMutation = useTransferirPedidoProveedor();
+
+  const finalizarMutation = useMutation({
+    mutationFn: (diaId) =>
+      apiRequest(`/pedidos-proveedor/${diaId}/finalizar/`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+  });
 
   const esHoy = view === "hoy";
   const data = esHoy ? dataHoy : dataDia;
   const loading = esHoy ? loadingHoy : loadingDia;
+  const finalized = data?.finalizado ?? false;
 
   function handleToggle(diaId, itemId) {
     toggleMutation.mutate({ diaId, itemId });
@@ -129,10 +185,10 @@ export default function PedidosProveedoresPage() {
     setShowConfirmDelete(null);
   }
 
-  function handleTransferir() {
+  function handleFinalizar() {
     if (!data) return;
-    transferirMutation.mutate(data.id);
-    setShowConfirmTransfer(false);
+    finalizarMutation.mutate(data.id);
+    setShowConfirmFinalizar(false);
   }
 
   function handlePrint() {
@@ -159,10 +215,10 @@ export default function PedidosProveedoresPage() {
   }
 
   if (view === "historial") {
-    const dias = historialData?.results || [];
+    const dias = Array.isArray(historialData) ? historialData : (historialData?.results || []);
     return (
       <div className="pedidos-proveedores">
-        <div className="pedidos-header-actions">
+        <div className="pedidos-header-actions no-print">
           <button className="btn btn-sm btn-outline" onClick={volverAHoy}>
             Volver al día de hoy
           </button>
@@ -178,6 +234,7 @@ export default function PedidosProveedoresPage() {
                     <th>Fecha</th>
                     <th>Items</th>
                     <th>Pedidos</th>
+                    <th>Estado</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -187,6 +244,13 @@ export default function PedidosProveedoresPage() {
                       <td>{formatFecha(dia.fecha)}</td>
                       <td>{dia.total_items}</td>
                       <td>{dia.total_pedidos}/{dia.total_items}</td>
+                      <td>
+                        {dia.finalizado ? (
+                          <span className="badge badge-success">Finalizado</span>
+                        ) : (
+                          <span className="badge badge-warning">Pendiente</span>
+                        )}
+                      </td>
                       <td>
                         <button
                           className="btn btn-sm btn-outline"
@@ -209,22 +273,28 @@ export default function PedidosProveedoresPage() {
   const proveedores = data?.proveedores || [];
   const totalItems = proveedores.reduce((acc, p) => acc + p.items.length, 0);
   const totalPedidos = proveedores.reduce((acc, p) => acc + p.items.filter((i) => i.pedido).length, 0);
+  const editable = esHoy && !finalized;
 
   return (
     <div className="pedidos-proveedores">
-      <div className="pedidos-header-actions">
-        {esHoy && proveedores.length > 0 && (
+      <div className="pedidos-header-actions no-print">
+        {esHoy && proveedores.length > 0 && !finalized && (
           <>
             <button
-              className="btn btn-sm btn-outline"
-              onClick={() => setShowConfirmTransfer(true)}
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowConfirmFinalizar(true)}
             >
-              Transferir pendientes al día siguiente
+              Terminar pedido
             </button>
             <button className="btn btn-sm btn-outline" onClick={handlePrint}>
               Imprimir
             </button>
           </>
+        )}
+        {esHoy && finalized && (
+          <button className="btn btn-sm btn-outline" onClick={handlePrint}>
+            Imprimir
+          </button>
         )}
         <button
           className="btn btn-sm btn-outline"
@@ -237,8 +307,8 @@ export default function PedidosProveedoresPage() {
       <PageCard
         title={
           esHoy
-            ? `Pedidos a proveedores — ${data ? formatFecha(data.fecha) : "hoy"}`
-            : `Detalle — ${data ? formatFecha(data.fecha) : ""}`
+            ? `Pedidos a proveedores — ${data ? formatFecha(data.fecha) : "hoy"}${finalized ? " (Finalizado)" : ""}`
+            : `Detalle — ${data ? formatFecha(data.fecha) : ""}${finalized ? " (Finalizado)" : ""}`
         }
       >
         {proveedores.length === 0 ? (
@@ -247,13 +317,24 @@ export default function PedidosProveedoresPage() {
           </p>
         ) : (
           <>
-            <ProveedorTable
-              proveedores={proveedores}
-              diaId={data?.id}
-              editable={esHoy}
-              onToggle={handleToggle}
-              onDelete={handleEliminarConfirm}
-            />
+            <div className="pedidos-desktop">
+              <ProveedorTableDesktop
+                proveedores={proveedores}
+                diaId={data?.id}
+                editable={editable}
+                onToggle={handleToggle}
+                onDelete={handleEliminarConfirm}
+              />
+            </div>
+            <div className="pedidos-mobile">
+              <ProveedorCardsMobile
+                proveedores={proveedores}
+                diaId={data?.id}
+                editable={editable}
+                onToggle={handleToggle}
+                onDelete={handleEliminarConfirm}
+              />
+            </div>
             <div className="no-print" style={{ marginTop: "1rem", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
               Total: {totalItems} producto{totalItems !== 1 ? "s" : ""} | {totalPedidos} pedido(s)
             </div>
@@ -289,27 +370,27 @@ export default function PedidosProveedoresPage() {
         </div>
       )}
 
-      {showConfirmTransfer && (
+      {showConfirmFinalizar && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="modal-dialog" style={{ maxWidth: 400 }}>
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Transferir pendientes</h5>
-                <button type="button" className="modal-close" onClick={() => setShowConfirmTransfer(false)}>
+                <h5 className="modal-title">Terminar pedido</h5>
+                <button type="button" className="modal-close" onClick={() => setShowConfirmFinalizar(false)}>
                   &times;
                 </button>
               </div>
               <div className="modal-body text-center py-4">
                 <p className="mb-0 text-secondary">
-                  Los productos <strong>no pedidos</strong> serán transferidos a la lista del día siguiente.
+                  Los productos <strong>no marcados como pedidos</strong> serán transferidos automáticamente a la lista del día siguiente. El pedido de hoy quedará finalizado y no podrá ser modificado.
                 </p>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmTransfer(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmFinalizar(false)}>
                   Cancelar
                 </button>
-                <button type="button" className="btn btn-primary" onClick={handleTransferir}>
-                  Transferir
+                <button type="button" className="btn btn-primary" onClick={handleFinalizar}>
+                  Finalizar pedido
                 </button>
               </div>
             </div>

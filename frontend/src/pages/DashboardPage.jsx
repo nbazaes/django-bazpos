@@ -231,15 +231,20 @@ export default function DashboardPage() {
                               >
                                 Ignorar permanentemente
                               </button>
-                              <button
-                                className="btn btn-sm btn-outline"
-                                onClick={() =>
-                                  agregarPedidoMutation.mutate(p.producto_id)
-                                }
-                                disabled={agregarPedidoMutation.isPending}
-                              >
-                                Agregar a pedido
-                              </button>
+                              {((productosEnPedido) => {
+                                const yaAgregado = productosEnPedido.includes(p.producto_id);
+                                return (
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() =>
+                                      agregarPedidoMutation.mutate(p.producto_id)
+                                    }
+                                    disabled={agregarPedidoMutation.isPending || yaAgregado}
+                                  >
+                                    {yaAgregado ? "Agregado" : "Agregar a pedido"}
+                                  </button>
+                                );
+                              })(data.stock.productos_en_pedido || [])}
                             </div>
                           </td>
                         </tr>

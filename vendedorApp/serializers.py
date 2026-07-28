@@ -575,7 +575,7 @@ class PedidoProveedorDiaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PedidoProveedorDia
-        fields = ["id", "fecha", "created_at", "proveedores"]
+        fields = ["id", "fecha", "finalizado", "created_at", "proveedores"]
 
     def get_proveedores(self, obj):
         items = obj.items.select_related("producto", "proveedor").all().order_by("proveedor__nombre")
@@ -598,7 +598,7 @@ class PedidoProveedorDiaHistorialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PedidoProveedorDia
-        fields = ["id", "fecha", "created_at", "total_items", "total_pedidos"]
+        fields = ["id", "fecha", "finalizado", "created_at", "total_items", "total_pedidos"]
 
     def get_total_items(self, obj):
         return obj.items.count()

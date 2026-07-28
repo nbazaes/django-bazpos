@@ -138,6 +138,17 @@ class DashboardStatsView(APIView):
                 p["proveedor_nombre"] = p.pop("proveedor__nombre")
                 p["oem_productos"] = oem_map.get(p["oem"], [])
 
+        productos_en_pedido = []
+        hoy_fecha = date.today()
+        try:
+            dia_hoy = PedidoProveedorDia.objects.filter(fecha=hoy_fecha).first()
+            if dia_hoy:
+                productos_en_pedido = list(
+                    ItemPedidoProveedor.objects.filter(dia=dia_hoy).values_list("producto_id", flat=True)
+                )
+        except Exception:
+            pass
+
         return Response(
             {
                 "es_gerente": es_gerente,
@@ -150,6 +161,7 @@ class DashboardStatsView(APIView):
                     "total_productos": Producto.objects.count(),
                     "sin_stock": Producto.objects.filter(stock_actual=0).count(),
                     "bajo_minimo": bajo_minimo,
+                    "productos_en_pedido": productos_en_pedido,
                 },
             }
         )
@@ -856,6 +868,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         "agregar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "toggle_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "eliminar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "finalizar": [ROLE_ENCARGADO, ROLE_GERENTE],
         "transferir": [ROLE_ENCARGADO, ROLE_GERENTE],
         "hoy": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
@@ -867,6 +880,10 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return PedidoProveedorDiaHistorialSerializer
         return PedidoProveedorDiaSerializer
+
+    def _check_finalizado(self, dia):
+        if dia.finalizado:
+            raise serializers.ValidationError({"error": "Este pedido ya fue finalizado"})
 
     @action(detail=False, methods=["get"], url_path="hoy")
     def hoy(self, request):
@@ -899,6 +916,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
             fecha=fecha,
             defaults={"usuario": request.user},
         )
+        self._check_finalizado(dia)
 
         item, created = ItemPedidoProveedor.objects.get_or_create(
             dia=dia,
@@ -911,6 +929,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="toggle-item/(?P<item_id>[^/.]+)")
     def toggle_item(self, request, pk=None, item_id=None):
         dia = self.get_object()
+        self._check_finalizado(dia)
         try:
             item = dia.items.get(id=item_id)
         except ItemPedidoProveedor.DoesNotExist:
@@ -922,6 +941,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["delete"], url_path="eliminar-item/(?P<item_id>[^/.]+)")
     def eliminar_item(self, request, pk=None, item_id=None):
         dia = self.get_object()
+        self._check_finalizado(dia)
         try:
             item = dia.items.get(id=item_id)
         except ItemPedidoProveedor.DoesNotExist:
@@ -929,9 +949,38 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         item.delete()
         return Response({"ok": True})
 
+    @action(detail=True, methods=["post"], url_path="finalizar")
+    def finalizar(self, request, pk=None):
+        dia = self.get_object()
+        self._check_finalizado(dia)
+
+        pendientes = dia.items.filter(pedido=False)
+
+        fecha_destino = date.today() + timedelta(days=1)
+        dia_destino, _ = PedidoProveedorDia.objects.get_or_create(
+            fecha=fecha_destino,
+            defaults={"usuario": request.user},
+        )
+
+        transferidos = 0
+        for item in pendientes:
+            _, created = ItemPedidoProveedor.objects.get_or_create(
+                dia=dia_destino,
+                producto=item.producto,
+                defaults={"proveedor": item.proveedor},
+            )
+            if created:
+                transferidos += 1
+
+        dia.finalizado = True
+        dia.save(update_fields=["finalizado"])
+
+        return Response({"ok": True, "finalizado": True, "transferidos": transferidos})
+
     @action(detail=True, methods=["post"], url_path="transferir")
     def transferir(self, request, pk=None):
         dia_origen = self.get_object()
+        self._check_finalizado(dia_origen)
         pendientes = dia_origen.items.filter(pedido=False)
 
         if not pendientes.exists():

@@ -1381,6 +1381,109 @@ textarea.form-control, textarea.input {
   }
 }
 
+/* ====== PEDIDOS PROVEEDORES MOBILE ====== */
+
+.pedidos-mobile { display: none; }
+
+@media (max-width: 768px) {
+  .pedidos-desktop { display: none; }
+  .pedidos-mobile { display: block; }
+}
+
+.proveedor-mobile-group {
+  margin-bottom: 1.5rem;
+}
+
+.proveedor-mobile-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--border-default);
+}
+
+.item-mobile-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.item-mobile-card.row-pedido {
+  opacity: 0.55;
+}
+
+.item-mobile-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-mobile-nombre {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.item-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.15rem;
+}
+
+.item-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.item-mobile-actions .checkbox-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.item-mobile-actions .checkbox-cell input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.item-mobile-pedido-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.item-mobile-delete {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 /* ====== PRINT STYLES ====== */
 
 @media print {
@@ -1467,5 +1570,18 @@ textarea.form-control, textarea.input {
 
   .checkbox-cell {
     text-align: center;
+  }
+
+  .pedidos-mobile {
+    display: none !important;
+  }
+
+  .pedidos-desktop {
+    display: block !important;
+  }
+
+  .item-mobile-actions,
+  .item-mobile-delete {
+    display: none !important;
   }
 }
