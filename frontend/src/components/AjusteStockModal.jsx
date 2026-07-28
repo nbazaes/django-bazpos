@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import StepperInput from "./StepperInput";
 import { useAjustarStock, useUbicaciones } from "../lib/queries";
 
@@ -16,13 +16,17 @@ export default function AjusteStockModal({ producto, onClose }) {
   const mutation = useAjustarStock();
 
   const initialRows = useMemo(() => {
-    return (producto.ubicaciones_stock || []).map((s) => ({
+    return (producto.ubicaciones_stock || []).map((s, i) => ({
+      rowKey: `row-${i}`,
       ubicacion_id: s.ubicacion_id,
+      ubicacion_id_original: s.ubicacion_id,
       nombre: s.nombre,
       cantidad_actual: s.cantidad,
       cantidad_nueva: String(s.cantidad),
     }));
   }, [producto.ubicaciones_stock]);
+
+  const nextKeyRef = useRef(producto.ubicaciones_stock?.length || 0);
 
   const [rows, setRows] = useState(initialRows);
   const [fecha, setFecha] = useState(todayInputValue());
@@ -35,10 +39,10 @@ export default function AjusteStockModal({ producto, onClose }) {
     (u) => !ubicacionesUsadas.has(u.id)
   );
 
-  function updateCantidad(ubicacionId, value) {
+  function updateCantidad(rowKey, value) {
     setRows((prev) =>
       prev.map((r) =>
-        r.ubicacion_id === ubicacionId ? { ...r, cantidad_nueva: value } : r
+        r.rowKey === rowKey ? { ...r, cantidad_nueva: value } : r
       )
     );
   }
@@ -49,14 +53,14 @@ export default function AjusteStockModal({ producto, onClose }) {
     if (!u) return;
     setRows((prev) => [
       ...prev,
-      { ubicacion_id: u.id, nombre: u.nombre, cantidad_actual: 0, cantidad_nueva: "0" },
+      { rowKey: `new-${nextKeyRef.current++}`, ubicacion_id: u.id, nombre: u.nombre, cantidad_actual: 0, cantidad_nueva: "0" },
     ]);
     setNuevaUbicacionId("");
   }
 
-  function quitarUbicacion(ubicacionId, cantidadActual) {
+  function quitarUbicacion(rowKey, cantidadActual) {
     if (cantidadActual > 0) return;
-    setRows((prev) => prev.filter((r) => r.ubicacion_id !== ubicacionId));
+    setRows((prev) => prev.filter((r) => r.rowKey !== rowKey));
   }
 
   function handleSubmit(e) {
@@ -75,13 +79,22 @@ export default function AjusteStockModal({ producto, onClose }) {
       }))
       .filter((r, idx) => r.cantidad !== rows[idx].cantidad_actual);
 
-    if (ajustes.length === 0) {
+    const hasReassignedOrphan = rows.some(
+      (r) => r.ubicacion_id_original === null && r.ubicacion_id !== null
+    );
+    const orphanCleanup = hasReassignedOrphan
+      ? [{ ubicacion_id: null, cantidad: 0 }]
+      : [];
+
+    const allAjustes = [...ajustes, ...orphanCleanup];
+
+    if (allAjustes.length === 0) {
       setError("No se ha modificado ninguna cantidad");
       return;
     }
 
     mutation.mutate(
-      { productoId: producto.producto_id, data: { ajustes, motivo, fecha } },
+      { productoId: producto.producto_id, data: { ajustes: allAjustes, motivo, fecha } },
       {
         onSuccess: () => onClose(),
         onError: (err) => setError(err.message || "Error al ajustar stock"),
@@ -158,13 +171,42 @@ export default function AjusteStockModal({ producto, onClose }) {
                       </tr>
                     ) : (
                       rows.map((r) => (
-                        <tr key={r.ubicacion_id}>
-                          <td>{r.nombre}</td>
+                        <tr key={r.rowKey}>
+                          <td>
+                            {r.ubicacion_id === null ? (
+                              <select
+                                className="form-control form-control-sm"
+                                value=""
+                                onChange={(e) => {
+                                  const newId = Number(e.target.value);
+                                  if (!newId) return;
+                                  const u = todasUbicaciones.find((x) => x.id === newId);
+                                  if (!u) return;
+                                  setRows((prev) =>
+                                    prev.map((row) =>
+                                      row.rowKey === r.rowKey
+                                        ? { ...row, ubicacion_id: newId, nombre: u.nombre }
+                                        : row
+                                    )
+                                  );
+                                }}
+                              >
+                                <option value="">Sin ubicación — reasignar...</option>
+                                {ubicacionesDisponibles.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              r.nombre
+                            )}
+                          </td>
                           <td className="text-center">{r.cantidad_actual}</td>
                           <td>
                             <StepperInput
                               value={r.cantidad_nueva}
-                              onChange={(val) => updateCantidad(r.ubicacion_id, val)}
+                              onChange={(val) => updateCantidad(r.rowKey, val)}
                               min={0}
                               inputStyle={{ width: 70, fontSize: "0.85rem" }}
                               decrementLabel={`Disminuir stock en ${r.nombre}`}
@@ -177,7 +219,7 @@ export default function AjusteStockModal({ producto, onClose }) {
                                 type="button"
                                 className="btn btn-sm btn-danger"
                                 title="Quitar ubicación"
-                                onClick={() => quitarUbicacion(r.ubicacion_id, r.cantidad_actual)}
+                                onClick={() => quitarUbicacion(r.rowKey, r.cantidad_actual)}
                               >
                                 &times;
                               </button>

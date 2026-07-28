@@ -324,7 +324,7 @@ class DevolucionInputSerializer(serializers.Serializer):
 
 
 class AjusteItemSerializer(serializers.Serializer):
-    ubicacion_id = serializers.IntegerField()
+    ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
     cantidad = serializers.IntegerField(min_value=0)
 
 

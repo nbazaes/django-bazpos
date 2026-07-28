@@ -213,6 +213,28 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 ubicacion_id = item["ubicacion_id"]
                 cantidad_nueva = item["cantidad"]
 
+                if ubicacion_id is None:
+                    try:
+                        stock = StockProductoUbicacion.objects.select_for_update().get(
+                            producto=producto,
+                            ubicacion__isnull=True,
+                        )
+                    except StockProductoUbicacion.DoesNotExist:
+                        continue
+
+                    cantidad_anterior = stock.cantidad
+
+                    if cantidad_anterior == cantidad_nueva:
+                        continue
+
+                    if cantidad_nueva == 0:
+                        stock.delete()
+                    else:
+                        stock.cantidad = cantidad_nueva
+                        stock.save()
+
+                    continue
+
                 try:
                     ubicacion = Ubicacion.objects.get(id=ubicacion_id)
                 except Ubicacion.DoesNotExist:
