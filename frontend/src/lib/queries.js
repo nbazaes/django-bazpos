@@ -56,6 +56,7 @@ export const queryKeys = {
     all: ["configuracion"],
   },
   dashboard: ["dashboard", "stats"],
+  reportes: (params) => ["reportes", "stats", params],
 };
 
 function paginatedResult(data) {
@@ -544,6 +545,17 @@ export function useDashboardStats() {
     queryKey: queryKeys.dashboard,
     queryFn: () => apiRequest("/dashboard/stats/"),
     staleTime: 30_000,
+  });
+}
+
+// ── Reportes ──
+
+export function useReportesStats(params = {}) {
+  return useQuery({
+    queryKey: queryKeys.reportes(params),
+    queryFn: () => apiRequest(`/reportes/stats/${buildQuery(params)}`),
+    placeholderData: placeholderData(),
+    staleTime: 60_000,
   });
 }
 

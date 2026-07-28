@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db.models import Count, F, Q, Sum
 from django.db import transaction
@@ -9,7 +9,7 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, ItemPedidoProveedor, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AgregarItemPedidoProveedorSerializer,
     AjustarStockInputSerializer,
@@ -163,6 +163,100 @@ class DashboardStatsView(APIView):
                     "bajo_minimo": bajo_minimo,
                     "productos_en_pedido": productos_en_pedido,
                 },
+            }
+        )
+
+
+class ReportesStatsView(APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        hoy = timezone.localtime(timezone.now()).date()
+        mes = int(request.query_params.get("mes", hoy.month))
+        anio = int(request.query_params.get("anio", hoy.year))
+
+        ventas = (
+            Venta.objects.filter(
+                fecha_venta__date__month=mes,
+                fecha_venta__date__year=anio,
+                estado=Venta.Estado.COMPLETADA,
+            )
+            .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
+        )
+
+        total_ventas_mes = ventas.aggregate(total=Sum("monto_total"))["total"] or 0
+
+        ventas_diarias_qs = (
+            ventas.values("fecha_venta__date")
+            .annotate(total=Sum("monto_total"), cantidad=Count("id"))
+            .order_by("fecha_venta__date")
+        )
+        ventas_diarias = [
+            {"fecha": str(row["fecha_venta__date"]), "total": row["total"], "cantidad": row["cantidad"]}
+            for row in ventas_diarias_qs
+        ]
+
+        top_productos_qs = (
+            DetalleVenta.objects.filter(
+                venta__fecha_venta__date__month=mes,
+                venta__fecha_venta__date__year=anio,
+                venta__estado=Venta.Estado.COMPLETADA,
+                producto__isnull=False,
+            )
+            .exclude(venta__tipo_documento=Venta.TipoDocumento.PEDIDO, venta__pedido__activo=False)
+            .values("producto__producto_id", "producto__codigo_producto", "producto__nombre")
+            .annotate(total_vendido=Sum("cantidad"), monto_total=Sum("subtotal"))
+            .order_by("-total_vendido")[:10]
+        )
+        top_productos = list(top_productos_qs)
+
+        ventas_por_vendedor_qs = (
+            ventas.values("usuario__first_name", "usuario__last_name", "usuario__username")
+            .annotate(total=Sum("monto_total"), cantidad=Count("id"))
+            .order_by("-total")
+        )
+        ventas_por_vendedor = []
+        for row in ventas_por_vendedor_qs:
+            nombre = f"{row['usuario__first_name']} {row['usuario__last_name']}".strip()
+            ventas_por_vendedor.append(
+                {
+                    "vendedor": nombre if nombre else row["usuario__username"],
+                    "total": row["total"],
+                    "cantidad": row["cantidad"],
+                }
+            )
+
+        now = timezone.now()
+        bajo_minimo_qs = (
+            Producto.objects.filter(
+                stock_actual__lt=F("stock_minimo"),
+                stock_minimo__gt=0,
+                ignorar_stock_permanente=False,
+            )
+            .filter(Q(recordar_stock_desde__isnull=True) | Q(recordar_stock_desde__lte=now))
+            .values(
+                "producto_id",
+                "codigo_producto",
+                "oem",
+                "nombre",
+                "proveedor__nombre",
+                "stock_actual",
+                "stock_minimo",
+            )
+            .order_by("stock_actual")[:10]
+        )
+        stock_critico = list(bajo_minimo_qs)
+        for p in stock_critico:
+            p["proveedor_nombre"] = p.pop("proveedor__nombre")
+
+        return Response(
+            {
+                "periodo": {"mes": mes, "anio": anio},
+                "total_ventas_mes": total_ventas_mes,
+                "ventas_diarias": ventas_diarias,
+                "top_productos_mes": top_productos,
+                "ventas_por_vendedor_mes": ventas_por_vendedor,
+                "stock_critico": stock_critico,
             }
         )
 

@@ -19,6 +19,7 @@ const gerenteLinks = [
   { to: "/pedidos-proveedores", label: "Pedidos Prov." },
   { to: "/usuarios", label: "Usuarios" },
   { to: "/facturas", label: "Facturas" },
+  { to: "/reportes", label: "Reportes" },
   { to: "/configuracion", label: "Configuración" },
 ];
 

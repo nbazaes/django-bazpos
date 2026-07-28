@@ -18,6 +18,7 @@ import FacturaFormPage from "./pages/FacturaFormPage";
 import PedidosProveedoresPage from "./pages/PedidosProveedoresPage";
 import UbicacionPage from "./pages/UbicacionPage";
 import ConfiguracionPage from "./pages/ConfiguracionPage";
+import ReportesPage from "./pages/ReportesPage";
 import StaticPage from "./pages/StaticPage";
 
 export const router = createBrowserRouter([
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
               { path: "facturas/:id/editar", element: <FacturaFormPage /> },
               { path: "pedidos-proveedores", element: <PedidosProveedoresPage /> },
               { path: "configuracion", element: <ConfiguracionPage /> },
+              { path: "reportes", element: <ReportesPage /> },
             ],
           },
         ],
