@@ -133,6 +133,7 @@ class Venta(models.Model):
         related_name='ventas_derivadas',
         verbose_name='Venta origen',
     )
+    cliente_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre del cliente")
 
     class Meta:
         db_table = 'ventas'

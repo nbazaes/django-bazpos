@@ -118,6 +118,7 @@ class VentaSerializer(serializers.ModelSerializer):
             "tipo_documento",
             "tipo_documento_display",
             "venta_origen",
+            "cliente_nombre",
             "detalles",
             "productos_devueltos",
         ]
@@ -174,6 +175,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
         required=False,
     )
     venta_origen = serializers.IntegerField(required=False, allow_null=True)
+    cliente_nombre = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
 
     def validate_venta_origen(self, value):
         if value is None:
@@ -242,6 +244,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
             estado=estado,
             tipo_documento=tipo_documento,
             venta_origen_id=validated_data.get("venta_origen"),
+            cliente_nombre=validated_data.get("cliente_nombre", "") or "",
         )
 
         for i, (cantidad, producto, subtotal) in enumerate(items_data):

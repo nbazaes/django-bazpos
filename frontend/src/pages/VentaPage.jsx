@@ -44,6 +44,8 @@ export default function VentaPage() {
   const [carro, setCarro] = useState(() => readStoredVenta().carro);
   const [error, setError] = useState("");
   const [showConfirmVenta, setShowConfirmVenta] = useState(false);
+  const [confirmMode, setConfirmMode] = useState("VE");
+  const [clienteNombre, setClienteNombre] = useState("");
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [lastDocumento, setLastDocumento] = useState(null);
@@ -398,6 +400,7 @@ export default function VentaPage() {
           monto_subtotal: subtotal,
           tipo_documento: tipoDocumento,
           productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
+          ...(clienteNombre.trim() ? { cliente_nombre: clienteNombre.trim() } : {}),
           ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
         },
       });
@@ -410,6 +413,7 @@ export default function VentaPage() {
       setHayMasProductos(false);
       localStorage.removeItem(VENTA_STORAGE_KEY);
       setShowConfirmVenta(false);
+      setClienteNombre("");
       setShowPreview(true);
       setShowVentaSuccess(true);
       if (cotizacionOrigenId) {
@@ -747,10 +751,10 @@ export default function VentaPage() {
           </div>
         </div>
         <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length} onClick={() => setShowConfirmVenta(true)}>
+          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
-          <button className="btn btn-outline" disabled={!carro.length} onClick={() => guardar("CO")}>
+          <button className="btn btn-outline" disabled={!carro.length} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
             Generar cotización
           </button>
           <button className="btn btn-danger" disabled={!carro.length && !oem} onClick={limpiarVenta}>
@@ -764,12 +768,24 @@ export default function VentaPage() {
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Confirmar venta</h5>
+                <h5 className="modal-title">{confirmMode === "CO" ? "Generar cotización" : "Confirmar venta"}</h5>
                 <button type="button" className="modal-close" onClick={() => setShowConfirmVenta(false)}>
                   &times;
                 </button>
               </div>
               <div className="modal-body">
+                {confirmMode === "CO" && (
+                  <div className="form-group mb-3">
+                    <label className="font-weight-bold">Nombre del cliente:</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ingrese el nombre del cliente (opcional)"
+                      value={clienteNombre}
+                      onChange={(e) => setClienteNombre(e.target.value)}
+                    />
+                  </div>
+                )}
                 <p className="mb-3 text-secondary">Revise el detalle antes de confirmar:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
@@ -843,7 +859,9 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmVenta(false)}>Cancelar</button>
-                <button type="button" className="btn btn-success" onClick={() => guardar("VE")}>Confirmar y guardar</button>
+                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)}>
+                  {confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
+                </button>
               </div>
             </div>
           </div>

@@ -272,7 +272,11 @@ export default function PedidosPage() {
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>
-                  <tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Total</th><th>Tipo</th><th>Estado</th><th></th></tr>
+                  <tr>
+                    <th>ID</th><th>Fecha</th><th>Usuario</th>
+                    {tipoFiltro === "CO" && <th>Cliente</th>}
+                    <th>Total</th><th>Tipo</th><th>Estado</th><th></th>
+                  </tr>
                 </thead>
                 <tbody>
                   {tab === "ventas" && rows.map((v) => (
@@ -280,6 +284,7 @@ export default function PedidosPage() {
                       <td>{v.id}</td>
                       <td>{formatDateTime(v.fecha_venta)}</td>
                       <td>{v.usuario_nombre}</td>
+                      {tipoFiltro === "CO" && <td>{v.cliente_nombre || "—"}</td>}
                       <td>${v.monto_total}</td>
                       <td>{v.tipo_documento_display || v.tipo_documento}</td>
                       <td>{v.estado_display || v.estado}</td>
@@ -311,7 +316,7 @@ export default function PedidosPage() {
                     </tr>
                   ))}
                   {rows.length === 0 && (
-                    <tr><td colSpan="7" className="text-center text-muted">No hay transacciones</td></tr>
+                    <tr><td colSpan={tipoFiltro === "CO" ? 8 : 7} className="text-center text-muted">No hay transacciones</td></tr>
                   )}
                 </tbody>
               </table>

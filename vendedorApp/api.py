@@ -354,7 +354,9 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         tipo_documento = self.request.query_params.get("tipo_documento", "").strip()
 
         if codigo:
-            queryset = queryset.filter(id__startswith=codigo)
+            queryset = queryset.filter(
+                Q(id__startswith=codigo) | Q(cliente_nombre__icontains=codigo)
+            )
         if tipo_documento:
             queryset = queryset.filter(tipo_documento=tipo_documento)
 
