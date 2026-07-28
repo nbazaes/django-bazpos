@@ -144,8 +144,12 @@ export default function VentaPage() {
   const debouncedOem = useDebounce(oem.trim());
 
   useEffect(() => {
-    buscarProducto(debouncedOem);
-  }, [debouncedOem]);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) buscarProducto(debouncedOem);
+    });
+    return () => { cancelled = true; };
+  }, [debouncedOem, buscarProducto]);
 
   async function escanearCodigoBarra() {
     const codigo = codigoBarra.trim();

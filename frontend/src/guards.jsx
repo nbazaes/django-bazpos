@@ -8,6 +8,7 @@ export function ProtectedRoute() {
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
+    if (!isLoggedIn()) return;
     me()
       .then((userData) => {
         saveUser(userData);
