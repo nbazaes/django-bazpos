@@ -3,11 +3,11 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import { getUser } from "../lib/auth";
 import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
-import { useToast } from "../lib/toast";
+import { useToast } from "../lib/useToast";
 
 function StatCard({ title, value, variant }) {
   return (

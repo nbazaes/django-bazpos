@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import AjusteStockModal from "../components/AjusteStockModal";
 import HistorialAjustesModal from "../components/HistorialAjustesModal";
 import { useProductos } from "../lib/queries";

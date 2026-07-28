@@ -1,18 +1,9 @@
-import { useState, createContext, useContext, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
 import { STORE_NAME } from "../lib/config";
-
-const TitleContext = createContext(() => {});
-
-export function usePageTitle(title) {
-  const setTitle = useContext(TitleContext);
-  useEffect(() => {
-    setTitle(title);
-    document.title = `${STORE_NAME} — ${title}`;
-  }, [title, setTitle]);
-}
+import TitleContext from "../lib/usePageTitle";
 
 const vendedorLinks = [
   { to: "/", label: "Dashboard", end: true },

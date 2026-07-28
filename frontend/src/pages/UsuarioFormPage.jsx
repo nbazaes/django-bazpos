@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import { useCreateUsuario, useGrupos, useUpdateUsuario, useUsuario } from "../lib/queries";
 
 const initial = {
@@ -31,7 +31,11 @@ export default function UsuarioFormPage() {
 
   useEffect(() => {
     if (usuarioData && id) {
-      setData({ ...usuarioData, password: "", group_id: usuarioData.groups?.[0]?.id || "" });
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setData({ ...usuarioData, password: "", group_id: usuarioData.groups?.[0]?.id || "" });
+      });
+      return () => { cancelled = true; };
     }
   }, [usuarioData, id]);
 

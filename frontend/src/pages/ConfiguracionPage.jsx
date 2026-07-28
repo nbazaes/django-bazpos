@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import { useStoreConfig, useUpdateStoreConfig } from "../lib/queries";
-import { useToast } from "../lib/toast";
+import { useToast } from "../lib/useToast";
 import { fetchStoreConfig } from "../lib/store";
 
 export default function ConfiguracionPage() {
@@ -18,13 +18,17 @@ export default function ConfiguracionPage() {
   useEffect(() => {
     if (configData?.length) {
       const cfg = configData[0];
-      setData({
-        id: cfg.id,
-        telefono: cfg.telefono || "",
-        direccion: cfg.direccion || "",
-        tax_percent: cfg.tax_percent != null ? String(cfg.tax_percent) : "19",
-        timezone: cfg.timezone || "America/Santiago",
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setData({
+          id: cfg.id,
+          telefono: cfg.telefono || "",
+          direccion: cfg.direccion || "",
+          tax_percent: cfg.tax_percent != null ? String(cfg.tax_percent) : "19",
+          timezone: cfg.timezone || "America/Santiago",
+        });
       });
+      return () => { cancelled = true; };
     }
   }, [configData]);
 

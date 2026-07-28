@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   useCheckFacturaExiste,
   useCreateFactura,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   useCreateProducto,
   useProducto,
@@ -53,13 +53,21 @@ export default function ProductoFormPage() {
 
   useEffect(() => {
     if (productoData && id) {
-      setData({ ...productoData, proveedor: String(productoData.proveedor) });
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setData({ ...productoData, proveedor: String(productoData.proveedor) });
+      });
+      return () => { cancelled = true; };
     } else if (!id && (codigo_producto || proveedor)) {
-      setData((prev) => ({
-        ...prev,
-        codigo_producto: codigo_producto || prev.codigo_producto,
-        proveedor: proveedor || prev.proveedor,
-      }));
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setData((prev) => ({
+          ...prev,
+          codigo_producto: codigo_producto || prev.codigo_producto,
+          proveedor: proveedor || prev.proveedor,
+        }));
+      });
+      return () => { cancelled = true; };
     }
   }, [productoData, id, codigo_producto, proveedor]);
 

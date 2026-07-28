@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
 import PedidosHistorial from "../components/PedidosHistorial";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
-import { useToast } from "../lib/toast";
+import { useToast } from "../lib/useToast";
 
 function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
   const costo = Number(precioCosto) || 0;

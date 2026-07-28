@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
@@ -109,7 +109,7 @@ export default function VentaPage() {
     }
   }, [carro, descuentoPorcentaje, oem]);
 
-  async function buscarProducto(texto) {
+  const buscarProducto = useCallback(async (texto) => {
     if (!texto.trim()) {
       setProductosEncontrados([]);
       setHayMasProductos(false);
@@ -132,7 +132,7 @@ export default function VentaPage() {
       setProductosEncontrados([]);
       setHayMasProductos(false);
     }
-  }
+  }, [mostrarSinStock]);
 
   useEffect(() => {
     const query = oem.trim();
@@ -140,7 +140,7 @@ export default function VentaPage() {
       buscarProducto(query);
     }, 250);
     return () => clearTimeout(timeoutId);
-  }, [oem, mostrarSinStock]);
+  }, [oem, buscarProducto, mostrarSinStock]);
 
   async function escanearCodigoBarra() {
     const codigo = codigoBarra.trim();

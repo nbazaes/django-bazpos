@@ -8,11 +8,6 @@ export function ProtectedRoute() {
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setAuthorized(false);
-      setChecking(false);
-      return;
-    }
     me()
       .then((userData) => {
         saveUser(userData);
@@ -24,6 +19,8 @@ export function ProtectedRoute() {
         setChecking(false);
       });
   }, []);
+
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
 
   if (checking) return null;
   if (!authorized) return <Navigate to="/login" replace />;

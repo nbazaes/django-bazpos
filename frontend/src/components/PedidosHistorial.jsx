@@ -10,7 +10,7 @@ import {
 } from "../lib/queries";
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
-import { useToast } from "../lib/toast";
+import { useToast } from "../lib/useToast";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
 

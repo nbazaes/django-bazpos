@@ -5,7 +5,7 @@ import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import PedidosHistorial from "../components/PedidosHistorial";
 import StepperInput from "../components/StepperInput";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   useAnularVenta,
   useDevolucion,
@@ -54,7 +54,7 @@ export default function PedidosPage() {
   const { data: devolverVentaData } = useVenta(devolverVentaId);
   const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
 
-  const ubicacionesList = ubicacionesData?.results ?? [];
+  const ubicacionesList = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData]);
   const anularMutation = useAnularVenta();
   const devolverMutation = useDevolverProductos();
 
@@ -71,8 +71,14 @@ export default function PedidosPage() {
       ubiMap[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
       cantMap[d.producto] = d.cantidad;
     }
-    setAnularUbicaciones(ubiMap);
-    setAnularCantidades(cantMap);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setAnularUbicaciones(ubiMap);
+        setAnularCantidades(cantMap);
+      }
+    });
+    return () => { cancelled = true; };
   }, [anularVentaData, ubicacionesList]);
 
   useEffect(() => {
@@ -90,10 +96,16 @@ export default function PedidosPage() {
       rep[d.producto] = true;
       ubi[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
     }
-    setDevolverSeleccion(sel);
-    setDevolverCantidades(cant);
-    setDevolverReponer(rep);
-    setDevolverUbicacion(ubi);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setDevolverSeleccion(sel);
+        setDevolverCantidades(cant);
+        setDevolverReponer(rep);
+        setDevolverUbicacion(ubi);
+      }
+    });
+    return () => { cancelled = true; };
   }, [devolverVentaData, ubicacionesList]);
 
   const devolverTotalCalculado = useMemo(() => {

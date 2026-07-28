@@ -1,6 +1,6 @@
 import { useState } from "react";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   usePedidoProveedorHoy,
   usePedidoProveedorHistorial,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   useCreateProveedor,
   useProveedor,
@@ -31,7 +31,11 @@ export default function ProveedorFormPage() {
 
   useEffect(() => {
     if (proveedorData && id) {
-      setData(proveedorData);
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setData(proveedorData);
+      });
+      return () => { cancelled = true; };
     }
   }, [proveedorData, id]);
 

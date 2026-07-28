@@ -4,7 +4,7 @@ import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import {
   useCreateUbicacion,
   useDeleteUbicacion,

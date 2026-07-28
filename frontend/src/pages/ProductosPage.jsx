@@ -4,7 +4,7 @@ import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
-import { usePageTitle } from "../components/Shell";
+import { usePageTitle } from "../lib/usePageTitle";
 import AjusteStockModal from "../components/AjusteStockModal";
 import { useDeleteProducto, useProductos } from "../lib/queries";
 import { getUser, isBodeguero } from "../lib/auth";
