@@ -546,7 +546,7 @@ export default function PedidosCrearPage() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
           <button
             type="button"
             className="btn btn-secondary btn-lg"

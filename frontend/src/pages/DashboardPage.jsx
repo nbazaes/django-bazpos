@@ -155,8 +155,8 @@ export default function DashboardPage() {
                         <th style={{ width: "40px" }}></th>
                         <th>Nombre</th>
                         <th>Código</th>
-                        <th>OEM</th>
-                        <th>Proveedor</th>
+                        <th className="hide-mobile">OEM</th>
+                        <th className="hide-mobile">Proveedor</th>
                         <th>Stock actual</th>
                         <th>Stock mínimo</th>
                         <th>Acciones</th>
@@ -201,8 +201,8 @@ export default function DashboardPage() {
                           </td>
                           <td>{p.nombre}</td>
                           <td>{p.codigo_producto}</td>
-                          <td>{p.oem}</td>
-                          <td>{p.proveedor_nombre}</td>
+                          <td className="hide-mobile">{p.oem}</td>
+                          <td className="hide-mobile">{p.proveedor_nombre}</td>
                           <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
                           <td>{p.stock_minimo}</td>
                           <td>

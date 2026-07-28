@@ -636,7 +636,8 @@ export default function VentaPage() {
             border: "1px solid var(--border-default)",
             borderRadius: "var(--radius-lg)",
             padding: "1.25rem 1.5rem",
-            minWidth: 320,
+            width: "100%",
+            maxWidth: 400,
             boxShadow: "var(--shadow)",
           }}>
             <div style={{
@@ -796,7 +797,7 @@ export default function VentaPage() {
                     border: "1px solid var(--border-default)",
                     borderRadius: "var(--radius-lg)",
                     padding: "1rem 1.25rem",
-                    minWidth: 260,
+                    width: "100%",
                     boxShadow: "var(--shadow)",
                   }}>
                     {discount > 0 && (

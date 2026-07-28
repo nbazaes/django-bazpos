@@ -50,7 +50,26 @@ export default function Shell() {
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const embed = searchParams.get("embed") === "1";
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
+  }, [sidebarOpen]);
+
+  function handleNav() {
+    setSidebarOpen(false);
+  }
 
   function handleToggleTheme() {
     const next = toggleTheme();
@@ -73,9 +92,9 @@ export default function Shell() {
 
   return (
     <TitleContext.Provider value={setTitle}>
-      <div id="wrapper">
-        <aside className="sidebar">
-          <NavLink className="sidebar-brand" to="/">{STORE_NAME}</NavLink>
+      <div id="wrapper" className={sidebarOpen ? "sidebar-open" : ""}>
+        <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
+          <NavLink className="sidebar-brand" to="/" onClick={handleNav}>{STORE_NAME}</NavLink>
 
           <ul className="sidebar-nav">
             {filteredVendedorLinks.map((link) => (
@@ -84,6 +103,7 @@ export default function Shell() {
                   className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`}
                   to={link.to}
                   end={link.end}
+                  onClick={handleNav}
                 >
                   {link.label}
                 </NavLink>
@@ -98,7 +118,7 @@ export default function Shell() {
               <ul className="sidebar-nav">
                 {bodegueroLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
-                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to}>
+                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
                       {link.label}
                     </NavLink>
                   </li>
@@ -114,7 +134,7 @@ export default function Shell() {
               <ul className="sidebar-nav">
                 {gerenteLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
-                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to}>
+                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
                       {link.label}
                     </NavLink>
                   </li>
@@ -128,9 +148,23 @@ export default function Shell() {
           </div>
         </aside>
 
+        <div className="sidebar-overlay" onClick={handleNav} />
+
         <div className="content-wrapper">
           <nav className="topbar">
-            <span className="topbar-title">{title}</span>
+            <div className="topbar-left">
+              <button
+                type="button"
+                className={`hamburger${sidebarOpen ? " open" : ""}`}
+                onClick={() => setSidebarOpen((v) => !v)}
+                aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+              <span className="topbar-title">{title}</span>
+            </div>
             <div className="btn-group">
               <button
                 type="button"

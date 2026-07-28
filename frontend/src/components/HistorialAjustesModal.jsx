@@ -24,8 +24,8 @@ export default function HistorialAjustesModal({ producto, onClose }) {
                     <th>Stock anterior</th>
                     <th>Stock nuevo</th>
                     <th>Diferencia</th>
-                    <th>Usuario</th>
-                    <th>Motivo</th>
+                    <th className="hide-mobile">Usuario</th>
+                    <th className="hide-mobile">Motivo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -50,8 +50,8 @@ export default function HistorialAjustesModal({ producto, onClose }) {
                           {a.cantidad_nueva - a.cantidad_anterior > 0 ? "+" : ""}
                           {a.cantidad_nueva - a.cantidad_anterior}
                         </td>
-                        <td>{a.usuario_nombre}</td>
-                        <td>{a.motivo}</td>
+                        <td className="hide-mobile">{a.usuario_nombre}</td>
+                        <td className="hide-mobile">{a.motivo}</td>
                       </tr>
                     ))
                   )}

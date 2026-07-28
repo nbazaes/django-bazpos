@@ -214,11 +214,11 @@ export default function PedidosHistorial() {
               <th>ID</th>
               <th>Fecha</th>
               <th>Cliente</th>
-              <th>Teléfono</th>
+              <th className="hide-mobile">Teléfono</th>
               <th>Estado</th>
-              <th>Documento</th>
-              <th>Persona que retiró</th>
-              <th>Fecha retiro</th>
+              <th className="hide-mobile">Documento</th>
+              <th className="hide-mobile">Persona que retiró</th>
+              <th className="hide-mobile">Fecha retiro</th>
               <th>Total</th>
               <th></th>
             </tr>
@@ -233,7 +233,7 @@ export default function PedidosHistorial() {
                   <td>P#{p.id}</td>
                   <td>{formatDateTime(p.fecha_creacion)}</td>
                   <td>{p.nombre_cliente}</td>
-                  <td>{p.telefono_cliente}</td>
+                  <td className="hide-mobile">{p.telefono_cliente}</td>
                   <td>
                     {esCotizacion ? (
                       <span className="badge badge-info">Cotización</span>
@@ -241,7 +241,7 @@ export default function PedidosHistorial() {
                       <span className={estadoInfo.className}>{estadoInfo.label}</span>
                     )}
                   </td>
-                  <td>
+                  <td className="hide-mobile">
                     {esCotizacion ? (
                       <span className="text-muted">—</span>
                     ) : (
@@ -257,8 +257,8 @@ export default function PedidosHistorial() {
                       </select>
                     )}
                   </td>
-                  <td>{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
-                  <td>{formatDateTime(p.fecha_retiro)}</td>
+                  <td className="hide-mobile">{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
+                  <td className="hide-mobile">{formatDateTime(p.fecha_retiro)}</td>
                   <td>${p.monto_total}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>

@@ -109,15 +109,15 @@ export default function InventarioPage() {
             <thead>
               <tr>
                 <th style={{ width: "1px" }}>Código</th>
-                <th style={{ width: "1px" }}>OEM</th>
-                <th style={{ width: "1px" }}>Cód. Proveedor</th>
+                <th className="hide-mobile" style={{ width: "1px" }}>OEM</th>
+                <th className="hide-mobile" style={{ width: "1px" }}>Cód. Proveedor</th>
                 <th>Nombre</th>
                 <th>Marca</th>
-                <th>Descripción</th>
+                <th className="hide-mobile">Descripción</th>
                 <th style={{ width: "1px" }}>Stock actual</th>
                 <th>Ubicación</th>
                 <th style={{ width: "1px" }}>Stock min</th>
-                <th style={{ width: "1px" }}>Stock max</th>
+                <th className="hide-mobile" style={{ width: "1px" }}>Stock max</th>
                 {puedeAjustar && <th style={{ width: "1px" }}>Acciones</th>}
               </tr>
             </thead>
@@ -130,15 +130,15 @@ export default function InventarioPage() {
                 productos.map((p) => (
                   <tr key={p.producto_id}>
                     <td className="text-nowrap">{p.codigo_producto}</td>
-                    <td className="text-nowrap">{p.oem}</td>
-                    <td className="text-nowrap">{p.codigo_proveedor}</td>
+                    <td className="hide-mobile text-nowrap">{p.oem}</td>
+                    <td className="hide-mobile text-nowrap">{p.codigo_proveedor}</td>
                     <td>{p.nombre}</td>
                     <td>{p.marca}</td>
-                    <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
+                    <td className="hide-mobile text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
                     <td>{p.stock_actual}</td>
                     <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
                     <td>{p.stock_minimo}</td>
-                    <td>{p.stock_maximo}</td>
+                    <td className="hide-mobile">{p.stock_maximo}</td>
                     {puedeAjustar && (
                       <td className="text-nowrap">
                         <button
