@@ -25,6 +25,7 @@ const vendedorLinks = [
 const gerenteLinks = [
   { to: "/productos", label: "Productos" },
   { to: "/proveedores", label: "Proveedores" },
+  { to: "/pedidos-proveedores", label: "Pedidos Prov." },
   { to: "/usuarios", label: "Usuarios" },
   { to: "/facturas", label: "Facturas" },
   { to: "/configuracion", label: "Configuración" },

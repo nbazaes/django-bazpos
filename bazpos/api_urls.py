@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import DashboardStatsView, DevolucionViewSet, PedidoViewSet, ProductoViewSet, VentaViewSet
+from vendedorApp.api import DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, VentaViewSet
 from .api_views import MeView
 
 router = DefaultRouter()
@@ -16,6 +16,7 @@ router.register("devoluciones", DevolucionViewSet, basename="devolucion")
 router.register("ubicaciones", UbicacionViewSet, basename="ubicacion")
 router.register("pedidos", PedidoViewSet, basename="pedido")
 router.register("configuracion", StoreConfigViewSet, basename="configuracion")
+router.register("pedidos-proveedor", PedidoProveedorViewSet, basename="pedido-proveedor")
 
 urlpatterns = [
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),

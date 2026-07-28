@@ -569,6 +569,93 @@ export function useUpdateStoreConfig() {
   });
 }
 
+// ── Pedidos a Proveedores ──
+
+export const queryKeysPedidoProveedor = {
+  all: ["pedidos-proveedor"],
+  hoy: ["pedidos-proveedor", "hoy"],
+  historial: (params) => ["pedidos-proveedor", "historial", params],
+  detail: (id) => ["pedidos-proveedor", "detail", id],
+};
+
+export function usePedidoProveedorHoy() {
+  return useQuery({
+    queryKey: queryKeysPedidoProveedor.hoy,
+    queryFn: () => apiRequest("/pedidos-proveedor/hoy/"),
+    staleTime: 30_000,
+  });
+}
+
+export function usePedidoProveedorHistorial(params = {}) {
+  return useQuery({
+    queryKey: queryKeysPedidoProveedor.historial(params),
+    queryFn: () => apiRequest(`/pedidos-proveedor/${buildQuery(params)}`),
+    placeholderData: placeholderData(),
+    staleTime: 30_000,
+  });
+}
+
+export function usePedidoProveedorDia(id) {
+  return useQuery({
+    queryKey: queryKeysPedidoProveedor.detail(id),
+    queryFn: () => apiRequest(`/pedidos-proveedor/${id}/`),
+    enabled: !!id,
+  });
+}
+
+export function useAgregarItemPedidoProveedor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (producto_id) =>
+      apiRequest("/pedidos-proveedor/agregar-item/", {
+        method: "POST",
+        body: { producto_id },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+  });
+}
+
+export function useToggleItemPedidoProveedor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ diaId, itemId }) =>
+      apiRequest(`/pedidos-proveedor/${diaId}/toggle-item/${itemId}/`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+  });
+}
+
+export function useEliminarItemPedidoProveedor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ diaId, itemId }) =>
+      apiRequest(`/pedidos-proveedor/${diaId}/eliminar-item/${itemId}/`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+  });
+}
+
+export function useTransferirPedidoProveedor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (diaId) =>
+      apiRequest(`/pedidos-proveedor/${diaId}/transferir/`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+  });
+}
+
 // ── Utils ──
 
 export { paginatedResult };

@@ -6,7 +6,7 @@ import PageCard from "../components/PageCard";
 import { usePageTitle } from "../components/Shell";
 import { getUser } from "../lib/auth";
 import { apiRequest } from "../lib/api";
-import { queryKeys, useDashboardStats } from "../lib/queries";
+import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/toast";
 
 function StatCard({ title, value, variant }) {
@@ -65,6 +65,21 @@ export default function DashboardPage() {
     },
     onError: (err) => {
       showToast(err.message || "No se pudo actualizar el producto", "danger");
+    },
+  });
+
+  const agregarPedidoMutation = useMutation({
+    mutationFn: (productoId) =>
+      apiRequest("/pedidos-proveedor/agregar-item/", {
+        method: "POST",
+        body: { producto_id: productoId },
+      }),
+    onSuccess: () => {
+      showToast("Producto agregado a la lista de pedidos", "success");
+      queryClient.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
+    },
+    onError: (err) => {
+      showToast(err.message || "No se pudo agregar el producto", "danger");
     },
   });
 
@@ -218,11 +233,10 @@ export default function DashboardPage() {
                               </button>
                               <button
                                 className="btn btn-sm btn-outline"
-                                onClick={() => {
-                                  // TODO: agregar a pedido
-                                }}
-                                disabled
-                                title="Próximamente"
+                                onClick={() =>
+                                  agregarPedidoMutation.mutate(p.producto_id)
+                                }
+                                disabled={agregarPedidoMutation.isPending}
                               >
                                 Agregar a pedido
                               </button>

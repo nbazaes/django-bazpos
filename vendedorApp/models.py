@@ -213,6 +213,35 @@ class AjusteStock(models.Model):
         return f"Ajuste {self.producto.nombre} en {ubicacion_nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"
 
 
+class PedidoProveedorDia(models.Model):
+    fecha = models.DateField(unique=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pedidos_proveedor_dia"
+        ordering = ["-fecha"]
+
+    def __str__(self):
+        return f"Pedidos proveedores {self.fecha}"
+
+
+class ItemPedidoProveedor(models.Model):
+    dia = models.ForeignKey(PedidoProveedorDia, on_delete=models.CASCADE, related_name="items")
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
+    pedido = models.BooleanField(default=False)
+    fecha_agregado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "items_pedido_proveedor"
+        unique_together = ("dia", "producto")
+
+    def __str__(self):
+        estado = "Pedido" if self.pedido else "Pendiente"
+        return f"{self.producto.nombre} — {estado}"
+
+
 class Pedido(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE_RETIRAR = "PR", "Pendiente por retirar"

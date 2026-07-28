@@ -9,8 +9,9 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, Devolucion, DetalleDevolucion, ItemPedidoProveedor, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
+    AgregarItemPedidoProveedorSerializer,
     AjustarStockInputSerializer,
     AjusteStockSerializer,
     AnulacionInputSerializer,
@@ -18,6 +19,8 @@ from vendedorApp.serializers import (
     CrearPedidoSerializer,
     DevolucionInputSerializer,
     DevolucionSerializer,
+    PedidoProveedorDiaSerializer,
+    PedidoProveedorDiaHistorialSerializer,
     PedidoSerializer,
     ProductoSerializer,
     RegistrarVentaSerializer,
@@ -838,3 +841,116 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             PedidoSerializer(nuevo_pedido, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+from datetime import date, timedelta
+
+
+class PedidoProveedorViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
+    pagination_class = None
+    role_action_map = {
+        "list": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "create": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "agregar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "toggle_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "eliminar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "transferir": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "hoy": [ROLE_ENCARGADO, ROLE_GERENTE],
+    }
+
+    def get_queryset(self):
+        return PedidoProveedorDia.objects.prefetch_related("items__producto", "items__proveedor").all()
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return PedidoProveedorDiaHistorialSerializer
+        return PedidoProveedorDiaSerializer
+
+    @action(detail=False, methods=["get"], url_path="hoy")
+    def hoy(self, request):
+        fecha = date.today()
+        dia, _ = PedidoProveedorDia.objects.get_or_create(
+            fecha=fecha,
+            defaults={"usuario": request.user},
+        )
+        serializer = self.get_serializer(dia)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="agregar-item")
+    def agregar_item(self, request):
+        serializer = AgregarItemPedidoProveedorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        producto_id = serializer.validated_data["producto_id"]
+
+        try:
+            producto = Producto.objects.select_related("proveedor").get(producto_id=producto_id)
+        except Producto.DoesNotExist:
+            return Response({"error": "Producto no encontrado"}, status=404)
+
+        fecha = date.today()
+        dia, _ = PedidoProveedorDia.objects.get_or_create(
+            fecha=fecha,
+            defaults={"usuario": request.user},
+        )
+
+        item, created = ItemPedidoProveedor.objects.get_or_create(
+            dia=dia,
+            producto=producto,
+            defaults={"proveedor": producto.proveedor},
+        )
+
+        return Response({"ok": True, "created": created})
+
+    @action(detail=True, methods=["post"], url_path="toggle-item/(?P<item_id>[^/.]+)")
+    def toggle_item(self, request, pk=None, item_id=None):
+        dia = self.get_object()
+        try:
+            item = dia.items.get(id=item_id)
+        except ItemPedidoProveedor.DoesNotExist:
+            return Response({"error": "Item no encontrado"}, status=404)
+        item.pedido = not item.pedido
+        item.save(update_fields=["pedido"])
+        return Response({"ok": True, "pedido": item.pedido})
+
+    @action(detail=True, methods=["delete"], url_path="eliminar-item/(?P<item_id>[^/.]+)")
+    def eliminar_item(self, request, pk=None, item_id=None):
+        dia = self.get_object()
+        try:
+            item = dia.items.get(id=item_id)
+        except ItemPedidoProveedor.DoesNotExist:
+            return Response({"error": "Item no encontrado"}, status=404)
+        item.delete()
+        return Response({"ok": True})
+
+    @action(detail=True, methods=["post"], url_path="transferir")
+    def transferir(self, request, pk=None):
+        dia_origen = self.get_object()
+        pendientes = dia_origen.items.filter(pedido=False)
+
+        if not pendientes.exists():
+            return Response({"ok": True, "transferidos": 0})
+
+        fecha_destino = date.today() + timedelta(days=1)
+        dia_destino, _ = PedidoProveedorDia.objects.get_or_create(
+            fecha=fecha_destino,
+            defaults={"usuario": request.user},
+        )
+
+        transferidos = 0
+        for item in pendientes:
+            _, created = ItemPedidoProveedor.objects.get_or_create(
+                dia=dia_destino,
+                producto=item.producto,
+                defaults={"proveedor": item.proveedor},
+            )
+            if created:
+                transferidos += 1
+
+        return Response({"ok": True, "transferidos": transferidos})

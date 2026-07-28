@@ -10,8 +10,10 @@ from vendedorApp.models import (
     DetalleDevolucion,
     DetalleVenta,
     Devolucion,
+    ItemPedidoProveedor,
     Pedido,
     PedidoDetalle,
+    PedidoProveedorDia,
     Producto,
     Ubicacion,
     Venta,
@@ -537,3 +539,73 @@ class CrearPedidoSerializer(serializers.Serializer):
             pedido.save(update_fields=["venta"])
 
         return pedido
+
+
+class ItemPedidoProveedorSerializer(serializers.ModelSerializer):
+    producto_id = serializers.IntegerField(source="producto.producto_id", read_only=True)
+    codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
+    codigo_proveedor = serializers.CharField(source="producto.codigo_proveedor", read_only=True)
+    oem = serializers.CharField(source="producto.oem", read_only=True)
+    nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    precio_costo = serializers.IntegerField(source="producto.precio_costo", read_only=True)
+    stock_actual = serializers.IntegerField(source="producto.stock_actual", read_only=True)
+    stock_maximo = serializers.IntegerField(source="producto.stock_maximo", read_only=True)
+    proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
+
+    class Meta:
+        model = ItemPedidoProveedor
+        fields = [
+            "id",
+            "producto_id",
+            "codigo_producto",
+            "codigo_proveedor",
+            "oem",
+            "nombre",
+            "precio_costo",
+            "stock_actual",
+            "stock_maximo",
+            "proveedor",
+            "proveedor_nombre",
+            "pedido",
+        ]
+
+
+class PedidoProveedorDiaSerializer(serializers.ModelSerializer):
+    proveedores = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PedidoProveedorDia
+        fields = ["id", "fecha", "created_at", "proveedores"]
+
+    def get_proveedores(self, obj):
+        items = obj.items.select_related("producto", "proveedor").all().order_by("proveedor__nombre")
+        grouped = {}
+        for item in items:
+            pid = item.proveedor_id
+            if pid not in grouped:
+                grouped[pid] = {
+                    "proveedor_id": pid,
+                    "proveedor_nombre": item.proveedor.nombre,
+                    "items": [],
+                }
+            grouped[pid]["items"].append(ItemPedidoProveedorSerializer(item).data)
+        return list(grouped.values())
+
+
+class PedidoProveedorDiaHistorialSerializer(serializers.ModelSerializer):
+    total_items = serializers.SerializerMethodField()
+    total_pedidos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PedidoProveedorDia
+        fields = ["id", "fecha", "created_at", "total_items", "total_pedidos"]
+
+    def get_total_items(self, obj):
+        return obj.items.count()
+
+    def get_total_pedidos(self, obj):
+        return obj.items.filter(pedido=True).count()
+
+
+class AgregarItemPedidoProveedorSerializer(serializers.Serializer):
+    producto_id = serializers.IntegerField()
