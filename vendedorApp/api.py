@@ -176,7 +176,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         proveedor = self.request.query_params.get("proveedor", "").strip()
 
         if texto:
-            queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto))
+            queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto) | Q(codigo_proveedor__icontains=texto))
         if proveedor:
             queryset = queryset.filter(proveedor_id=proveedor)
         if "sin_stock" in self.request.query_params:
@@ -212,6 +212,28 @@ class ProductoViewSet(viewsets.ModelViewSet):
             for item in data["ajustes"]:
                 ubicacion_id = item["ubicacion_id"]
                 cantidad_nueva = item["cantidad"]
+
+                if ubicacion_id is None:
+                    try:
+                        stock = StockProductoUbicacion.objects.select_for_update().get(
+                            producto=producto,
+                            ubicacion__isnull=True,
+                        )
+                    except StockProductoUbicacion.DoesNotExist:
+                        continue
+
+                    cantidad_anterior = stock.cantidad
+
+                    if cantidad_anterior == cantidad_nueva:
+                        continue
+
+                    if cantidad_nueva == 0:
+                        stock.delete()
+                    else:
+                        stock.cantidad = cantidad_nueva
+                        stock.save()
+
+                    continue
 
                 try:
                     ubicacion = Ubicacion.objects.get(id=ubicacion_id)
