@@ -46,6 +46,7 @@ export default function VentaPage() {
   const [showConfirmVenta, setShowConfirmVenta] = useState(false);
   const [confirmMode, setConfirmMode] = useState("VE");
   const [clienteNombre, setClienteNombre] = useState("");
+  const [ocultarTotales, setOcultarTotales] = useState(false);
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [lastDocumento, setLastDocumento] = useState(null);
@@ -90,6 +91,7 @@ export default function VentaPage() {
           codigo_producto: d.codigo_producto,
           oem: d.producto_oem || "",
           nombre: d.producto_nombre,
+          marca: d.producto_marca || "",
           precio: d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario,
           cantidad: d.cantidad,
           stock_actual: 99999,
@@ -195,6 +197,7 @@ export default function VentaPage() {
             codigo_producto: p.codigo_producto,
             oem: p.oem,
             nombre: p.nombre,
+            marca: p.marca || "",
             precio: p.precio,
             cantidad: 1,
             stock_actual: p.stock_actual,
@@ -239,6 +242,7 @@ export default function VentaPage() {
         codigo_producto: producto.codigo_producto,
         oem: producto.oem,
         nombre: producto.nombre,
+        marca: producto.marca || "",
         precio: producto.precio,
         cantidad: 1,
         stock_actual: producto.stock_actual,
@@ -267,6 +271,7 @@ export default function VentaPage() {
       impuesto: total - netoFromBruto(total),
       descuento_porcentaje: discount,
       subtotal_original: subtotalCarro,
+      ocultarTotales: tipoDocumento === "CO" && ocultarTotales,
     };
   }
 
@@ -278,8 +283,8 @@ export default function VentaPage() {
 
     const rows = documento.items.map((item) => {
       const label = esCotizacion
-        ? `${item.cantidad} x ${item.nombre}`
-        : `${item.cantidad} x ${item.codigo_producto} - ${item.nombre}`;
+        ? `${item.cantidad} x ${item.marca ? item.marca + " - " : ""}${item.nombre}`
+        : `${item.cantidad} x ${item.codigo_producto} - ${item.marca ? item.marca + " - " : ""}${item.nombre}`;
       return `
         <div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;">
           <span>${label}</span>
@@ -324,12 +329,14 @@ export default function VentaPage() {
           <p class="date">${documento.fecha}</p>
           <hr />
           ${rows}
+          ${documento.ocultarTotales ? "" : `
           <hr />
           <div class="totals-row"><span>Subtotal</span><span>$${documento.subtotal_original}</span></div>
           ${documento.descuento_porcentaje > 0 ? `<div class="totals-row"><span>Descuento (${documento.descuento_porcentaje}%)</span><span>-$${documento.subtotal_original - documento.total}</span></div>` : ""}
           <div class="totals-row"><span>Neto</span><span>$${documento.total_neto}</span></div>
           <div class="totals-row"><span>Impuesto</span><span>$${documento.impuesto}</span></div>
           <div class="totals-row"><span class="bold">Total</span><span class="bold">$${documento.total}</span></div>
+          `}
           ${esCotizacion ? `<p class="disclaimer">Cotización válida hasta agotar stock</p>` : ""}
           <p class="disclaimer">Documento carece de validez legal</p>
         </body>
@@ -431,6 +438,7 @@ export default function VentaPage() {
       localStorage.removeItem(VENTA_STORAGE_KEY);
       setShowConfirmVenta(false);
       setClienteNombre("");
+      setOcultarTotales(false);
       setShowPreview(true);
       setShowVentaSuccess(true);
       if (cotizacionOrigenId) {
@@ -606,6 +614,7 @@ export default function VentaPage() {
                 <th style={{ width: "1px" }}>Código</th>
                 <th style={{ width: "1px" }}>OEM</th>
                 <th>Nombre</th>
+                <th style={{ width: "1px" }}>Marca</th>
                 <th style={{ width: "1px" }}>Cantidad</th>
                 <th style={{ width: "1px" }}>Subtotal neto</th>
                 <th style={{ width: "1px" }}>Subtotal</th>
@@ -618,6 +627,7 @@ export default function VentaPage() {
                   <td className="text-nowrap">{i.codigo_producto}</td>
                   <td className="text-nowrap">{i.oem}</td>
                   <td>{i.nombre}</td>
+                  <td className="text-nowrap">{i.marca}</td>
                   <td>
                     <StepperInput
                       value={i.cantidad}
@@ -789,7 +799,7 @@ export default function VentaPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">{confirmMode === "CO" ? "Generar cotización" : "Confirmar venta"}</h5>
-                <button type="button" className="modal-close" onClick={() => setShowConfirmVenta(false)}>
+                <button type="button" className="modal-close" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); }}>
                   &times;
                 </button>
               </div>
@@ -804,13 +814,22 @@ export default function VentaPage() {
                       value={clienteNombre}
                       onChange={(e) => setClienteNombre(e.target.value)}
                     />
+                    <label className="checkbox-custom mt-2" style={{ cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={ocultarTotales}
+                        onChange={(e) => setOcultarTotales(e.target.checked)}
+                      />
+                      <span className="checkbox-custom__mark" />
+                      <span className="checkbox-custom__label">Ocultar totales en la cotización</span>
+                    </label>
                   </div>
                 )}
                 <p className="mb-3 text-secondary">Revise el detalle antes de confirmar:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
+                      <tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
                     </thead>
                     <tbody>
                       {carro.map((i) => (
@@ -818,6 +837,7 @@ export default function VentaPage() {
                           <td>{i.codigo_producto}</td>
                           <td>{i.oem}</td>
                           <td>{i.nombre}</td>
+                          <td>{i.marca}</td>
                           <td>{i.cantidad}</td>
                           <td>${netoFromBruto(i.precio * i.cantidad)}</td>
                           <td>${i.precio * i.cantidad}</td>
@@ -826,6 +846,7 @@ export default function VentaPage() {
                     </tbody>
                   </table>
                 </div>
+                {!(confirmMode === "CO" && ocultarTotales) && (
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
                   <div style={{
                     display: "flex",
@@ -876,9 +897,10 @@ export default function VentaPage() {
                     </div>
                   </div>
                 </div>
+                )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmVenta(false)}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); }}>Cancelar</button>
                 <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving}>
                   {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
@@ -917,10 +939,12 @@ export default function VentaPage() {
                   <hr />
                   {lastDocumento.items.map((item) => (
                     <div key={`${item.producto_id}-${item.cantidad}`} className="flex justify-between" style={{ color: "#333" }}>
-                      <span>{item.cantidad} x {item.codigo_producto} - {item.nombre}</span>
+                      <span>{item.cantidad} x {item.codigo_producto} - {item.marca ? item.marca + " - " : ""}{item.nombre}</span>
                       <span>${item.subtotal}</span>
                     </div>
                   ))}
+                  {!lastDocumento.ocultarTotales && (
+                  <>
                   <hr />
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Subtotal</span><span>${lastDocumento.subtotal_original}</span></div>
                   {lastDocumento.descuento_porcentaje > 0 && (
@@ -932,6 +956,8 @@ export default function VentaPage() {
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
                   <div className="flex justify-between" style={{ color: "#333" }}><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
                   <div className="flex justify-between font-bold" style={{ color: "#1a1a1a" }}><span>Total</span><span>${lastDocumento.total}</span></div>
+                  </>
+                  )}
                   {lastDocumento.tipo_documento === "CO" && (
                     <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Cotización válida hasta agotar stock</div>
                   )}
