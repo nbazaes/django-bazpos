@@ -426,6 +426,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "pedido_origen",
             "convertido",
             "fecha_creacion",
+            "motivo_cancelacion",
             "detalles",
         ]
 
@@ -453,6 +454,10 @@ class CrearPedidoSerializer(serializers.Serializer):
     metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
     items = PedidoDetalleInputSerializer(many=True)
     es_cotizacion = serializers.BooleanField(default=False)
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido._meta.get_field("estado_documento").choices,
+        default=Pedido.EstadoDocumento.SIN_BOLETEAR,
+    )
 
     def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import ROUND_HALF_UP, ROUND_UP
@@ -498,7 +503,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             costo_envio=costo_envio,
             metodo_pago=validated_data["metodo_pago"],
             estado=Pedido.Estado.PENDIENTE_RETIRAR,
-            estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+            estado_documento=validated_data.get("estado_documento", Pedido.EstadoDocumento.SIN_BOLETEAR),
             es_cotizacion=es_cotizacion,
         )
 

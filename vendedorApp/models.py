@@ -250,6 +250,7 @@ class Pedido(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE_RETIRAR = "PR", "Pendiente por retirar"
         RETIRADO = "RE", "Retirado"
+        CANCELADO = "CA", "Cancelado"
 
     class EstadoDocumento(models.TextChoices):
         SIN_BOLETEAR = "SB", "Sin boletear"
@@ -298,6 +299,7 @@ class Pedido(models.Model):
         verbose_name="Pedido origen (cotización)",
     )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+    motivo_cancelacion = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "pedidos"

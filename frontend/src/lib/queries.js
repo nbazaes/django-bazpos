@@ -262,10 +262,10 @@ export function useCambiarEstadoPedido() {
 export function useMarcarRetiro() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, persona_retiro }) =>
+    mutationFn: ({ pedidoId, persona_retiro, estado_documento }) =>
       apiRequest(`/pedidos/${pedidoId}/marcar-retiro/`, {
         method: "POST",
-        body: { persona_retiro },
+        body: { persona_retiro, estado_documento },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
@@ -275,11 +275,14 @@ export function useMarcarRetiro() {
   });
 }
 
-export function useDesactivarPedido() {
+export function useCancelarPedido() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (pedidoId) =>
-      apiRequest(`/pedidos/${pedidoId}/desactivar/`, { method: "POST" }),
+    mutationFn: ({ pedidoId, motivo }) =>
+      apiRequest(`/pedidos/${pedidoId}/cancelar/`, {
+        method: "POST",
+        body: { motivo },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
       qc.invalidateQueries({ queryKey: queryKeys.ventas.all });

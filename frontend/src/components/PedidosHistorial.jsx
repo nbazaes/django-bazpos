@@ -3,7 +3,7 @@ import { formatDateTime } from "../lib/format";
 import {
   useCambiarEstadoPedido,
   useConvertirCotizacion,
-  useDesactivarPedido,
+  useCancelarPedido,
   useMarcarRetiro,
   usePedido,
   usePedidos,
@@ -11,6 +11,7 @@ import {
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/useToast";
+import { getUser, isGerente } from "../lib/auth";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
 
@@ -23,6 +24,7 @@ const DOCUMENTO_OPCIONES = [
 const ESTADO_BADGE = {
   PR: { className: "badge badge-warning", label: "Pendiente por retirar" },
   RE: { className: "badge badge-success", label: "Retirado" },
+  CA: { className: "badge badge-danger", label: "Cancelado" },
 };
 
 export default function PedidosHistorial() {
@@ -32,7 +34,9 @@ export default function PedidosHistorial() {
   const [retiroId, setRetiroId] = useState(null);
   const [retiroPersona, setRetiroPersona] = useState("");
   const [retiroMismoUsuario, setRetiroMismoUsuario] = useState(false);
-  const [desactivarId, setDesactivarId] = useState(null);
+  const [retiroDocumento, setRetiroDocumento] = useState("");
+  const [cancelarId, setCancelarId] = useState(null);
+  const [cancelarMotivo, setCancelarMotivo] = useState("");
   const [convertirId, setConvertirId] = useState(null);
   const [convertirSeleccion, setConvertirSeleccion] = useState({});
 
@@ -43,7 +47,7 @@ export default function PedidosHistorial() {
   const { data: convertirData } = usePedido(convertirId);
   const cambiarDocumento = useCambiarEstadoPedido();
   const marcarRetiro = useMarcarRetiro();
-  const desactivarPedido = useDesactivarPedido();
+  const cancelarPedido = useCancelarPedido();
   const convertirCotizacion = useConvertirCotizacion();
 
   useEffect(() => {
@@ -63,27 +67,32 @@ export default function PedidosHistorial() {
     setPage(1);
   }
 
-  function handleDocumentoChange(pedido, nuevoDocumento) {
-    cambiarDocumento.mutate({ pedidoId: pedido.id, estado_documento: nuevoDocumento });
-  }
-
   function abrirRetiro(pedido) {
     setRetiroId(pedido.id);
     setRetiroPersona("");
     setRetiroMismoUsuario(false);
+    setRetiroDocumento(pedido.estado_documento === "SB" ? "BO" : "");
   }
 
   function confirmarRetiro() {
     const persona = retiroPersona.trim() || (retiroMismoUsuario ? retiroData?.usuario_nombre : "");
     if (!persona) return;
+    const body = { pedidoId: retiroId, persona_retiro: persona };
+    if (retiroDocumento) {
+      body.estado_documento = retiroDocumento;
+    }
     marcarRetiro.mutate(
-      { pedidoId: retiroId, persona_retiro: persona },
+      body,
       { onSuccess: () => setRetiroId(null) },
     );
   }
 
-  function confirmarDesactivar() {
-    desactivarPedido.mutate(desactivarId, { onSuccess: () => setDesactivarId(null) });
+  function confirmarCancelar() {
+    if (!cancelarMotivo.trim()) return;
+    cancelarPedido.mutate(
+      { pedidoId: cancelarId, motivo: cancelarMotivo.trim() },
+      { onSuccess: () => { setCancelarId(null); setCancelarMotivo(""); } },
+    );
   }
 
   function abrirConvertir(pedido) {
@@ -128,15 +137,23 @@ export default function PedidosHistorial() {
     const win = window.open("", "_blank", "width=420,height=700");
     if (!win) return;
     const storeConfig = getStoreConfig();
+    const esCotizacion = pedido.es_cotizacion;
 
     const filas = (pedido.detalles || []).map((d) => `
       <tr>
-        <td>${d.codigo_proveedor || "—"}</td>
-        <td>${d.oem || "—"}</td>
+        ${!esCotizacion ? `<td>${d.codigo_proveedor || "—"}</td><td>${d.oem || "—"}</td>` : ""}
         <td>${d.nombre}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
     `).join("");
+
+    const titulo = esCotizacion
+      ? `Cotización #${pedido.id}`
+      : `Pedido #${pedido.id}`;
+
+    const disclaimer = esCotizacion
+      ? `<div class="disclaimer">Cotización válida hasta 3 días o hasta agotar stock</div>`
+      : `<div class="footer">El abono del producto constituye garantía por repuestos solicitados. Al desistir del producto el abono sera para saldar costos y gestión.</div>`;
 
     const fecha = formatDateTime(pedido.fecha_creacion);
     const fechaRetiro = formatDateTime(pedido.fecha_retiro);
@@ -171,20 +188,20 @@ export default function PedidosHistorial() {
           <div class="store">${STORE_NAME}</div>
           ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
           ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
-          <div class="title">Pedido #${pedido.id}</div>
+          <div class="title">${titulo}</div>
         </div>
         <div class="info">
           <strong>Fecha:</strong> ${fecha}<br />
           <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
           <strong>Teléfono:</strong> ${pedido.telefono_cliente}<br />
-          <strong>Estado:</strong> ${estado}<br />
+          ${!esCotizacion ? `<strong>Estado:</strong> ${estado}<br />` : ""}
           ${pedido.fecha_retiro ? `<strong>Fecha retiro:</strong> ${fechaRetiro}<br />` : ""}
           ${pedido.persona_retiro ? `<strong>Retiró:</strong> ${pedido.persona_retiro}<br />` : ""}
-          <strong>Documento:</strong> ${estadoDoc}
+          ${!esCotizacion ? `<strong>Documento:</strong> ${estadoDoc}` : ""}
         </div>
         <table>
           <thead>
-            <tr><th>Cód. Prov.</th><th>OEM</th><th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
@@ -192,10 +209,7 @@ export default function PedidosHistorial() {
         <div class="check-row">
           <strong>Método de pago:</strong> ${metodo}
         </div>
-        <div class="footer">
-          El abono del producto constituye garantía por repuestos solicitados.
-          Al desistir del producto el abono sera para saldar costos y gestión.
-        </div>
+        ${disclaimer}
         <script>
           window.onload = function() { window.print(); };
         </script>
@@ -245,16 +259,7 @@ export default function PedidosHistorial() {
                     {esCotizacion ? (
                       <span className="text-muted">—</span>
                     ) : (
-                      <select
-                        className="form-control form-control-sm"
-                        value={p.estado_documento}
-                        onChange={(e) => handleDocumentoChange(p, e.target.value)}
-                        disabled={cambiarDocumento.isPending}
-                      >
-                        {DOCUMENTO_OPCIONES.map((op) => (
-                          <option key={op.value} value={op.value}>{op.label}</option>
-                        ))}
-                      </select>
+                      <span className="badge badge-secondary">{p.estado_documento_display || p.estado_documento}</span>
                     )}
                   </td>
                   <td className="hide-mobile">{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
@@ -268,7 +273,7 @@ export default function PedidosHistorial() {
                     {!esCotizacion && p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
                     )}
-                    <button className="btn btn-sm btn-danger" onClick={() => setDesactivarId(p.id)}>Eliminar pedido</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => setCancelarId(p.id)}>Cancelar pedido</button>
                   </td>
                 </tr>
               );
@@ -303,7 +308,23 @@ export default function PedidosHistorial() {
                 </div>
                 <div className="row mb-4">
                   <div className="col-md-4"><strong>Estado:</strong> {detalleData.estado_display || detalleData.estado}</div>
-                  <div className="col-md-4"><strong>Documento:</strong> {detalleData.estado_documento_display || detalleData.estado_documento}</div>
+                  <div className="col-md-4">
+                    <strong>Documento:</strong>{" "}
+                    {isGerente(getUser()) && !detalleData.es_cotizacion ? (
+                      <select
+                        className="form-control form-control-sm d-inline-block"
+                        style={{ width: "auto" }}
+                        value={detalleData.estado_documento}
+                        onChange={(e) => cambiarDocumento.mutate({ pedidoId: detalleData.id, estado_documento: e.target.value })}
+                      >
+                        {DOCUMENTO_OPCIONES.map((op) => (
+                          <option key={op.value} value={op.value}>{op.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      detalleData.estado_documento_display || detalleData.estado_documento
+                    )}
+                  </div>
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleData.usuario_nombre}</div>
                 </div>
                 {detalleData.fecha_retiro && (
@@ -383,6 +404,15 @@ export default function PedidosHistorial() {
                   />
                   <span>Misma persona que pidió (cliente)</span>
                 </label>
+                {retiroData.estado_documento === "SB" && (
+                  <div className="form-group mt-3">
+                    <label>Documento</label>
+                    <select className="form-control" value={retiroDocumento} onChange={(e) => setRetiroDocumento(e.target.value)}>
+                      <option value="BO">Boleteado</option>
+                      <option value="FA">Facturado</option>
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setRetiroId(null)}>Cancelar</button>
@@ -400,27 +430,36 @@ export default function PedidosHistorial() {
         </div>
       )}
 
-      {desactivarId && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDesactivarId(null)}>
+      {cancelarId && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setCancelarId(null)}>
           <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Eliminar retiro</h5>
-                <button type="button" className="modal-close" onClick={() => setDesactivarId(null)}>&times;</button>
+                <h5 className="modal-title">Cancelar pedido</h5>
+                <button type="button" className="modal-close" onClick={() => setCancelarId(null)}>&times;</button>
               </div>
               <div className="modal-body">
-                <p>¿Estás seguro de que deseas eliminar este pedido de la lista?</p>
-                <p className="text-sm text-muted">El pedido quedará oculto pero seguirá registrado en la base de datos.</p>
+                <p>¿Estás seguro de que deseas cancelar este pedido?</p>
+                <div className="form-group">
+                  <label>Motivo de cancelación</label>
+                  <textarea
+                    className="form-control"
+                    value={cancelarMotivo}
+                    onChange={(e) => setCancelarMotivo(e.target.value)}
+                    placeholder="Indica el motivo..."
+                    rows={3}
+                  />
+                </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDesactivarId(null)}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setCancelarId(null)}>Volver</button>
                 <button
                   type="button"
                   className="btn btn-danger"
-                  onClick={confirmarDesactivar}
-                  disabled={desactivarPedido.isPending}
+                  onClick={confirmarCancelar}
+                  disabled={cancelarPedido.isPending || !cancelarMotivo.trim()}
                 >
-                  {desactivarPedido.isPending ? "Eliminando..." : "Eliminar retiro"}
+                  {cancelarPedido.isPending ? "Cancelando..." : "Cancelar pedido"}
                 </button>
               </div>
             </div>

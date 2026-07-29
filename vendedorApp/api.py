@@ -673,6 +673,9 @@ class CambiarEstadoPedidoSerializer(serializers.Serializer):
 
 class MarcarRetiroSerializer(serializers.Serializer):
     persona_retiro = serializers.CharField(max_length=200, trim_whitespace=True)
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido.EstadoDocumento.choices, required=False
+    )
 
 
 class ConvertirCotizacionSerializer(serializers.Serializer):
@@ -680,6 +683,10 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         min_length=1,
     )
+
+
+class CancelarPedidoSerializer(serializers.Serializer):
+    motivo = serializers.CharField(max_length=500, trim_whitespace=True)
 
 
 class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -692,7 +699,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "cambiar_estado": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "marcar_retiro": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
-        "desactivar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "cancelar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "convertir_a_pedido": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
@@ -765,16 +772,21 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             pedido.fecha_retiro = timezone.now()
             if not pedido.stock_descontado:
                 self._descontar_stock_pedido(pedido)
-            pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado"])
+            if "estado_documento" in serializer.validated_data:
+                pedido.estado_documento = serializer.validated_data["estado_documento"]
+            pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado", "estado_documento"])
 
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
 
-    @action(detail=True, methods=["post"], url_path="desactivar")
-    def desactivar(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="cancelar")
+    def cancelar(self, request, pk=None):
         pedido = self.get_object()
-        pedido.activo = False
-        pedido.save(update_fields=["activo"])
-        return Response({"ok": True})
+        serializer = CancelarPedidoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pedido.estado = Pedido.Estado.CANCELADO
+        pedido.motivo_cancelacion = serializer.validated_data["motivo"]
+        pedido.save(update_fields=["estado", "motivo_cancelacion"])
+        return Response(PedidoSerializer(pedido, context={"request": request}).data)
 
     def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import Decimal, ROUND_HALF_UP, ROUND_UP

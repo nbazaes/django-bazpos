@@ -51,6 +51,7 @@ export default function PedidosCrearPage() {
   const [producto, setProducto] = useState({ ...productoVacio });
   const [items, setItems] = useState([]);
   const [metodoPago, setMetodoPago] = useState("EF");
+  const [estadoDocumento, setEstadoDocumento] = useState("SB");
   const [productoTexto, setProductoTexto] = useState("");
   const [mostrarProductos, setMostrarProductos] = useState(false);
   const productosRef = useRef(null);
@@ -169,6 +170,7 @@ export default function PedidosCrearPage() {
       nombre_cliente: cliente.nombre.trim(),
       telefono_cliente: cliente.telefono.trim(),
       metodo_pago: metodoPago,
+      estado_documento: estadoDocumento,
       items: items.map((it) => ({
         producto_id: it.producto_id,
         codigo_proveedor: it.codigo_proveedor,
@@ -205,6 +207,7 @@ export default function PedidosCrearPage() {
 
     const filas = (documento.detalles || []).map((d) => `
       <tr>
+        ${!esCotizacion ? `<td>${d.codigo_proveedor || "—"}</td><td>${d.oem || "—"}</td>` : ""}
         <td>${d.nombre}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
@@ -262,7 +265,7 @@ export default function PedidosCrearPage() {
         </div>
         <table>
           <thead>
-            <tr><th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
@@ -540,6 +543,14 @@ export default function PedidosCrearPage() {
                 <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
                   <option value="EF">Efectivo</option>
                   <option value="TJ">Tarjeta</option>
+                </select>
+              </div>
+              <div className="form-group mb-0">
+                <label>Documento</label>
+                <select className="form-control" value={estadoDocumento} onChange={(e) => setEstadoDocumento(e.target.value)}>
+                  <option value="SB">Sin boletear</option>
+                  <option value="BO">Boleteado</option>
+                  <option value="FA">Facturado</option>
                 </select>
               </div>
             </div>
