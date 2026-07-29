@@ -162,7 +162,7 @@ export default function ProductoFormPage() {
               value={data.margen_utilidad}
               onChange={(val) => setData({ ...data, margen_utilidad: val })}
               min={0}
-              step={0.01}
+              step={1}
               style={{ width: "100%" }}
               inputStyle={{ width: "100%" }}
               decrementLabel="Disminuir margen de utilidad"
