@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
@@ -22,16 +22,19 @@ from vendedorApp.serializers import (
     PedidoProveedorDiaSerializer,
     PedidoProveedorDiaHistorialSerializer,
     PedidoSerializer,
+    PrecioHistoricoSerializer,
     ProductoSerializer,
     RegistrarVentaSerializer,
     VentaSerializer,
 )
 from vendedorApp.pagination import (
+    DefaultPagination,
     DevolucionPagination,
     PedidoPagination,
     ProductoPagination,
     VentaPagination,
 )
+from gerenteApp.models import DetalleFactura
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_BODEGUERO,
@@ -183,12 +186,19 @@ class ProductoViewSet(viewsets.ModelViewSet):
         "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "ignorar_stock": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "ultima_factura": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "historial_precios": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
         queryset = super().get_queryset()
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
+
+        ultima_fecha = DetalleFactura.objects.filter(
+            producto_id=OuterRef("producto_id")
+        ).values("factura__fecha").order_by("-factura__fecha")[:1]
+        queryset = queryset.annotate(ultima_fecha_llegada=Subquery(ultima_fecha))
 
         if texto:
             queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto) | Q(codigo_proveedor__icontains=texto))
@@ -310,6 +320,31 @@ class ProductoViewSet(viewsets.ModelViewSet):
             )
 
         return Response({"ok": True})
+
+    @action(detail=True, methods=["get"], url_path="ultima-factura")
+    def ultima_factura(self, request, pk=None):
+        producto = self.get_object()
+        last = DetalleFactura.objects.filter(
+            producto=producto
+        ).select_related("factura__proveedor").order_by("-factura__fecha").first()
+        if not last:
+            return Response(None)
+        return Response({
+            "factura_id": last.factura.id,
+            "numero_factura": last.factura.numero_factura,
+            "fecha": last.factura.fecha,
+            "proveedor_nombre": last.factura.proveedor.nombre,
+        })
+
+    @action(detail=True, methods=["get"], url_path="historial-precios")
+    def historial_precios(self, request, pk=None):
+        producto = self.get_object()
+        historial = producto.precios_historicos.select_related("factura").order_by("-fecha")
+        paginator = DefaultPagination()
+        paginator.page_size = 10
+        page = paginator.paginate_queryset(historial, request)
+        serializer = PrecioHistoricoSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class DeducirStockInputSerializer(serializers.Serializer):

@@ -114,6 +114,24 @@ export function useProductoPorCodigo(codigo) {
   });
 }
 
+// ── Producto detalle ──
+
+export function useUltimaFacturaProducto(productoId) {
+  return useQuery({
+    queryKey: ["productos", "ultima-factura", productoId],
+    queryFn: () => apiRequest(`/productos/${productoId}/ultima-factura/`),
+    enabled: !!productoId,
+  });
+}
+
+export function useHistorialPrecios(productoId, params = {}) {
+  return useQuery({
+    queryKey: ["productos", "historial-precios", productoId, params],
+    queryFn: () => apiRequest(`/productos/${productoId}/historial-precios/${buildQuery(params)}`),
+    enabled: !!productoId,
+  });
+}
+
 // ── Ventas ──
 
 export function useVentas(params = {}) {

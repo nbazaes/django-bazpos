@@ -559,6 +559,7 @@ export default function VentaPage() {
                     <th>Marca</th>
                     <th>Descripción</th>
                     <th style={{ width: "1px" }}>Stock</th>
+                    <th style={{ width: "1px" }}>Última fecha de llegada</th>
                     <th style={{ width: "1px" }}>Precio</th>
                     <th style={{ width: "1px" }}></th>
                   </tr>
@@ -588,6 +589,7 @@ export default function VentaPage() {
                           p.stock_actual
                         )}
                       </td>
+                      <td className="text-nowrap">{p.ultima_fecha_llegada || "—"}</td>
                       <td>${p.precio}</td>
                       <td>
                         <button

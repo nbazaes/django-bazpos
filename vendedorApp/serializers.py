@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
+from gerenteApp.models import PrecioHistorico
 from vendedorApp.models import (
     AjusteStock,
     Anulacion,
@@ -30,6 +31,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
     stock_actual = serializers.IntegerField(read_only=True)
     ubicaciones_stock = serializers.SerializerMethodField()
+    ultima_fecha_llegada = serializers.DateField(read_only=True, allow_null=True)
 
     class Meta:
         model = Producto
@@ -51,6 +53,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "proveedor",
             "proveedor_nombre",
             "ubicaciones_stock",
+            "ultima_fecha_llegada",
         ]
 
     def get_ubicaciones_stock(self, obj):
@@ -662,3 +665,25 @@ class AgregarItemPedidoProveedorSerializer(serializers.Serializer):
                 {"proveedor_id": "Debe seleccionar un proveedor para un producto personalizado"}
             )
         return data
+
+
+class PrecioHistoricoSerializer(serializers.ModelSerializer):
+    factura_numero = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PrecioHistorico
+        fields = [
+            "id",
+            "precio_costo_anterior",
+            "precio_costo_nuevo",
+            "precio_venta_anterior",
+            "precio_venta_nuevo",
+            "fecha",
+            "factura",
+            "factura_numero",
+        ]
+
+    def get_factura_numero(self, obj):
+        if obj.factura:
+            return obj.factura.numero_factura
+        return None
