@@ -7,6 +7,9 @@ import {
   usePedidoProveedorDia,
   useToggleItemPedidoProveedor,
   useEliminarItemPedidoProveedor,
+  useAgregarItemPedidoProveedor,
+  useProveedores,
+  useProductoPorCodigo,
 } from "../lib/queries";
 import { apiRequest } from "../lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -54,12 +57,15 @@ function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelet
           <tbody>
             {prov.items.map((item) => (
               <tr key={item.id} className={item.pedido ? "row-pedido" : ""}>
-                <td>{item.codigo_proveedor || "—"}</td>
-                <td>{item.codigo_producto}</td>
-                <td>{item.oem}</td>
+                <td>
+                  {item.codigo_proveedor || "—"}
+                  {item.es_custom && <span className="badge badge-info" style={{ marginLeft: "0.3rem", fontSize: "0.7rem" }}>Custom</span>}
+                </td>
+                <td>{item.codigo_producto || "—"}</td>
+                <td>{item.oem || "—"}</td>
                 <td>{item.nombre}</td>
-                <td>{formatCLP(item.precio_costo)}</td>
-                <td>{item.stock_maximo}</td>
+                <td>{item.precio_costo > 0 ? formatCLP(item.precio_costo) : "—"}</td>
+                <td>{item.stock_maximo > 0 ? item.stock_maximo : "—"}</td>
                 <td>
                   {editable ? (
                     <label className="checkbox-cell" style={{ display: "flex", justifyContent: "center" }}>
@@ -100,15 +106,18 @@ function ProveedorCardsMobile({ proveedores, diaId, editable, onToggle, onDelete
       {prov.items.map((item) => (
         <div key={item.id} className={`item-mobile-card ${item.pedido ? "row-pedido" : ""}`}>
           <div className="item-mobile-main">
-            <span className="item-mobile-nombre">{item.nombre}</span>
+            <span className="item-mobile-nombre">
+              {item.nombre}
+              {item.es_custom && <span className="badge badge-info" style={{ marginLeft: "0.3rem", fontSize: "0.65rem" }}>Custom</span>}
+            </span>
             <div className="item-mobile-meta">
-              <span>Cód: {item.codigo_producto}</span>
-              <span>OEM: {item.oem}</span>
+              <span>Cód: {item.codigo_producto || "—"}</span>
+              <span>OEM: {item.oem || "—"}</span>
               {item.codigo_proveedor && <span>Prov: {item.codigo_proveedor}</span>}
             </div>
             <div className="item-mobile-meta">
-              <span>Precio: {formatCLP(item.precio_costo)}</span>
-              <span>Stock máx: {item.stock_maximo}</span>
+              <span>Precio: {item.precio_costo > 0 ? formatCLP(item.precio_costo) : "—"}</span>
+              <span>Stock máx: {item.stock_maximo > 0 ? item.stock_maximo : "—"}</span>
             </div>
           </div>
           <div className="item-mobile-actions">
@@ -147,14 +156,22 @@ export default function PedidosProveedoresPage() {
   const [historialDiaId, setHistorialDiaId] = useState(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(null);
   const [showConfirmFinalizar, setShowConfirmFinalizar] = useState(false);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [addTab, setAddTab] = useState("existente");
+  const [customForm, setCustomForm] = useState({ proveedor_id: "", nombre_custom: "", codigo_proveedor_custom: "" });
+  const [searchCodigo, setSearchCodigo] = useState("");
+  const { data: productoSearch } = useProductoPorCodigo(searchCodigo);
+  const productoEncontrado = productoSearch?.encontrado ? productoSearch.producto : null;
 
   usePageTitle("Pedidos a proveedores");
 
   const { data: dataHoy, isLoading: loadingHoy } = usePedidoProveedorHoy();
   const { data: historialData } = usePedidoProveedorHistorial();
   const { data: dataDia, isLoading: loadingDia } = usePedidoProveedorDia(historialDiaId);
+  const { data: proveedoresData } = useProveedores({ page_size: 200 });
   const toggleMutation = useToggleItemPedidoProveedor();
   const eliminarMutation = useEliminarItemPedidoProveedor();
+  const agregarMutation = useAgregarItemPedidoProveedor();
 
   const finalizarMutation = useMutation({
     mutationFn: (diaId) =>
@@ -170,6 +187,7 @@ export default function PedidosProveedoresPage() {
   const data = esHoy ? dataHoy : dataDia;
   const loading = esHoy ? loadingHoy : loadingDia;
   const finalized = data?.finalizado ?? false;
+  const proveedoresList = proveedoresData?.results || [];
 
   function handleToggle(diaId, itemId) {
     toggleMutation.mutate({ diaId, itemId });
@@ -189,6 +207,28 @@ export default function PedidosProveedoresPage() {
     if (!data) return;
     finalizarMutation.mutate(data.id);
     setShowConfirmFinalizar(false);
+  }
+
+  function handleAgregarCustom() {
+    agregarMutation.mutate(customForm, {
+      onSuccess: () => {
+        setShowAddCustom(false);
+        setCustomForm({ proveedor_id: "", nombre_custom: "", codigo_proveedor_custom: "" });
+        setSearchCodigo("");
+        setAddTab("existente");
+      },
+    });
+  }
+
+  function handleAgregarExistente() {
+    if (!productoEncontrado) return;
+    agregarMutation.mutate({ producto_id: productoEncontrado.producto_id }, {
+      onSuccess: () => {
+        setShowAddCustom(false);
+        setSearchCodigo("");
+        setAddTab("existente");
+      },
+    });
   }
 
   function handlePrint() {
@@ -278,6 +318,14 @@ export default function PedidosProveedoresPage() {
   return (
     <div className="pedidos-proveedores">
       <div className="pedidos-header-actions no-print">
+        {esHoy && !finalized && (
+          <button
+            className="btn btn-sm btn-outline"
+            onClick={() => setShowAddCustom(true)}
+          >
+            + Agregar producto
+          </button>
+        )}
         {esHoy && proveedores.length > 0 && !finalized && (
           <>
             <button
@@ -313,7 +361,7 @@ export default function PedidosProveedoresPage() {
       >
         {proveedores.length === 0 ? (
           <p className="text-muted">
-            No hay productos en esta lista. Agregue productos desde el dashboard (Stock crítico → Agregar a pedido).
+            No hay productos en esta lista. Agregue productos desde el dashboard (Stock crítico → Agregar a pedido) o use el botón &quot;+ Agregar producto&quot; para productos personalizados.
           </p>
         ) : (
           <>
@@ -341,6 +389,131 @@ export default function PedidosProveedoresPage() {
           </>
         )}
       </PageCard>
+
+      {showAddCustom && (
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog" style={{ maxWidth: 450 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Agregar producto</h5>
+                <button type="button" className="modal-close" onClick={() => { setShowAddCustom(false); setSearchCodigo(""); }}>
+                  &times;
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="btn-group" style={{ width: "100%", marginBottom: "1rem" }}>
+                  <button
+                    className={`btn btn-sm ${addTab === "existente" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setAddTab("existente")}
+                    style={{ flex: 1 }}
+                  >
+                    Producto existente
+                  </button>
+                  <button
+                    className={`btn btn-sm ${addTab === "custom" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setAddTab("custom")}
+                    style={{ flex: 1 }}
+                  >
+                    Producto personalizado
+                  </button>
+                </div>
+
+                {addTab === "existente" && (
+                  <>
+                    <div className="mb-3">
+                      <label className="form-label">Buscar por código de producto</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={searchCodigo}
+                        onChange={(e) => setSearchCodigo(e.target.value)}
+                        placeholder="Código del producto..."
+                        autoFocus
+                      />
+                    </div>
+                    {productoEncontrado && (
+                      <div style={{ background: "var(--bg-hover)", borderRadius: "var(--radius)", padding: "0.75rem" }}>
+                        <p className="mb-1"><strong>{productoEncontrado.nombre}</strong></p>
+                        <p className="text-secondary mb-2" style={{ fontSize: "0.85rem" }}>
+                          Cód: {productoEncontrado.codigo_producto} | OEM: {productoEncontrado.oem} | {productoEncontrado.proveedor_nombre}
+                        </p>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={handleAgregarExistente}
+                          disabled={agregarMutation.isPending}
+                        >
+                          Agregar a la lista
+                        </button>
+                      </div>
+                    )}
+                    {searchCodigo && !productoEncontrado && productoSearch && !productoSearch.encontrado && (
+                      <p className="text-muted" style={{ fontSize: "0.85rem" }}>Producto no encontrado</p>
+                    )}
+                  </>
+                )}
+
+                {addTab === "custom" && (
+                  <>
+                    <div className="mb-3">
+                      <label className="form-label">Proveedor</label>
+                      <select
+                        className="form-control"
+                        value={customForm.proveedor_id}
+                        onChange={(e) => setCustomForm({ ...customForm, proveedor_id: e.target.value })}
+                      >
+                        <option value="">Seleccione...</option>
+                        {proveedoresList.map((p) => (
+                          <option key={p.proveedor_id} value={p.proveedor_id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Nombre del producto</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={customForm.nombre_custom}
+                        onChange={(e) => setCustomForm({ ...customForm, nombre_custom: e.target.value })}
+                        placeholder="Ej: Filtro de aceite"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Código del proveedor</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={customForm.codigo_proveedor_custom}
+                        onChange={(e) => setCustomForm({ ...customForm, codigo_proveedor_custom: e.target.value })}
+                        placeholder="Código del producto para el proveedor"
+                      />
+                    </div>
+                    <div className="modal-footer" style={{ padding: 0, marginTop: "0.5rem" }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => { setShowAddCustom(false); setSearchCodigo(""); }}>
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleAgregarCustom}
+                        disabled={!customForm.proveedor_id || !customForm.nombre_custom || agregarMutation.isPending}
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {addTab === "existente" && (
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => { setShowAddCustom(false); setSearchCodigo(""); }}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfirmDelete && (
         <div className="modal" role="dialog" aria-modal="true">

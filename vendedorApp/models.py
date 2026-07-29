@@ -230,18 +230,20 @@ class PedidoProveedorDia(models.Model):
 
 class ItemPedidoProveedor(models.Model):
     dia = models.ForeignKey(PedidoProveedorDia, on_delete=models.CASCADE, related_name="items")
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    producto = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True, blank=True)
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
+    nombre_custom = models.CharField(max_length=200, blank=True, default="")
+    codigo_proveedor_custom = models.CharField(max_length=50, blank=True, default="")
     pedido = models.BooleanField(default=False)
     fecha_agregado = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "items_pedido_proveedor"
-        unique_together = ("dia", "producto")
 
     def __str__(self):
+        nombre = self.producto.nombre if self.producto else self.nombre_custom
         estado = "Pedido" if self.pedido else "Pendiente"
-        return f"{self.producto.nombre} — {estado}"
+        return f"{nombre} — {estado}"
 
 
 class Pedido(models.Model):

@@ -915,12 +915,8 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
     def agregar_item(self, request):
         serializer = AgregarItemPedidoProveedorSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        producto_id = serializer.validated_data["producto_id"]
-
-        try:
-            producto = Producto.objects.select_related("proveedor").get(producto_id=producto_id)
-        except Producto.DoesNotExist:
-            return Response({"error": "Producto no encontrado"}, status=404)
+        data = serializer.validated_data
+        producto_id = data.get("producto_id")
 
         fecha = date.today()
         dia, _ = PedidoProveedorDia.objects.get_or_create(
@@ -929,11 +925,32 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         )
         self._check_finalizado(dia)
 
-        item, created = ItemPedidoProveedor.objects.get_or_create(
-            dia=dia,
-            producto=producto,
-            defaults={"proveedor": producto.proveedor},
-        )
+        if producto_id:
+            try:
+                producto = Producto.objects.select_related("proveedor").get(producto_id=producto_id)
+            except Producto.DoesNotExist:
+                return Response({"error": "Producto no encontrado"}, status=404)
+
+            item, created = ItemPedidoProveedor.objects.get_or_create(
+                dia=dia,
+                producto=producto,
+                defaults={"proveedor": producto.proveedor},
+            )
+        else:
+            from gerenteApp.models import Proveedor
+            try:
+                proveedor = Proveedor.objects.get(proveedor_id=data["proveedor_id"])
+            except Proveedor.DoesNotExist:
+                return Response({"error": "Proveedor no encontrado"}, status=404)
+
+            item = ItemPedidoProveedor.objects.create(
+                dia=dia,
+                producto=None,
+                proveedor=proveedor,
+                nombre_custom=data["nombre_custom"],
+                codigo_proveedor_custom=data["codigo_proveedor_custom"],
+            )
+            created = True
 
         return Response({"ok": True, "created": created})
 
