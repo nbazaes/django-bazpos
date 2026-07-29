@@ -424,6 +424,7 @@ export default function VentaPage() {
       const documento = buildDocumento(tipoDocumento);
       setLastDocumento({ ...documento, ventaId: result.id, estado: result.estado_display, tipoDisplay: result.tipo_documento_display });
       setCarro([]);
+      setDescuentoPorcentaje(0);
       setOem("");
       setProductosEncontrados([]);
       setHayMasProductos(false);
