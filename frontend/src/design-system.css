@@ -18,6 +18,7 @@
 
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-base: #09090f;
   --bg-surface: #0e0e1a;
   --bg-elevated: #151528;
