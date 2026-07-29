@@ -17,9 +17,7 @@ services:
 
   app:
     container_name: bazpos_app
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/nbazaes/django-bazpos/app:${IMAGE_TAG:-latest}
     restart: always
     env_file: .env
     volumes:
@@ -39,11 +37,7 @@ services:
 
   nginx:
     container_name: bazpos_nginx
-    build:
-      context: .
-      dockerfile: Dockerfile.nginx
-      args:
-        VITE_STORE_NAME: ${VITE_STORE_NAME:-BAZPOS}
+    image: ghcr.io/nbazaes/django-bazpos/nginx:${IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "0.0.0.0:80:80"
