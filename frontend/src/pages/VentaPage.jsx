@@ -55,6 +55,10 @@ export default function VentaPage() {
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
+  const savingRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const deducirRef = useRef(false);
+  const [isDeducing, setIsDeducing] = useState(false);
   const [mostrarSinStock, setMostrarSinStock] = useState(false);
   const oemRequestRef = useRef(0);
   const taxPercent = getTaxPercent();
@@ -359,13 +363,15 @@ export default function VentaPage() {
   }
 
   async function handleDeducirStock() {
-    if (!lastDocumento) return;
-    const deducciones = ubicacionItems.map((item) => ({
-      producto_id: item.producto_id,
-      ubicacion_id: selectedUbicaciones[item.producto_id],
-      cantidad: item.cantidad_vendida,
-    }));
+    if (!lastDocumento || deducirRef.current) return;
+    deducirRef.current = true;
+    setIsDeducing(true);
     try {
+      const deducciones = ubicacionItems.map((item) => ({
+        producto_id: item.producto_id,
+        ubicacion_id: selectedUbicaciones[item.producto_id],
+        cantidad: item.cantidad_vendida,
+      }));
       await apiRequest(`/ventas/${lastDocumento.ventaId}/deducir-stock/`, {
         method: "POST",
         body: { deducciones },
@@ -373,6 +379,9 @@ export default function VentaPage() {
       setShowUbicacionDialog(false);
     } catch (err) {
       setError(err.message);
+    } finally {
+      deducirRef.current = false;
+      setIsDeducing(false);
     }
   }
 
@@ -391,6 +400,9 @@ export default function VentaPage() {
   }
 
   async function guardar(tipoDocumento = "VE") {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
     try {
       const subtotal = subtotalCarro;
       const discounted = Math.round(subtotal * (1 - discount / 100));
@@ -426,6 +438,9 @@ export default function VentaPage() {
       setTimeout(() => setShowVentaSuccess(false), 1300);
     } catch (err) {
       setError(err.message);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
   }
 
@@ -863,8 +878,8 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowConfirmVenta(false)}>Cancelar</button>
-                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)}>
-                  {confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
+                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving}>
+                  {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
               </div>
             </div>
@@ -977,7 +992,9 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowUbicacionDialog(false)}>Cancelar</button>
-                <button type="button" className="btn btn-success" onClick={handleDeducirStock}>Confirmar</button>
+                <button type="button" className="btn btn-success" onClick={handleDeducirStock} disabled={isDeducing}>
+                  {isDeducing ? "Deduciendo..." : "Confirmar"}
+                </button>
               </div>
             </div>
           </div>
