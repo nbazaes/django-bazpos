@@ -545,20 +545,22 @@ class CrearPedidoSerializer(serializers.Serializer):
 
 
 class ItemPedidoProveedorSerializer(serializers.ModelSerializer):
-    producto_id = serializers.IntegerField(source="producto.producto_id", read_only=True)
-    codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
-    codigo_proveedor = serializers.CharField(source="producto.codigo_proveedor", read_only=True)
-    oem = serializers.CharField(source="producto.oem", read_only=True)
-    nombre = serializers.CharField(source="producto.nombre", read_only=True)
-    precio_costo = serializers.IntegerField(source="producto.precio_costo", read_only=True)
-    stock_actual = serializers.IntegerField(source="producto.stock_actual", read_only=True)
-    stock_maximo = serializers.IntegerField(source="producto.stock_maximo", read_only=True)
+    es_custom = serializers.SerializerMethodField()
+    producto_id = serializers.SerializerMethodField()
+    codigo_producto = serializers.SerializerMethodField()
+    codigo_proveedor = serializers.SerializerMethodField()
+    oem = serializers.SerializerMethodField()
+    nombre = serializers.SerializerMethodField()
+    precio_costo = serializers.SerializerMethodField()
+    stock_actual = serializers.SerializerMethodField()
+    stock_maximo = serializers.SerializerMethodField()
     proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
 
     class Meta:
         model = ItemPedidoProveedor
         fields = [
             "id",
+            "es_custom",
             "producto_id",
             "codigo_producto",
             "codigo_proveedor",
@@ -571,6 +573,33 @@ class ItemPedidoProveedorSerializer(serializers.ModelSerializer):
             "proveedor_nombre",
             "pedido",
         ]
+
+    def get_es_custom(self, obj):
+        return obj.producto is None
+
+    def get_producto_id(self, obj):
+        return obj.producto.producto_id if obj.producto else None
+
+    def get_codigo_producto(self, obj):
+        return obj.producto.codigo_producto if obj.producto else ""
+
+    def get_codigo_proveedor(self, obj):
+        return obj.producto.codigo_proveedor if obj.producto else obj.codigo_proveedor_custom
+
+    def get_oem(self, obj):
+        return obj.producto.oem if obj.producto else ""
+
+    def get_nombre(self, obj):
+        return obj.producto.nombre if obj.producto else obj.nombre_custom
+
+    def get_precio_costo(self, obj):
+        return obj.producto.precio_costo if obj.producto else 0
+
+    def get_stock_actual(self, obj):
+        return obj.producto.stock_actual if obj.producto else 0
+
+    def get_stock_maximo(self, obj):
+        return obj.producto.stock_maximo if obj.producto else 0
 
 
 class PedidoProveedorDiaSerializer(serializers.ModelSerializer):
@@ -611,4 +640,18 @@ class PedidoProveedorDiaHistorialSerializer(serializers.ModelSerializer):
 
 
 class AgregarItemPedidoProveedorSerializer(serializers.Serializer):
-    producto_id = serializers.IntegerField()
+    producto_id = serializers.IntegerField(required=False)
+    proveedor_id = serializers.IntegerField(required=False)
+    nombre_custom = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    codigo_proveedor_custom = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+
+    def validate(self, data):
+        if not data.get("producto_id") and not data.get("nombre_custom"):
+            raise serializers.ValidationError(
+                {"nombre_custom": "Debe especificar un producto existente o un nombre personalizado"}
+            )
+        if not data.get("producto_id") and not data.get("proveedor_id"):
+            raise serializers.ValidationError(
+                {"proveedor_id": "Debe seleccionar un proveedor para un producto personalizado"}
+            )
+        return data

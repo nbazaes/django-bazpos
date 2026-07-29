@@ -618,10 +618,10 @@ export function usePedidoProveedorDia(id) {
 export function useAgregarItemPedidoProveedor() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (producto_id) =>
+    mutationFn: (payload) =>
       apiRequest("/pedidos-proveedor/agregar-item/", {
         method: "POST",
-        body: { producto_id },
+        body: payload,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
