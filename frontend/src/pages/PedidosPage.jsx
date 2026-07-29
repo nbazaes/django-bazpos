@@ -29,6 +29,8 @@ export default function PedidosPage() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const debouncedSearch = useDebounce(search.trim());
   const [tipoFiltro, setTipoFiltro] = useState(searchParams.get("tipo") || "");
+  const [fechaDesde, setFechaDesde] = useState(searchParams.get("fecha_desde") || "");
+  const [fechaHasta, setFechaHasta] = useState(searchParams.get("fecha_hasta") || "");
 
   const [detalleVentaId, setDetalleVentaId] = useState(null);
   const [detalleDevolucionId, setDetalleDevolucionId] = useState(null);
@@ -53,6 +55,8 @@ export default function PedidosPage() {
   const ventasParams = { ...params };
   if (debouncedSearch) ventasParams.codigo = debouncedSearch;
   if (tipoFiltro) ventasParams.tipo_documento = tipoFiltro;
+  if (fechaDesde) ventasParams.fecha_desde = fechaDesde;
+  if (fechaHasta) ventasParams.fecha_hasta = fechaHasta;
   const { data: ventasData } = useVentas(ventasParams);
   const { data: devolucionesData } = useDevoluciones(params);
   const { data: detalleVentaData } = useVenta(detalleVentaId);
@@ -131,10 +135,12 @@ export default function PedidosPage() {
     return total;
   }, [devolverVentaData, devolverSeleccion, devolverCantidades]);
 
-  const syncURL = (t, p, ps, s, tf) => {
+  const syncURL = (t, p, ps, s, tf, fd, fh) => {
     const params = { tab: t, page: String(p), page_size: String(ps) };
     if (s) params.search = s;
     if (tf) params.tipo = tf;
+    if (fd) params.fecha_desde = fd;
+    if (fh) params.fecha_hasta = fh;
     setSearchParams(params, { replace: true });
   };
 
@@ -143,7 +149,9 @@ export default function PedidosPage() {
     setPage(1);
     setSearch("");
     setTipoFiltro("");
-    syncURL(newTab, 1, pageSize, "", "");
+    setFechaDesde("");
+    setFechaHasta("");
+    syncURL(newTab, 1, pageSize, "", "", "", "");
   }
 
   function handleSearchChange(val) {
@@ -156,15 +164,25 @@ export default function PedidosPage() {
     setPage(1);
   }
 
+  function handleFechaDesdeChange(val) {
+    setFechaDesde(val);
+    setPage(1);
+  }
+
+  function handleFechaHastaChange(val) {
+    setFechaHasta(val);
+    setPage(1);
+  }
+
   function handlePageChange(newPage) {
     setPage(newPage);
-    syncURL(tab, newPage, pageSize, debouncedSearch, tipoFiltro);
+    syncURL(tab, newPage, pageSize, debouncedSearch, tipoFiltro, fechaDesde, fechaHasta);
   }
 
   function handlePageSizeChange(newSize) {
     setPageSize(newSize);
     setPage(1);
-    syncURL(tab, 1, newSize, debouncedSearch, tipoFiltro);
+    syncURL(tab, 1, newSize, debouncedSearch, tipoFiltro, fechaDesde, fechaHasta);
   }
 
   function abrirAnular(venta) {
@@ -267,6 +285,24 @@ export default function PedidosPage() {
                   <option value="VE">Ventas</option>
                   <option value="CO">Cotizaciones</option>
                 </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>
+                  <input
+                    type="date"
+                    className="form-control"
+                    style={{ maxWidth: 180 }}
+                    value={fechaDesde}
+                    onChange={(e) => handleFechaDesdeChange(e.target.value)}
+                  />
+                  <span className="text-muted" style={{ fontSize: "0.875rem" }}>Hasta:</span>
+                  <input
+                    type="date"
+                    className="form-control"
+                    style={{ maxWidth: 180 }}
+                    value={fechaHasta}
+                    onChange={(e) => handleFechaHastaChange(e.target.value)}
+                  />
+                </div>
               </div>
             )}
             <div className="table-responsive">

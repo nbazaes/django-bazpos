@@ -360,6 +360,14 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         if tipo_documento:
             queryset = queryset.filter(tipo_documento=tipo_documento)
 
+        fecha_desde = self.request.query_params.get("fecha_desde", "").strip()
+        fecha_hasta = self.request.query_params.get("fecha_hasta", "").strip()
+
+        if fecha_desde:
+            queryset = queryset.filter(fecha_venta__date__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_venta__date__lte=fecha_hasta)
+
         user = self.request.user
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset
