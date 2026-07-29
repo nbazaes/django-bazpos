@@ -18,6 +18,8 @@ import {
 } from "../lib/queries";
 import { getUser, isGerente } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
+import { STORE_NAME } from "../lib/config";
+import { getStoreConfig } from "../lib/store";
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
@@ -235,6 +237,97 @@ export default function PedidosPage() {
   const closeDevolverModal = () => setDevolverVentaId(null);
   const anularDisabled = anularMutation.isPending;
 
+  function imprimirVenta(venta) {
+    const win = window.open("", "_blank", "width=420,height=700");
+    if (!win) return;
+    const storeConfig = getStoreConfig();
+    const esCotizacion = venta.tipo_documento === "CO";
+
+    const filas = (venta.detalles || []).map((d) => `
+      <tr>
+        <td>${d.codigo_producto}</td>
+        <td>${d.producto_nombre}</td>
+        <td style="text-align:right;">${d.cantidad}</td>
+        <td style="text-align:right;">$${d.precio_unitario}</td>
+        <td style="text-align:right;">$${d.subtotal}</td>
+      </tr>
+    `).join("");
+
+    const titulo = esCotizacion
+      ? `COTIZACION #${venta.id}`
+      : `COMPROBANTE DE VENTA #${venta.id}`;
+
+    const fecha = formatDateTime(venta.fecha_venta);
+
+    const totales = esCotizacion ? "" : `
+      <hr />
+      <div class="totals-row"><span>Subtotal</span><span>$${venta.monto_subtotal}</span></div>
+      ${venta.descuento_porcentaje > 0 ? `<div class="totals-row"><span>Descuento (${venta.descuento_porcentaje}%)</span><span>-$${venta.monto_descuento}</span></div>` : ""}
+      <div class="totals-row bold"><span>Total</span><span>$${venta.monto_total}</span></div>
+    `;
+
+    const disclaimer = esCotizacion
+      ? `<div class="disclaimer">Cotización válida hasta agotar stock</div>`
+      : "";
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${titulo}</title>
+        <style>
+          @page { size: letter; margin: 12mm; }
+          body {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 12px;
+            margin: 0;
+            padding: 1.25rem;
+            color: #000;
+          }
+          .center { text-align: center; }
+          .store { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+          .address { font-size: 11px; color: #666; margin-bottom: 2px; }
+          .title { font-size: 14px; margin-bottom: 8px; }
+          .doc-number { font-size: 12px; color: #666; margin-bottom: 4px; }
+          .date { font-size: 11px; color: #666; margin-bottom: 8px; }
+          hr { border: none; border-top: 1px dashed #999; margin: 8px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+          th, td { border-bottom: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+          th { font-weight: bold; }
+          .totals-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 12px; }
+          .bold { font-weight: bold; }
+          .disclaimer { text-align: center; color: #999; font-size: 10px; margin-top: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <div class="store">${STORE_NAME}</div>
+          ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
+          ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
+          <div class="title">${titulo}</div>
+          <div class="doc-number">Fecha: ${fecha}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th><th>Producto</th><th style="text-align:right;">Cant.</th><th style="text-align:right;">P.Unit.</th><th style="text-align:right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+        ${totales}
+        ${disclaimer}
+        <div class="disclaimer">Documento carece de validez legal</div>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  }
+
   return (
     <>
       <PageCard title="Historial de ventas">
@@ -403,6 +496,7 @@ export default function PedidosPage() {
                 </div>
               </div>
               <div className="modal-footer">
+                <button type="button" className="btn btn-primary" onClick={() => imprimirVenta(detalleVentaData)}>Imprimir</button>
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalleVentaId(null)}>Cerrar</button>
               </div>
             </div>
