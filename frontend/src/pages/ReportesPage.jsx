@@ -57,8 +57,8 @@ export default function ReportesPage() {
           label: "Ventas ($)",
           data: values,
           fill: true,
-          borderColor: "var(--primary)",
-          backgroundColor: "rgba(103, 58, 183, 0.1)",
+          borderColor: "#673ab7",
+          backgroundColor: "rgba(103, 58, 183, 0.15)",
           tension: 0.3,
           pointRadius: 3,
           pointHoverRadius: 5,
@@ -81,10 +81,11 @@ export default function ReportesPage() {
       },
       scales: {
         x: {
-          grid: { display: false },
+          grid: { color: "rgba(128,128,128,0.2)" },
           title: { display: true, text: "Día del mes" },
         },
         y: {
+          grid: { color: "rgba(128,128,128,0.2)" },
           ticks: {
             callback: (v) => formatCLP(v),
           },
