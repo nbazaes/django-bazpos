@@ -744,6 +744,7 @@ textarea.form-control, textarea.input {
   height: 100vh;
   overflow-y: auto;
   z-index: 100;
+  will-change: transform;
 }
 
 .sidebar::before {

@@ -311,10 +311,10 @@ export function useCancelarPedido() {
 export function useConvertirCotizacion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, detalle_ids }) =>
+    mutationFn: ({ pedidoId, detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento }) =>
       apiRequest(`/pedidos/${pedidoId}/convertir-a-pedido/`, {
         method: "POST",
-        body: { detalle_ids },
+        body: { detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });

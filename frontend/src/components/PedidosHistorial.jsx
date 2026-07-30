@@ -39,6 +39,10 @@ export default function PedidosHistorial() {
   const [cancelarMotivo, setCancelarMotivo] = useState("");
   const [convertirId, setConvertirId] = useState(null);
   const [convertirSeleccion, setConvertirSeleccion] = useState({});
+  const [convertirNombre, setConvertirNombre] = useState("");
+  const [convertirTelefono, setConvertirTelefono] = useState("");
+  const [convertirMetodoPago, setConvertirMetodoPago] = useState("EF");
+  const [convertirDocumento, setConvertirDocumento] = useState("SB");
 
   const addToast = useToast();
   const { data: pedidosData } = usePedidos({ page, page_size: pageSize });
@@ -97,6 +101,10 @@ export default function PedidosHistorial() {
 
   function abrirConvertir(pedido) {
     setConvertirId(pedido.id);
+    setConvertirNombre(pedido.nombre_cliente || "");
+    setConvertirTelefono(pedido.telefono_cliente || "");
+    setConvertirMetodoPago(pedido.metodo_pago || "EF");
+    setConvertirDocumento("SB");
     const sel = {};
     (pedido.detalles || []).forEach((d) => {
       sel[d.id] = true;
@@ -117,7 +125,14 @@ export default function PedidosHistorial() {
       return;
     }
     convertirCotizacion.mutate(
-      { pedidoId: convertirId, detalle_ids: ids },
+      {
+        pedidoId: convertirId,
+        detalle_ids: ids,
+        nombre_cliente: convertirNombre.trim(),
+        telefono_cliente: convertirTelefono.trim(),
+        metodo_pago: convertirMetodoPago,
+        estado_documento: convertirDocumento,
+      },
       {
         onSuccess: () => {
           addToast("Cotización convertida a pedido", "success");
@@ -475,7 +490,7 @@ export default function PedidosHistorial() {
                 <h5 className="modal-title">Convertir cotización #{convertirData.id} a pedido</h5>
                 <button type="button" className="modal-close" onClick={() => setConvertirId(null)}>&times;</button>
               </div>
-              <div className="modal-body">
+               <div className="modal-body">
                 <p className="mb-3">Selecciona los productos que deseas incluir en el nuevo pedido:</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
@@ -508,6 +523,61 @@ export default function PedidosHistorial() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="row mt-3">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Nombre del cliente</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={convertirNombre}
+                        onChange={(e) => setConvertirNombre(e.target.value)}
+                        placeholder="Nombre del cliente"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Teléfono</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={convertirTelefono}
+                        onChange={(e) => setConvertirTelefono(e.target.value)}
+                        placeholder="Teléfono"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="row mt-3">
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Medio de pago</label>
+                      <select
+                        className="form-control"
+                        value={convertirMetodoPago}
+                        onChange={(e) => setConvertirMetodoPago(e.target.value)}
+                      >
+                        <option value="EF">Efectivo</option>
+                        <option value="TJ">Tarjeta</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-group">
+                      <label>Documento</label>
+                      <select
+                        className="form-control"
+                        value={convertirDocumento}
+                        onChange={(e) => setConvertirDocumento(e.target.value)}
+                      >
+                        {DOCUMENTO_OPCIONES.map((op) => (
+                          <option key={op.value} value={op.value}>{op.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">

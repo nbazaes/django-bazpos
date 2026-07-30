@@ -718,6 +718,10 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         min_length=1,
     )
+    nombre_cliente = serializers.CharField(max_length=200, required=False, default="")
+    telefono_cliente = serializers.CharField(max_length=50, required=False, default="")
+    metodo_pago = serializers.CharField(max_length=2, required=False, default="EF")
+    estado_documento = serializers.CharField(max_length=2, required=False, default="SB")
 
 
 class CancelarPedidoSerializer(serializers.Serializer):
@@ -850,6 +854,10 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         serializer = ConvertirCotizacionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         detalle_ids = serializer.validated_data["detalle_ids"]
+        nombre_cliente = serializer.validated_data.get("nombre_cliente") or cotizacion.nombre_cliente
+        telefono_cliente = serializer.validated_data.get("telefono_cliente") or cotizacion.telefono_cliente
+        metodo_pago = serializer.validated_data.get("metodo_pago") or cotizacion.metodo_pago or "EF"
+        estado_documento = serializer.validated_data.get("estado_documento") or "SB"
 
         detalles_originales = cotizacion.detalles.filter(id__in=detalle_ids)
         if not detalles_originales.exists():
@@ -877,14 +885,14 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         with transaction.atomic():
             nuevo_pedido = Pedido.objects.create(
                 usuario=request.user,
-                nombre_cliente=cotizacion.nombre_cliente,
-                telefono_cliente=cotizacion.telefono_cliente,
+                nombre_cliente=nombre_cliente,
+                telefono_cliente=telefono_cliente,
                 monto_subtotal=monto_subtotal,
                 monto_total=monto_total,
                 costo_envio=costo_envio,
-                metodo_pago=cotizacion.metodo_pago,
+                metodo_pago=metodo_pago,
                 estado=Pedido.Estado.PENDIENTE_RETIRAR,
-                estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+                estado_documento=estado_documento,
                 es_cotizacion=False,
                 pedido_origen=cotizacion,
             )
