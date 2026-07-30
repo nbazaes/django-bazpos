@@ -66,6 +66,7 @@ export default function VentaPage() {
   const [mostrarSinStock, setMostrarSinStock] = useState(false);
   const [quickStockProducto, setQuickStockProducto] = useState(null);
   const [quickPrecioCostoProducto, setQuickPrecioCostoProducto] = useState(null);
+  const [preciosModificados, setPreciosModificados] = useState({});
   const oemRequestRef = useRef(0);
   const taxPercent = getTaxPercent();
   const esGerente = isGerente(getUser());
@@ -204,7 +205,7 @@ export default function VentaPage() {
             oem: p.oem,
             nombre: p.nombre,
             marca: p.marca || "",
-            precio: p.precio,
+            precio: preciosModificados[p.producto_id]?.precio ?? p.precio,
             cantidad: 1,
             stock_actual: p.stock_actual,
           },
@@ -249,7 +250,7 @@ export default function VentaPage() {
         oem: producto.oem,
         nombre: producto.nombre,
         marca: producto.marca || "",
-        precio: producto.precio,
+        precio: preciosModificados[producto.producto_id]?.precio ?? producto.precio,
         cantidad: 1,
         stock_actual: producto.stock_actual,
       },
@@ -623,7 +624,21 @@ export default function VentaPage() {
                         )}
                       </td>
                       <td className="text-nowrap">{p.ultima_fecha_llegada || "—"}</td>
-                      <td>${p.precio}</td>
+                      <td>
+                        {preciosModificados[p.producto_id] ? (
+                          <span
+                            style={{ color: "var(--accent)", fontWeight: 700 }}
+                            title="Precio modificado temporalmente"
+                          >
+                            ${preciosModificados[p.producto_id].precio}
+                          </span>
+                        ) : (
+                          <>${p.precio}</>
+                        )}
+                        {preciosModificados[p.producto_id] && (
+                          <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: "0.8rem" }}>*</span>
+                        )}
+                      </td>
                       {esGerente && (
                         <td>
                           <button
@@ -631,7 +646,13 @@ export default function VentaPage() {
                             onClick={() => setQuickPrecioCostoProducto(p)}
                             style={{ textDecoration: "none" }}
                           >
-                            ${p.precio_costo != null ? p.precio_costo : "—"}
+                            {preciosModificados[p.producto_id] ? (
+                              <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+                                ${preciosModificados[p.producto_id].precioCosto}
+                              </span>
+                            ) : (
+                              <>${p.precio_costo != null ? p.precio_costo : "—"}</>
+                            )}
                           </button>
                         </td>
                       )}
@@ -1100,9 +1121,17 @@ export default function VentaPage() {
       {quickPrecioCostoProducto && (
         <QuickPrecioCostoModal
           producto={quickPrecioCostoProducto}
-          onClose={(actualizado) => {
+          initialPrecioCosto={preciosModificados[quickPrecioCostoProducto.producto_id]?.precioCosto}
+          initialMargenUtilidad={preciosModificados[quickPrecioCostoProducto.producto_id]?.margenUtilidad}
+          onClose={(result) => {
             setQuickPrecioCostoProducto(null);
-            if (actualizado) buscarProducto(debouncedOem);
+            if (result) {
+              setPreciosModificados((prev) => ({
+                ...prev,
+                [quickPrecioCostoProducto.producto_id]: result,
+              }));
+              if (result.saveProduct) buscarProducto(debouncedOem);
+            }
           }}
         />
       )}

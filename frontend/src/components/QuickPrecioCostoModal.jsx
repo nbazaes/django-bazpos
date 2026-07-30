@@ -13,13 +13,14 @@ function roundPrecio(precioCosto, margen) {
   return Math.round(total / 100) * 100;
 }
 
-export default function QuickPrecioCostoModal({ producto, onClose }) {
+export default function QuickPrecioCostoModal({ producto, initialPrecioCosto, initialMargenUtilidad, onClose }) {
   const [precioCosto, setPrecioCosto] = useState(
-    String(producto.precio_costo ?? 0)
+    String(initialPrecioCosto ?? producto.precio_costo ?? 0)
   );
   const [margenUtilidad, setMargenUtilidad] = useState(
-    String(producto.margen_utilidad ?? 0)
+    String(initialMargenUtilidad ?? producto.margen_utilidad ?? 0)
   );
+  const [guardarModificacion, setGuardarModificacion] = useState(false);
   const [error, setError] = useState("");
   const mutation = useUpdateProducto();
 
@@ -31,30 +32,35 @@ export default function QuickPrecioCostoModal({ producto, onClose }) {
 
     const newPrecioCosto = Number(precioCosto) || 0;
     const newMargen = Number(margenUtilidad) || 0;
+    const newPrecio = roundPrecio(precioCosto, margenUtilidad);
 
-    const body = {
-      nombre: autoFill(producto.nombre, "-"),
-      codigo_producto: autoFill(producto.codigo_producto, "-"),
-      oem: autoFill(producto.oem, "-"),
-      oem_alternativo: autoFill(producto.oem_alternativo, ""),
-      codigo_proveedor: autoFill(producto.codigo_proveedor, "-"),
-      marca: autoFill(producto.marca, "-"),
-      descripcion: autoFill(producto.descripcion, "-"),
-      precio: 0,
-      precio_costo: newPrecioCosto,
-      stock_minimo: autoFill(producto.stock_minimo, 0),
-      stock_maximo: autoFill(producto.stock_maximo, 0),
-      margen_utilidad: String(newMargen),
-      proveedor: producto.proveedor ?? null,
-    };
+    if (guardarModificacion) {
+      const body = {
+        nombre: autoFill(producto.nombre, "-"),
+        codigo_producto: autoFill(producto.codigo_producto, "-"),
+        oem: autoFill(producto.oem, "-"),
+        oem_alternativo: autoFill(producto.oem_alternativo, ""),
+        codigo_proveedor: autoFill(producto.codigo_proveedor, "-"),
+        marca: autoFill(producto.marca, "-"),
+        descripcion: autoFill(producto.descripcion, "-"),
+        precio: 0,
+        precio_costo: newPrecioCosto,
+        stock_minimo: autoFill(producto.stock_minimo, 0),
+        stock_maximo: autoFill(producto.stock_maximo, 0),
+        margen_utilidad: String(newMargen),
+        proveedor: producto.proveedor ?? null,
+      };
 
-    mutation.mutate(
-      { id: producto.producto_id, data: body },
-      {
-        onSuccess: () => onClose(true),
-        onError: (err) => setError(err.message || "Error al actualizar precio costo"),
-      }
-    );
+      mutation.mutate(
+        { id: producto.producto_id, data: body },
+        {
+          onSuccess: () => onClose({ precioCosto: newPrecioCosto, margenUtilidad: newMargen, precio: newPrecio, saveProduct: true }),
+          onError: (err) => setError(err.message || "Error al actualizar precio costo"),
+        }
+      );
+    } else {
+      onClose({ precioCosto: newPrecioCosto, margenUtilidad: newMargen, precio: newPrecio, saveProduct: false });
+    }
   }
 
   return (
@@ -64,7 +70,7 @@ export default function QuickPrecioCostoModal({ producto, onClose }) {
           <form onSubmit={handleSubmit}>
             <div className="modal-header">
               <h5 className="modal-title">Editar precio costo — {producto.nombre}</h5>
-              <button type="button" className="modal-close" onClick={() => onClose(false)}>
+              <button type="button" className="modal-close" onClick={() => onClose(null)}>
                 &times;
               </button>
             </div>
@@ -108,14 +114,31 @@ export default function QuickPrecioCostoModal({ producto, onClose }) {
                   style={{ background: "var(--bg-input)", fontWeight: 700 }}
                 />
               </div>
+
+              <div className="mt-3">
+                <label className="checkbox-custom">
+                  <input
+                    type="checkbox"
+                    checked={guardarModificacion}
+                    onChange={(e) => setGuardarModificacion(e.target.checked)}
+                  />
+                  <span className="checkbox-custom__mark" />
+                  <span
+                    className="checkbox-custom__label"
+                    style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}
+                  >
+                    Guardar modificación en el producto
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => onClose(false)}>
+              <button type="button" className="btn btn-secondary" onClick={() => onClose(null)}>
                 Cancelar
               </button>
               <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
-                {mutation.isPending ? "Guardando..." : "Guardar"}
+                {mutation.isPending ? "Guardando..." : !guardarModificacion ? "Aplicar" : "Guardar"}
               </button>
             </div>
           </form>
