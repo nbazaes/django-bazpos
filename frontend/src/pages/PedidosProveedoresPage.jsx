@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
 import {
@@ -35,6 +36,7 @@ function formatCLP(n) {
 }
 
 function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelete }) {
+  const navigate = useNavigate();
   return proveedores.map((prov) => (
     <div key={prov.proveedor_id} className="proveedor-group" style={{ marginBottom: "2rem" }}>
       <h3 style={{ marginBottom: "0.5rem", fontSize: "1.1rem", fontWeight: 600 }}>
@@ -81,6 +83,15 @@ function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelet
                 </td>
                 {editable && (
                   <td className="no-print">
+                    {item.producto_id && (
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => navigate(`/productos/${item.producto_id}/editar`)}
+                        title="Editar producto"
+                      >
+                        <i className="bi bi-pencil" />
+                      </button>
+                    )}
                     <button
                       className="btn btn-sm btn-danger"
                       onClick={() => onDelete(diaId, item.id, item.nombre)}
@@ -100,6 +111,7 @@ function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelet
 }
 
 function ProveedorCardsMobile({ proveedores, diaId, editable, onToggle, onDelete }) {
+  const navigate = useNavigate();
   return proveedores.map((prov) => (
     <div key={prov.proveedor_id} className="proveedor-mobile-group">
       <h4 className="proveedor-mobile-title">{prov.proveedor_nombre} ({prov.items.length})</h4>
@@ -136,12 +148,23 @@ function ProveedorCardsMobile({ proveedores, diaId, editable, onToggle, onDelete
               </span>
             )}
             {editable && (
-              <button
-                className="btn btn-sm btn-danger item-mobile-delete"
-                onClick={() => onDelete(diaId, item.id, item.nombre)}
-              >
-                &times;
-              </button>
+              <>
+                {item.producto_id && (
+                  <button
+                    className="btn btn-sm btn-outline item-mobile-delete"
+                    onClick={() => navigate(`/productos/${item.producto_id}/editar`)}
+                    title="Editar producto"
+                  >
+                    <i className="bi bi-pencil" />
+                  </button>
+                )}
+                <button
+                  className="btn btn-sm btn-danger item-mobile-delete"
+                  onClick={() => onDelete(diaId, item.id, item.nombre)}
+                >
+                  &times;
+                </button>
+              </>
             )}
           </div>
         </div>
