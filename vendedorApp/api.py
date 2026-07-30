@@ -931,7 +931,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
         "create": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "agregar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "agregar_item": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "toggle_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "eliminar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "finalizar": [ROLE_ENCARGADO, ROLE_GERENTE],

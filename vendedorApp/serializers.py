@@ -541,6 +541,47 @@ class CrearPedidoSerializer(serializers.Serializer):
             )
 
         if not es_cotizacion:
+            from datetime import date, timedelta
+            from django.db.models import Q
+            from vendedorApp.models import PedidoProveedorDia, ItemPedidoProveedor
+
+            for item in items:
+                producto_id = item.get("producto_id")
+                producto = None
+                if producto_id:
+                    try:
+                        producto = Producto.objects.get(producto_id=producto_id)
+                    except Producto.DoesNotExist:
+                        producto = None
+
+                fecha = date.today()
+                dia_hoy = PedidoProveedorDia.objects.filter(fecha=fecha).first()
+                if dia_hoy and dia_hoy.finalizado:
+                    fecha = date.today() + timedelta(days=1)
+
+                dia, _ = PedidoProveedorDia.objects.get_or_create(fecha=fecha)
+
+                if producto:
+                    ItemPedidoProveedor.objects.get_or_create(
+                        dia=dia,
+                        producto=producto,
+                        defaults={"proveedor": producto.proveedor},
+                    )
+                else:
+                    if not ItemPedidoProveedor.objects.filter(
+                        dia=dia,
+                        proveedor_id=item["proveedor_id"],
+                        nombre_custom=item["nombre"],
+                    ).exists():
+                        ItemPedidoProveedor.objects.create(
+                            dia=dia,
+                            producto=None,
+                            proveedor_id=item["proveedor_id"],
+                            nombre_custom=item["nombre"],
+                            codigo_proveedor_custom=item["codigo_proveedor"],
+                        )
+
+        if not es_cotizacion:
             venta = Venta.objects.create(
                 usuario=request.user,
                 monto_total=monto_total,
