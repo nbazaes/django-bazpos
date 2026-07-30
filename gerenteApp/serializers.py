@@ -238,6 +238,11 @@ class FacturaUpsertSerializer(serializers.Serializer):
 
 
 class StoreConfigSerializer(serializers.ModelSerializer):
+    ubicacion_por_defecto_nombre = serializers.SerializerMethodField()
+
     class Meta:
         model = StoreConfig
-        fields = ["id", "telefono", "direccion", "tax_percent", "timezone"]
+        fields = ["id", "telefono", "direccion", "tax_percent", "timezone", "ubicacion_por_defecto", "ubicacion_por_defecto_nombre"]
+
+    def get_ubicacion_por_defecto_nombre(self, obj):
+        return obj.ubicacion_por_defecto.nombre if obj.ubicacion_por_defecto else None

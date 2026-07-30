@@ -7,7 +7,10 @@ import { getTaxPercent } from "../lib/tax";
 import { STORE_NAME } from "../lib/config";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useDebounce } from "../lib/hooks";
+import { getUser, isGerente } from "../lib/auth";
 import StepperInput from "../components/StepperInput";
+import QuickStockModal from "../components/QuickStockModal";
+import QuickPrecioCostoModal from "../components/QuickPrecioCostoModal";
 
 const VENTA_STORAGE_KEY = "bazpos_venta_pending";
 
@@ -61,8 +64,11 @@ export default function VentaPage() {
   const deducirRef = useRef(false);
   const [isDeducing, setIsDeducing] = useState(false);
   const [mostrarSinStock, setMostrarSinStock] = useState(false);
+  const [quickStockProducto, setQuickStockProducto] = useState(null);
+  const [quickPrecioCostoProducto, setQuickPrecioCostoProducto] = useState(null);
   const oemRequestRef = useRef(0);
   const taxPercent = getTaxPercent();
+  const esGerente = isGerente(getUser());
 
   useEffect(() => {
     fetchStoreConfig();
@@ -561,6 +567,7 @@ export default function VentaPage() {
                     <th style={{ width: "1px" }}>Stock</th>
                     <th style={{ width: "1px" }}>Última fecha de llegada</th>
                     <th style={{ width: "1px" }}>Precio</th>
+                    {esGerente && <th style={{ width: "1px" }}>Precio costo</th>}
                     <th style={{ width: "1px" }}></th>
                   </tr>
                 </thead>
@@ -573,24 +580,61 @@ export default function VentaPage() {
                       <td>{p.marca}</td>
                       <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
                       <td>
-                        {(p.ubicaciones_stock || []).length > 0 ? (
-                          <span className="stock-hover">
-                            {p.stock_actual}
-                            <span className="stock-popover">
-                              {(p.ubicaciones_stock || []).map((u) => (
-                                <div key={u.nombre} className="popover-row">
-                                  <span>{u.nombre}</span>
-                                  <strong>{u.cantidad}</strong>
-                                </div>
-                              ))}
-                            </span>
-                          </span>
+                        {esGerente ? (
+                          <button
+                            className="btn btn-link p-0 stock-clickable"
+                            onClick={() => setQuickStockProducto(p)}
+                            style={{ textDecoration: "none" }}
+                          >
+                            {(p.ubicaciones_stock || []).length > 0 ? (
+                              <span className="stock-hover">
+                                {p.stock_actual}
+                                <span className="stock-popover">
+                                  {(p.ubicaciones_stock || []).map((u) => (
+                                    <div key={u.nombre} className="popover-row">
+                                      <span>{u.nombre}</span>
+                                      <strong>{u.cantidad}</strong>
+                                    </div>
+                                  ))}
+                                </span>
+                              </span>
+                            ) : (
+                              p.stock_actual
+                            )}
+                          </button>
                         ) : (
-                          p.stock_actual
+                          <>
+                            {(p.ubicaciones_stock || []).length > 0 ? (
+                              <span className="stock-hover">
+                                {p.stock_actual}
+                                <span className="stock-popover">
+                                  {(p.ubicaciones_stock || []).map((u) => (
+                                    <div key={u.nombre} className="popover-row">
+                                      <span>{u.nombre}</span>
+                                      <strong>{u.cantidad}</strong>
+                                    </div>
+                                  ))}
+                                </span>
+                              </span>
+                            ) : (
+                              p.stock_actual
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="text-nowrap">{p.ultima_fecha_llegada || "—"}</td>
                       <td>${p.precio}</td>
+                      {esGerente && (
+                        <td>
+                          <button
+                            className="btn btn-link p-0"
+                            onClick={() => setQuickPrecioCostoProducto(p)}
+                            style={{ textDecoration: "none" }}
+                          >
+                            ${p.precio_costo != null ? p.precio_costo : "—"}
+                          </button>
+                        </td>
+                      )}
                       <td>
                         <button
                           className="btn btn-sm btn-success"
@@ -1043,6 +1087,24 @@ export default function VentaPage() {
             </div>
           </div>
         </div>
+      )}
+      {quickStockProducto && (
+        <QuickStockModal
+          producto={quickStockProducto}
+          onClose={(actualizado) => {
+            setQuickStockProducto(null);
+            if (actualizado) buscarProducto(debouncedOem);
+          }}
+        />
+      )}
+      {quickPrecioCostoProducto && (
+        <QuickPrecioCostoModal
+          producto={quickPrecioCostoProducto}
+          onClose={(actualizado) => {
+            setQuickPrecioCostoProducto(null);
+            if (actualizado) buscarProducto(debouncedOem);
+          }}
+        />
       )}
     </>
   );
