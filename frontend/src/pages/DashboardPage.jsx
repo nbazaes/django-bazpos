@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
-import { getUser } from "../lib/auth";
+import { getUser, isGerente } from "../lib/auth";
 import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const location = useLocation();
   const showToast = useToast();
   const user = getUser();
+  const esGerente = isGerente(user);
   usePageTitle("Dashboard");
   const didToast = useRef(false);
   const { data, error } = useDashboardStats();
@@ -207,6 +208,15 @@ export default function DashboardPage() {
                           <td>{p.stock_minimo}</td>
                           <td>
                             <div className="btn-group flex-wrap">
+                              {esGerente && (
+                                <button
+                                  className="btn btn-sm btn-outline"
+                                  title="Editar producto"
+                                  onClick={() => navigate(`/productos/${p.producto_id}/editar`)}
+                                >
+                                  <i className="bi bi-pencil" />
+                                </button>
+                              )}
                               <button
                                 className="btn btn-sm btn-outline"
                                 onClick={() =>
