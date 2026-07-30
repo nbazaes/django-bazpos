@@ -1,14 +1,13 @@
 # AGENTS.md
 
 ## Repo Map
-- `bazpos/` — Django project config (settings, urls, WSGI, API router at `api_urls.py`).
-- `gerenteApp/` — management app: Proveedor, Factura, Usuario, Ubicacion models + DRF ViewSets.
-- `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion models + DRF ViewSets.
-- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`).
-- `frontend/` — Vite 8 / React 19 SPA with react-router-dom. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
+- `bazpos/` — Django project config (settings, urls, WSGI, API router at `api_urls.py`, middleware, permissions).
+- `gerenteApp/` — management app: Proveedor, Factura, Usuario, Ubicacion, StoreConfig models + DRF ViewSets.
+- `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion, Devolucion, Pedido, PedidoProveedor models + DRF ViewSets.
+- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`).
+- `frontend/` — Vite 8 / React 19 SPA with react-router-dom v7. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
 - `static/` — legacy assets (Django admin, vendor).
 - `Dockerfile` / `Dockerfile.nginx` / `docker-entrypoint.sh` / `nginx.conf` / `compose.yaml` — production container definitions.
-- `deploy/` — **removed**. Production is handled by Docker Compose.
 
 ## Commands
 ```bash
@@ -35,75 +34,49 @@ docker compose up -d --build
 python manage.py migrate
 python manage.py setup_groups
 python manage.py create_admin
+# Seed demo data (optional)
+python manage.py seed_data
 ```
 
 ## Architecture
-- Decoupled services via Docker Compose: MariaDB, Django + Gunicorn, and nginx each run in their own container.
-- The frontend SPA is built into the nginx container and served from the same origin as the API, so the default API base is a relative path (`/api`).
-- CORS is only needed if the API is accessed from a different origin; with the default setup it can be left empty.
-- Frontend is a **SPA** (react-router-dom v7), NOT an MPA. The old HTML files in `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/`, `frontend/404.html`, `frontend/admin.html`, and `frontend/forgot-password.html` are **dead MPA leftovers** — do not edit them. All routes are defined in `frontend/src/router.jsx`.
-- `GerenteGuard` (`frontend/src/guards.jsx:33`) wraps product/management routes — only Gerente and Encargado roles can access them.
-- `ProtectedRoute` calls `/auth/me/` on mount to validate the JWT on every protected route visit.
-
-## Production / VPS Deployment
-- Production stack runs on a **single server** via Docker Compose: MariaDB container, Django + Gunicorn container, and nginx container. All services are isolated and can be scaled independently later.
-- The frontend SPA is built into the nginx container and served from the same origin as the API.
-- Backend is exposed through nginx (reverse proxy) on ports 80 and 443. Gunicorn is not exposed directly.
-- DB is inside a Docker container and reachable only on the internal Docker network — never exposed to the LAN or internet.
-- `DEBUG` is controlled via `DJANGO_DEBUG` env var. Settings.py reads it at line 37:
-  `DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"`. Must be `False` in production.
-
-### Cloudflare + HTTPS Setup
-1. On Cloudflare dashboard, point your domain's DNS A record to the VPS IP (orange cloud / proxied).
-2. SSL/TLS → Origin Server → Create Certificate. Generate a certificate for `*.yourdomain.com` and `yourdomain.com` (15-year validity, RSA).
-3. On the VPS, create the certs directory and save the files:
-   ```bash
-   mkdir certs
-   # Copy the Origin Certificate → certs/origin.pem
-   # Copy the Private Key → certs/origin.key
-   ```
-4. Set SSL/TLS encryption mode to **Full (strict)**.
-5. Copy `.env.production.example` to `.env`, fill in secrets, and set `DJANGO_ALLOWED_HOSTS` to include your domain.
-6. Run `docker compose up -d --build`.
-7. Access at `https://<your-domain>`.
+- Three services via Docker Compose: MariaDB, Django + Gunicorn, and nginx. Frontend SPA is built into the nginx container (`Dockerfile.nginx` two-stage build) and served from the same origin as the API.
+- Default API base is a relative path (`/api`). CORS is only needed when the frontend dev server runs on a different origin.
+- Frontend is a **SPA** (react-router-dom v7). Old HTML files in `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/`, `frontend/404.html`, `frontend/admin.html`, and `frontend/forgot-password.html` are **dead MPA leftovers** — do not edit them. All routes are in `frontend/src/router.jsx`.
+- Nginx always redirects HTTP→HTTPS. For local Docker testing without certs, this will fail — either provide certs or modify nginx.conf temporarily.
+- `collectstatic` uses `--clear` flag, wiping the staticfiles dir before collecting. The dir is a Docker volume in production.
+- `@tanstack/react-query` is used for server-state caching in the frontend.
 
 ## API
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `auth/token/`, `auth/token/refresh/`, `auth/me/`
 - `dashboard/stats/`
-- CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `ubicaciones`
+- CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `devoluciones`, `ubicaciones`, `pedidos`, `configuracion`, `pedidos-proveedor`
+- Health check: `/health/` (used by Docker healthcheck)
 
 ## API Client (`frontend/src/lib/api.js`)
-- `apiRequest()` auto-refreshes the JWT on 401: tries `/auth/token/refresh/` → retries the request → falls through to redirect on double failure.
-- `redirectToLogin()` clears tokens and redirects to `/registration/login.html` — this is a leftover MPA URL. It works because the SPA catches `/login` via the router. Do not rely on this redirect; prefer navigating to `/login` inside the SPA.
+- `apiRequest()` auto-refreshes the JWT on 401: tries `/auth/token/refresh/` → retries the request → clears tokens and redirects on double failure.
+- `redirectToLogin()` redirects to `/registration/login.html` — this is a leftover MPA URL. It works because the SPA catches `/login` via the router. Prefer navigating to `/login` in new code.
 
 ## Auth & Roles
-- Three groups via `setup_groups`: Vendedor, Encargado, Gerente.
+- Four groups via `setup_groups`: Vendedor, Bodeguero, Encargado, Gerente.
 - `RoleActionPermission` at `bazpos/permissions.py` maps DRF actions to allowed roles per ViewSet. Superusers bypass all role checks.
+- `HasKnownRole` requires one of the four business roles for any protected endpoint.
 - JWT auth via `rest_framework_simplejwt`. Session auth also enabled for Django admin.
 
+## Guards (frontend routing)
+- `ProtectedRoute` calls `/auth/me/` on mount to validate JWT on every protected route visit.
+- `GerenteGuard` — allows Gerente and Encargado roles (wraps product/management routes).
+- `BodegueroGuard` — allows Bodeguero, Encargado, and Gerente roles (wraps `/ubicaciones`).
+- `isGerente()` in auth.js also treats Encargado as Gerente (both have management access).
+- `isBodeguero()` in auth.js also allows Encargado and Gerente (both have warehouse access).
+
 ## Django Settings Gotchas
-- `DEBUG` is controlled by `DJANGO_DEBUG` env var (set to `True` in `.env` for dev).
-- **PyMySQL version override** at the top of `settings.py:19-20` pins `(2, 2, 1)`. Do not remove or change this without understanding MariaDB compatibility.
-- `load_dotenv()` runs at module level in settings.py — `.env` must exist at startup or env vars must be set externally.
+- `DEBUG` is controlled by `DJANGO_DEBUG` env var. Must be `False` in production.
+- **PyMySQL version override** at the top of `settings.py` pins `(2, 2, 1)`. Do not remove or change — required for MariaDB compatibility.
+- `load_dotenv()` runs at module level — `.env` must exist at startup or env vars must be set externally.
 - `LANGUAGE_CODE = "es-cl"` (Chilean Spanish). DRF responses may be in Spanish from the DB.
 - `RequestLogMiddleware` is first in `MIDDLEWARE` to log all requests to a ring buffer (viewable at `/admin/logs/` by superusers).
-
-## Frontend Env Vars
-Copy `frontend/.env.example` → `frontend/.env`. Never commit `.env`.
-- `VITE_API_BASE_URL` — backend API path. Default is `/api` (relative, same origin) for the Docker production setup. Override with an absolute URL (e.g. `http://localhost:8000/api`) only when running the Vite dev server separately from the backend.
-- `VITE_BACKEND_URL` — backend base URL for redirects/media. Default is empty (same origin). Override only for local dev.
-- `VITE_STORE_NAME` — displayed in UI (default: `BAZPOS`)
-
-## Backend Env Vars
-Copy `.env.production.example` → `.env` for production deployments. For local development, use `.env.example`.
-Never commit `.env`.
-- `DJANGO_DEBUG` — `True` enables debug mode (must be `False` in production)
-- `CORS_ALLOWED_ORIGINS` — comma-separated frontend origins. Can be left empty when the SPA is served from the same origin as the API.
-- `CSRF_TRUSTED_ORIGINS` — comma-separated origins for CSRF. Can be left empty for same-origin deployments.
-- `DB_PASSWORD`, `DB_HOST`, `DB_USER`, `DB_NAME`, `DB_PORT` — MariaDB connection
-- `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`
-- `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` — MariaDB container initialization
+- `ALLOWED_HOSTS` reads from `DJANGO_ALLOWED_HOSTS` comma-separated env var.
 
 ## Frontend Rules
 - Plain JSX with ESLint only. No TypeScript.
@@ -114,4 +87,4 @@ Never commit `.env`.
 ## Python Rules
 - No linting, typechecking, or tests configured. All `tests.py` files are empty stubs.
 - MySQL driver is PyMySQL (pinned). Do not swap to mysqlclient or other drivers.
-- Docker entrypoint runs `migrate → setup_groups → create_admin → collectstatic → gunicorn` in sequence.
+- Docker entrypoint runs: `wait-for-db → migrate → setup_groups → create_admin → collectstatic --clear → gunicorn`.
