@@ -96,6 +96,13 @@ class StoreConfig(models.Model):
     direccion = models.TextField(blank=True, default="")
     tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=19)
     timezone = models.CharField(max_length=100, blank=True, default="America/Santiago")
+    ubicacion_por_defecto = models.ForeignKey(
+        "vendedorApp.Ubicacion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+    )
 
     class Meta:
         db_table = "store_config"
