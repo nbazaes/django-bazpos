@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
 from django.db import transaction
@@ -913,6 +913,33 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     stellantis=d.stellantis,
                 )
 
+                fecha = date.today()
+                dia_hoy = PedidoProveedorDia.objects.filter(fecha=fecha).first()
+                if dia_hoy and dia_hoy.finalizado:
+                    fecha = date.today() + timedelta(days=1)
+
+                dia, _ = PedidoProveedorDia.objects.get_or_create(fecha=fecha)
+
+                if d.producto:
+                    ItemPedidoProveedor.objects.get_or_create(
+                        dia=dia,
+                        producto=d.producto,
+                        defaults={"proveedor": d.proveedor},
+                    )
+                else:
+                    if not ItemPedidoProveedor.objects.filter(
+                        dia=dia,
+                        proveedor=d.proveedor,
+                        nombre_custom=d.nombre,
+                    ).exists():
+                        ItemPedidoProveedor.objects.create(
+                            dia=dia,
+                            producto=None,
+                            proveedor=d.proveedor,
+                            nombre_custom=d.nombre,
+                            codigo_proveedor_custom=d.codigo_proveedor,
+                        )
+
             venta = Venta.objects.create(
                 usuario=request.user,
                 monto_total=monto_total,
@@ -927,9 +954,6 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             PedidoSerializer(nuevo_pedido, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
-
-
-from datetime import date, timedelta
 
 
 class PedidoProveedorViewSet(viewsets.ModelViewSet):
