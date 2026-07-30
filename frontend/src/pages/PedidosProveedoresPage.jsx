@@ -10,10 +10,9 @@ import {
   useEliminarItemPedidoProveedor,
   useAgregarItemPedidoProveedor,
   useProveedores,
-  useProductoPorCodigo,
 } from "../lib/queries";
 import { apiRequest } from "../lib/api";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeysPedidoProveedor } from "../lib/queries";
 
 function formatFecha(fechaStr) {
@@ -183,8 +182,12 @@ export default function PedidosProveedoresPage() {
   const [addTab, setAddTab] = useState("existente");
   const [customForm, setCustomForm] = useState({ proveedor_id: "", nombre_custom: "", codigo_proveedor_custom: "" });
   const [searchCodigo, setSearchCodigo] = useState("");
-  const { data: productoSearch } = useProductoPorCodigo(searchCodigo);
-  const productoEncontrado = productoSearch?.encontrado ? productoSearch.producto : null;
+  const { data: productosSearch } = useQuery({
+    queryKey: ["productos", "lista", { texto: searchCodigo, page_size: 5 }],
+    queryFn: () => apiRequest(`/productos/?texto=${encodeURIComponent(searchCodigo)}&page_size=5`),
+    enabled: !!searchCodigo,
+  });
+  const productosEncontrados = productosSearch?.results || [];
 
   usePageTitle("Pedidos a proveedores");
 
@@ -243,9 +246,8 @@ export default function PedidosProveedoresPage() {
     });
   }
 
-  function handleAgregarExistente() {
-    if (!productoEncontrado) return;
-    agregarMutation.mutate({ producto_id: productoEncontrado.producto_id }, {
+  function handleAgregarExistente(productoId) {
+    agregarMutation.mutate({ producto_id: productoId }, {
       onSuccess: () => {
         setShowAddCustom(false);
         setSearchCodigo("");
@@ -444,33 +446,51 @@ export default function PedidosProveedoresPage() {
                 {addTab === "existente" && (
                   <>
                     <div className="mb-3">
-                      <label className="form-label">Buscar por código de producto</label>
+                      <label className="form-label">Buscar por código de proveedor</label>
                       <input
                         type="text"
                         className="form-control"
                         value={searchCodigo}
                         onChange={(e) => setSearchCodigo(e.target.value)}
-                        placeholder="Código del producto..."
+                        placeholder="Código del proveedor..."
                         autoFocus
                       />
                     </div>
-                    {productoEncontrado && (
-                      <div style={{ background: "var(--bg-hover)", borderRadius: "var(--radius)", padding: "0.75rem" }}>
-                        <p className="mb-1"><strong>{productoEncontrado.nombre}</strong></p>
-                        <p className="text-secondary mb-2" style={{ fontSize: "0.85rem" }}>
-                          Cód: {productoEncontrado.codigo_producto} | OEM: {productoEncontrado.oem} | {productoEncontrado.proveedor_nombre}
-                        </p>
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={handleAgregarExistente}
-                          disabled={agregarMutation.isPending}
-                        >
-                          Agregar a la lista
-                        </button>
+                    {productosEncontrados.length > 0 && (
+                      <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                        {productosEncontrados.map((p) => (
+                          <div
+                            key={p.producto_id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              background: "var(--bg-hover)",
+                              borderRadius: "var(--radius)",
+                              padding: "0.5rem 0.75rem",
+                              marginBottom: "0.35rem",
+                            }}
+                          >
+                            <div style={{ minWidth: 0, marginRight: "0.5rem" }}>
+                              <p className="mb-0" style={{ fontWeight: 600, fontSize: "0.9rem" }}>{p.nombre}</p>
+                              <p className="text-secondary mb-0" style={{ fontSize: "0.8rem" }}>
+                                Cód: {p.codigo_proveedor || "—"} | OEM: {p.oem} | {p.proveedor_nombre}
+                              </p>
+                            </div>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleAgregarExistente(p.producto_id)}
+                              disabled={agregarMutation.isPending}
+                              style={{ flexShrink: 0 }}
+                            >
+                              Agregar
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
-                    {searchCodigo && !productoEncontrado && productoSearch && !productoSearch.encontrado && (
-                      <p className="text-muted" style={{ fontSize: "0.85rem" }}>Producto no encontrado</p>
+                    {searchCodigo && productosEncontrados.length === 0 && (
+                      <p className="text-muted" style={{ fontSize: "0.85rem" }}>No se encontraron productos</p>
                     )}
                   </>
                 )}
