@@ -847,8 +847,10 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         fecha_desde = self.request.query_params.get("fecha_desde", "").strip()
         fecha_hasta = self.request.query_params.get("fecha_hasta", "").strip()
 
-        if estado:
-            queryset = queryset.filter(estado=estado)
+        if estado == "CO":
+            queryset = queryset.filter(es_cotizacion=True)
+        elif estado:
+            queryset = queryset.filter(estado=estado, es_cotizacion=False)
         if search:
             queryset = queryset.filter(
                 Q(id__startswith=search) | Q(nombre_cliente__icontains=search)

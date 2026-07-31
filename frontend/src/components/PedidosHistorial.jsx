@@ -266,6 +266,7 @@ export default function PedidosHistorial() {
           <option value="PR">Pendiente por retirar</option>
           <option value="RE">Retirado</option>
           <option value="CA">Cancelado</option>
+          <option value="CO">Cotización</option>
         </select>
         <input
           type="text"
