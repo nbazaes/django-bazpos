@@ -838,9 +838,27 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
     }
 
     def get_queryset(self):
-        return Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
+        queryset = Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
             "detalles__proveedor", "detalles__producto"
         ).order_by("-fecha_creacion")
+
+        estado = self.request.query_params.get("estado", "").strip()
+        search = self.request.query_params.get("search", "").strip()
+        fecha_desde = self.request.query_params.get("fecha_desde", "").strip()
+        fecha_hasta = self.request.query_params.get("fecha_hasta", "").strip()
+
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if search:
+            queryset = queryset.filter(
+                Q(id__startswith=search) | Q(nombre_cliente__icontains=search)
+            )
+        if fecha_desde:
+            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
+
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = CrearPedidoSerializer(data=request.data, context={"request": request})

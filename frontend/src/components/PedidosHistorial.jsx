@@ -30,6 +30,10 @@ const ESTADO_BADGE = {
 export default function PedidosHistorial() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [search, setSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [detalleId, setDetalleId] = useState(null);
   const [retiroId, setRetiroId] = useState(null);
   const [retiroPersona, setRetiroPersona] = useState("");
@@ -45,7 +49,12 @@ export default function PedidosHistorial() {
   const [convertirDocumento, setConvertirDocumento] = useState("SB");
 
   const addToast = useToast();
-  const { data: pedidosData } = usePedidos({ page, page_size: pageSize });
+  const pedidosParams = { page, page_size: pageSize };
+  if (estadoFiltro) pedidosParams.estado = estadoFiltro;
+  if (search.trim()) pedidosParams.search = search.trim();
+  if (fechaDesde) pedidosParams.fecha_desde = fechaDesde;
+  if (fechaHasta) pedidosParams.fecha_hasta = fechaHasta;
+  const { data: pedidosData } = usePedidos(pedidosParams);
   const { data: detalleData } = usePedido(detalleId);
   const { data: retiroData } = usePedido(retiroId);
   const { data: convertirData } = usePedido(convertirId);
@@ -234,8 +243,57 @@ export default function PedidosHistorial() {
     win.document.close();
   }
 
+  function handleFilterChange(field, value) {
+    switch (field) {
+      case "estado": setEstadoFiltro(value); break;
+      case "search": setSearch(value); break;
+      case "fecha_desde": setFechaDesde(value); break;
+      case "fecha_hasta": setFechaHasta(value); break;
+    }
+    setPage(1);
+  }
+
   return (
     <>
+      <div className="filter-bar flex flex-wrap items-center gap-3 mb-3">
+        <select
+          className="form-control"
+          style={{ maxWidth: 180 }}
+          value={estadoFiltro}
+          onChange={(e) => handleFilterChange("estado", e.target.value)}
+        >
+          <option value="">Todos los estados</option>
+          <option value="PR">Pendiente por retirar</option>
+          <option value="RE">Retirado</option>
+          <option value="CA">Cancelado</option>
+        </select>
+        <input
+          type="text"
+          className="form-control"
+          style={{ maxWidth: 220 }}
+          placeholder="Buscar por nombre o ID..."
+          value={search}
+          onChange={(e) => handleFilterChange("search", e.target.value)}
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>
+          <input
+            type="date"
+            className="form-control"
+            style={{ maxWidth: 180 }}
+            value={fechaDesde}
+            onChange={(e) => handleFilterChange("fecha_desde", e.target.value)}
+          />
+          <span className="text-muted" style={{ fontSize: "0.875rem" }}>Hasta:</span>
+          <input
+            type="date"
+            className="form-control"
+            style={{ maxWidth: 180 }}
+            value={fechaHasta}
+            onChange={(e) => handleFilterChange("fecha_hasta", e.target.value)}
+          />
+        </div>
+      </div>
       <div className="table-responsive">
         <table className="table table-sm table-bordered">
           <thead>
