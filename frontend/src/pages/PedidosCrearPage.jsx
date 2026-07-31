@@ -43,7 +43,6 @@ export default function PedidosCrearPage() {
   useEffect(() => {
     fetchStoreConfig();
   }, []);
-  const { data: productosData } = useProductos({ page_size: 200 });
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
 
@@ -53,8 +52,20 @@ export default function PedidosCrearPage() {
   const [metodoPago, setMetodoPago] = useState("EF");
   const [estadoDocumento, setEstadoDocumento] = useState("SB");
   const [productoTexto, setProductoTexto] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [mostrarProductos, setMostrarProductos] = useState(false);
   const productosRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(productoTexto.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [productoTexto]);
+
+  const { data: productosData } = useProductos(
+    searchQuery ? { texto: searchQuery, page_size: 10 } : { page_size: 10 },
+  );
 
   const itemTotalPreview = useMemo(() => {
     return calcularItemTotal(
@@ -84,16 +95,8 @@ export default function PedidosCrearPage() {
   }, []);
 
   const productosFiltrados = useMemo(() => {
-    const q = productoTexto.trim().toLowerCase();
-    if (!q) return [];
-    return (productosData?.results ?? [])
-      .filter(
-        (p) =>
-          p.nombre.toLowerCase().includes(q) ||
-          p.oem.toLowerCase().includes(q) ||
-          p.codigo_producto.toLowerCase().includes(q),
-      )
-      .slice(0, 10);
+    if (!productoTexto.trim()) return [];
+    return productosData?.results ?? [];
   }, [productoTexto, productosData]);
 
   function seleccionarProductoExistente(p) {
