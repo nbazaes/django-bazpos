@@ -139,6 +139,7 @@ class Command(BaseCommand):
         encargado.permissions.add(*store_config_perms)
         # Puede gestionar pedidos a proveedores
         encargado.permissions.add(*pedido_proveedor_dia_perms, *item_pedido_proveedor_perms)
+        encargado.permissions.add(*ubicacion_perms)
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Encargado' {status} con permisos."))
 
@@ -179,6 +180,7 @@ class Command(BaseCommand):
             *store_config_perms,
             *pedido_proveedor_dia_perms,
             *item_pedido_proveedor_perms,
+            *ubicacion_perms,
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Gerente' {status} con permisos."))
