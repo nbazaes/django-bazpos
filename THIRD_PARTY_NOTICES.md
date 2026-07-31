@@ -40,6 +40,11 @@ Componentes incluidos y licencias
    - Licencia: MIT
    - Enlace: https://github.com/gdsmith/jquery.easing/blob/master/LICENSE
 
+7) Bootstrap Icons
+   - Paquete: `bootstrap-icons` (npm, `frontend/package.json`)
+   - Licencia: MIT
+   - Enlace: https://github.com/twbs/icons/blob/main/LICENSE
+
 Notas legales y de cumplimiento (mínimas):
 - Todas las dependencias listadas son software de licencia permisiva (MIT, CC BY 4.0 para algunos iconos, SIL OFL para fuentes). Mantener las cabeceras de licencia que ya están en los archivos distribuidos.
 - Si distribuyes el software binario o empaquetado, asegúrate de incluir este archivo o las licencias correspondientes en el paquete de distribución.
@@ -58,6 +63,7 @@ Licencias añadidas en el repositorio
 Se han añadido copias mínimas y referencias a los textos de licencia en la carpeta `licenses/`:
 
 - `licenses/LICENSE-BOOTSTRAP.txt`
+- `licenses/LICENSE-BOOTSTRAP-ICONS.txt`
 - `licenses/LICENSE-CHARTJS.txt`
 - `licenses/LICENSE-DATATABLES.txt`
 - `licenses/LICENSE-JQUERY.txt`
@@ -65,3 +71,9 @@ Se han añadido copias mínimas y referencias a los textos de licencia en la car
 - `licenses/LICENSE-FONT-AWESOME.txt`
 
 Incluye también `licenses/README.txt` con instrucciones cortas de cumplimiento.
+
+## Licencia del proyecto
+
+BazPOS se distribuye bajo los términos de la **GNU General Public License v2** (GPLv2). El texto completo se encuentra en el archivo `LICENSE` en la raíz del repositorio.
+
+Las dependencias de terceros listadas arriba se distribuyen bajo sus respectivas licencias (MIT, CC BY 4.0, SIL OFL 1.1) y no se ven afectadas por la licencia GPLv2 del proyecto.
