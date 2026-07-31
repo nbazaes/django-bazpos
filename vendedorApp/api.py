@@ -1,7 +1,9 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
 from django.db import transaction
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -34,7 +36,7 @@ from vendedorApp.pagination import (
     ProductoPagination,
     VentaPagination,
 )
-from gerenteApp.models import DetalleFactura
+from gerenteApp.models import DetalleFactura, StoreConfig
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_BODEGUERO,
@@ -376,6 +378,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         "deducir_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "anular": [ROLE_ENCARGADO, ROLE_GERENTE],
         "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "documento": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
@@ -681,6 +684,102 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             devolucion.save(update_fields=["monto_devuelto"])
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="documento")
+    def documento(self, request, pk=None):
+        venta = self.get_object()
+
+        if venta.documento_html:
+            return Response(venta.documento_html, content_type="text/html; charset=utf-8")
+
+        es_cotizacion = venta.tipo_documento == Venta.TipoDocumento.COTIZACION
+        config = StoreConfig.current()
+
+        detalles = venta.detalleventa_set.select_related("producto").all()
+
+        items_html = ""
+        for d in detalles:
+            if es_cotizacion:
+                label = f'{d.cantidad} x {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+            else:
+                label = f'{d.cantidad} x {d.producto.codigo_producto} - {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+            items_html += f"""
+        <div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;">
+          <span>{label}</span>
+          <span>${d.subtotal}</span>
+        </div>"""
+
+        titulo = "COTIZACION" if es_cotizacion else "COMPROBANTE DE VENTA"
+
+        tax_percent = float(config.tax_percent)
+        factor = Decimal("1") + (Decimal(str(tax_percent)) / Decimal("100"))
+        total_neto = int(round(Decimal(str(venta.monto_total)) / factor))
+        impuesto = venta.monto_total - total_neto
+
+        totales_html = ""
+        if not es_cotizacion:
+            desc_html = ""
+            if venta.descuento_porcentaje > 0:
+                monto_desc = venta.monto_subtotal - venta.monto_total
+                desc_html = f'<div class="totals-row"><span>Descuento ({venta.descuento_porcentaje}%)</span><span>-${monto_desc}</span></div>'
+            totales_html = f"""
+          <hr />
+          <div class="totals-row"><span>Subtotal</span><span>${venta.monto_subtotal}</span></div>
+          {desc_html}
+          <div class="totals-row"><span>Neto</span><span>${total_neto}</span></div>
+          <div class="totals-row"><span>Impuesto</span><span>${impuesto}</span></div>
+          <div class="totals-row"><span class="bold">Total</span><span class="bold">${venta.monto_total}</span></div>"""
+
+        disclaimer = ""
+        if es_cotizacion:
+            disclaimer = '<p class="disclaimer">Cotización válida hasta agotar stock</p>'
+
+        from django.utils.formats import date_format
+        fecha_str = date_format(venta.fecha_venta, format="SHORT_DATETIME_FORMAT", use_l10n=True)
+
+        html = f"""<html>
+        <head>
+          <meta charset="utf-8" />
+          <title>{titulo}</title>
+          <style>
+            @page {{ size: letter; margin: 12mm; }}
+            body {{
+              font-family: "JetBrains Mono", monospace;
+              margin: 0;
+              padding: 1.25rem;
+              font-size: 0.8rem;
+              line-height: 1.5;
+              color: #1a1a1a;
+              background: #faf9f6;
+            }}
+            h1 {{ margin: 0 0 4px; text-align: center; font-size: 1rem; }}
+            .subtitle {{ text-align: center; margin: 0 0 4px; }}
+            .address {{ text-align: center; font-size: 0.7rem; color: #666; margin: 0 0 4px; }}
+            .doc-number {{ text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 4px; }}
+            .date {{ text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 8px; }}
+            hr {{ border: none; border-top: 1px dashed #999; margin: 8px 0; }}
+            .totals-row {{ display: flex; justify-content: space-between; }}
+            .disclaimer {{ text-align: center; color: #999; font-size: 0.7rem; margin-top: 8px; }}
+            .bold {{ font-weight: bold; }}
+          </style>
+        </head>
+        <body>
+          <h1>{settings.STORE_NAME}</h1>
+          {f'<p class="address">{config.direccion}</p>' if config.direccion else ""}
+          {f'<p class="address">{config.telefono}</p>' if config.telefono else ""}
+          <p class="subtitle">{titulo}</p>
+          <p class="doc-number">#{venta.id}</p>
+          <p class="date">{fecha_str}</p>
+          <hr />{items_html}{totales_html}
+          {disclaimer}
+          <p class="disclaimer">Documento carece de validez legal</p>
+        </body>
+        </html>"""
+
+        venta.documento_html = html
+        venta.save(update_fields=["documento_html"])
+
+        return Response(html, content_type="text/html; charset=utf-8")
 
 
 class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):

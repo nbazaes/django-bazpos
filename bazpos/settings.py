@@ -33,6 +33,8 @@ MEDIA_DIR = os.path.join(BASE_DIR, "media")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-default-key-for-dev")
 
+STORE_NAME = os.environ.get("STORE_NAME", "BAZPOS")
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 

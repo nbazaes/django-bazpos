@@ -124,6 +124,7 @@ class VentaSerializer(serializers.ModelSerializer):
             "tipo_documento_display",
             "venta_origen",
             "cliente_nombre",
+            "documento_html",
             "detalles",
             "productos_devueltos",
         ]

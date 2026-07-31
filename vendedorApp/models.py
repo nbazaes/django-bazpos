@@ -134,6 +134,7 @@ class Venta(models.Model):
         verbose_name='Venta origen',
     )
     cliente_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre del cliente")
+    documento_html = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = 'ventas'
