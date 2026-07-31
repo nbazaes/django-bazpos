@@ -157,12 +157,14 @@ class FacturaViewSet(viewsets.ModelViewSet):
         except Producto.DoesNotExist:
             return Response({"encontrado": False})
 
+        proveedor_nombre = producto.proveedor.nombre if producto.proveedor else ""
         return Response(
             {
                 "encontrado": True,
                 "producto": {
                     "producto_id": producto.producto_id,
                     "codigo_producto": producto.codigo_producto,
+                    "codigo_proveedor": producto.codigo_proveedor,
                     "oem": producto.oem,
                     "nombre": producto.nombre,
                     "marca": producto.marca,
@@ -170,6 +172,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
                     "precio_costo": producto.precio_costo,
                     "margen_utilidad": float(producto.margen_utilidad),
                     "precio_venta": producto.precio,
+                    "proveedor": proveedor_nombre,
                 },
             }
         )
