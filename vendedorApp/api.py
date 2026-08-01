@@ -198,10 +198,11 @@ class ProductoViewSet(viewsets.ModelViewSet):
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
 
-        ultima_fecha = DetalleFactura.objects.filter(
-            producto_id=OuterRef("producto_id")
-        ).values("factura__fecha").order_by("-factura__fecha")[:1]
-        queryset = queryset.annotate(ultima_fecha_llegada=Subquery(ultima_fecha))
+        if self.action == 'retrieve':
+            ultima_fecha = DetalleFactura.objects.filter(
+                producto_id=OuterRef("producto_id")
+            ).values("factura__fecha").order_by("-factura__fecha")[:1]
+            queryset = queryset.annotate(ultima_fecha_llegada=Subquery(ultima_fecha))
 
         if texto:
             queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto) | Q(codigo_proveedor__icontains=texto))
