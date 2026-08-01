@@ -29,7 +29,7 @@ class Factura(models.Model):
     id = models.AutoField(primary_key=True)
     numero_factura = models.BigIntegerField(verbose_name='Número de factura')
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE)
-    fecha = models.DateField(default=fecha_ayer, verbose_name='Fecha')
+    fecha = models.DateField(default=fecha_ayer, verbose_name='Fecha', db_index=True)
     monto_total = models.IntegerField(default=0)
 
     class Meta:
@@ -46,6 +46,9 @@ class DetalleFactura(models.Model):
 
     class Meta:
         db_table = 'detalle_facturas'
+        indexes = [
+            models.Index(fields=['producto', 'factura']),
+        ]
 
     def __str__(self):
         return f'Detalle Factura {self.factura.numero_factura} - Producto {self.producto.nombre}'
