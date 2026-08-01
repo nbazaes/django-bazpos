@@ -36,7 +36,6 @@ export default function FacturaFormPage() {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
-  const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
   const [createUrl, setCreateUrl] = useState("");
@@ -200,7 +199,6 @@ export default function FacturaFormPage() {
     params.set("from_factura", "1");
     params.set("embed", "1");
     setCreateUrl(`/productos/crear?${params.toString()}`);
-    setShowCreatePrompt(false);
     setShowCreateModal(true);
   }
 
@@ -435,6 +433,15 @@ export default function FacturaFormPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!searching && searchText.trim() && searchResults.length === 0 && (
+          <div className="mt-2 mb-3">
+            <span className="text-secondary">Producto no encontrado. </span>
+            <button type="button" className="btn btn-sm btn-primary" onClick={abrirCrearProducto}>
+              Crear producto
+            </button>
           </div>
         )}
 
@@ -677,26 +684,6 @@ export default function FacturaFormPage() {
       {step === "header" && renderStepHeader()}
       {step === "items" && renderStepItems()}
       {renderUbicacionModal()}
-
-      {showCreatePrompt && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Producto no encontrado</h5>
-                <button type="button" className="modal-close" onClick={() => { setShowCreatePrompt(false); }}>&times;</button>
-              </div>
-              <div className="modal-body">
-                <p className="mb-0 text-secondary">No existe ese código. ¿Desea crear un producto ahora?</p>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreatePrompt(false); }}>Cancelar</button>
-                <button type="button" className="btn btn-primary" onClick={abrirCrearProducto}>Crear producto</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showCreateModal && (
         <div className="modal" role="dialog" aria-modal="true">
