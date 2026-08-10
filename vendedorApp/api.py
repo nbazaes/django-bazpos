@@ -64,33 +64,100 @@ class DashboardStatsView(APIView):
             .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
         )
 
+        devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=hoy)
+        anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=hoy)
+
+        def _nombre(row):
+            nombre = f"{row.get('usuario__first_name', '')} {row.get('usuario__last_name', '')}".strip()
+            return nombre if nombre else row.get("usuario__username", "")
+
         if es_gerente:
-            total_dia = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
-            cant_ventas_dia = ventas_hoy.count()
-            ventas_por_vendedor = (
-                ventas_hoy.values("usuario__first_name", "usuario__last_name", "usuario__username")
-                .annotate(total=Sum("monto_total"), cantidad=Count("id"))
-                .order_by("-total")
+            total_vendido = (
+                ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
+            ) + (
+                anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
             )
-            desglose = []
+            monto_devuelto = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+            monto_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            total_dia = total_vendido - monto_devuelto - monto_anulaciones
+            cant_ventas_dia = ventas_hoy.count()
+
+            ventas_por_vendedor = (
+                ventas_hoy.values("usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username")
+                .annotate(total=Sum("monto_total"), cantidad=Count("id"))
+            )
+            devueltos_por_usuario = {
+                r["usuario_id"]: r["total"]
+                for r in devoluciones_hoy.values("usuario_id").annotate(total=Sum("monto_devuelto"))
+            }
+            anulados_por_usuario = {
+                r["usuario_id"]: r["total"]
+                for r in anulaciones_hoy.values("usuario_id").annotate(total=Sum("venta__monto_total"))
+            }
+
+            filas = {}
             for row in ventas_por_vendedor:
-                nombre = f"{row['usuario__first_name']} {row['usuario__last_name']}".strip()
-                desglose.append(
-                    {
-                        "vendedor": nombre if nombre else row["usuario__username"],
-                        "total": row["total"],
-                        "cantidad": row["cantidad"],
+                uid = row["usuario_id"]
+                filas[uid] = {
+                    "vendedor": _nombre(row),
+                    "total_vendido": row["total"],
+                    "devoluciones": devueltos_por_usuario.get(uid, 0),
+                    "anulaciones": anulados_por_usuario.get(uid, 0),
+                    "cantidad": row["cantidad"],
+                }
+            for row in devoluciones_hoy.values(
+                "usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username"
+            ).distinct():
+                uid = row["usuario_id"]
+                if uid not in filas:
+                    filas[uid] = {
+                        "vendedor": _nombre(row),
+                        "total_vendido": 0,
+                        "devoluciones": devueltos_por_usuario.get(uid, 0),
+                        "anulaciones": 0,
+                        "cantidad": 0,
                     }
+            for row in anulaciones_hoy.values(
+                "usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username"
+            ).distinct():
+                uid = row["usuario_id"]
+                if uid not in filas:
+                    filas[uid] = {
+                        "vendedor": _nombre(row),
+                        "total_vendido": 0,
+                        "devoluciones": 0,
+                        "anulaciones": anulados_por_usuario.get(uid, 0),
+                        "cantidad": 0,
+                    }
+
+            desglose = []
+            for uid, fila in filas.items():
+                fila["total"] = (
+                    fila["total_vendido"] - fila["devoluciones"] - fila["anulaciones"]
                 )
+                desglose.append(fila)
+            desglose.sort(key=lambda d: d["total"], reverse=True)
         else:
             ventas_propias = ventas_hoy.filter(usuario=user)
-            total_dia = ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
+            anulaciones_propias = anulaciones_hoy.filter(usuario=user)
+            devoluciones_propias = devoluciones_hoy.filter(usuario=user)
+            total_vendido = (
+                ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
+            ) + (
+                anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            )
+            monto_devuelto = devoluciones_propias.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+            monto_anulaciones = anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            total_dia = total_vendido - monto_devuelto - monto_anulaciones
             cant_ventas_dia = ventas_propias.count()
             nombre = f"{user.first_name} {user.last_name}".strip()
             desglose = [
                 {
                     "vendedor": nombre if nombre else user.username,
                     "total": total_dia,
+                    "total_vendido": total_vendido,
+                    "devoluciones": monto_devuelto,
+                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                 }
             ]
@@ -160,6 +227,9 @@ class DashboardStatsView(APIView):
                 "es_gerente": es_gerente,
                 "ventas_dia": {
                     "total": total_dia,
+                    "total_vendido": total_vendido,
+                    "devoluciones": monto_devuelto,
+                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                     "desglose": desglose,
                 },

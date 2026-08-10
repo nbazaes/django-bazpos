@@ -9,11 +9,20 @@ import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
 
-function StatCard({ title, value, variant }) {
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString()}`;
+
+function StatCard({ title, value, variant, breakdown }) {
   return (
     <div className={`stat-card stat-card-${variant}`}>
       <div className="stat-label">{title}</div>
       <div className="stat-value">{value}</div>
+      {breakdown && breakdown.length > 0 && (
+        <div className="stat-breakdown">
+          {breakdown.map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -103,9 +112,18 @@ export default function DashboardPage() {
           <div className="row mb-4">
             <div className="col-md-4">
               <StatCard
-                title={`${data.es_gerente ? "Total ventas hoy" : "Total ventas hoy"}`}
-                value={`$${Number(data.ventas_dia.total || 0).toLocaleString()}`}
+                title="Total ventas hoy"
+                value={fmtMoney(data.ventas_dia.total)}
                 variant="success"
+                breakdown={[
+                  `${fmtMoney(data.ventas_dia.total_vendido)} vendido`,
+                  data.ventas_dia.devoluciones
+                    ? `- ${fmtMoney(data.ventas_dia.devoluciones)} devoluciones`
+                    : null,
+                  data.ventas_dia.anulaciones
+                    ? `- ${fmtMoney(data.ventas_dia.anulaciones)} anulaciones`
+                    : null,
+                ].filter(Boolean)}
               />
             </div>
             <div className="col-md-4">
@@ -135,7 +153,18 @@ export default function DashboardPage() {
                       {data.ventas_dia.desglose.map((row, i) => (
                         <tr key={i}>
                           <td>{row.vendedor}</td>
-                          <td>${Number(row.total || 0).toLocaleString()}</td>
+                          <td>
+                            <strong>{fmtMoney(row.total)}</strong>
+                            <div className="stat-breakdown">
+                              {fmtMoney(row.total_vendido)} vendido
+                              {row.devoluciones
+                                ? <> · - {fmtMoney(row.devoluciones)} dev.</>
+                                : null}
+                              {row.anulaciones
+                                ? <> · - {fmtMoney(row.anulaciones)} anul.</>
+                                : null}
+                            </div>
+                          </td>
                           <td>{row.cantidad}</td>
                         </tr>
                       ))}
