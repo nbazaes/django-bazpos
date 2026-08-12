@@ -1,0 +1,51 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
+    env:
+      IMAGE_BASE: ${{ github.repository }}
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+      APP_IMAGE: ghcr.io/${{ github.repository }}:app-${{ github.event.workflow_run.head_sha }}
+      NGINX_IMAGE: ghcr.io/${{ github.repository }}:nginx-${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "compose.prod.yaml"
+          target: ${{ secrets.COMPOSE_DIR }}
+
+      - name: Pull images and quick-swap on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          COMPOSE_DIR: ${{ secrets.COMPOSE_DIR }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER,APP_IMAGE,NGINX_IMAGE,COMPOSE_DIR
+          script: |
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            cd "$COMPOSE_DIR"
+            docker compose -f compose.prod.yaml pull
+            docker compose -f compose.prod.yaml up -d --wait
+            docker image prune -f
