@@ -85,6 +85,9 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - Design uses a corporate purple palette with CSS custom properties (see `frontend/src/design-system.css`).
 
 ## Python Rules
-- No linting, typechecking, or tests configured. All `tests.py` files are empty stubs.
+- No linting, typechecking, or test framework (pytest) configured. Tests use Django's `manage.py test` (TestCases in each app's `tests.py`).
+- Tests create business groups via `call_command("setup_groups")`; shared fixtures live in `docker/test_utils.py` (`create_business_groups`, `make_user`, `auth_client`).
+- The test DB is `test_bazpos_db` — the local DB user needs `ALL ON test_bazpos_db.*`. CI uses the MariaDB service with root, so it works out of the box.
+- Run tests locally: `python manage.py test --noinput`. Run the full suite via CI: `.github/workflows/test.yml`.
 - MySQL driver is PyMySQL (pinned). Do not swap to mysqlclient or other drivers.
 - Docker entrypoint runs: `wait-for-db → migrate → setup_groups → create_admin → collectstatic --clear → gunicorn`.

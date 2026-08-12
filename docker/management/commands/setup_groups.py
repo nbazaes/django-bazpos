@@ -131,8 +131,8 @@ class Command(BaseCommand):
         encargado.permissions.add(*producto_perms)
         # Puede gestionar facturas
         encargado.permissions.add(*factura_perms, *detalle_factura_perms, *precio_historico_perms)
-        # Puede ver proveedores (necesario para facturas)
-        encargado.permissions.add(*proveedor_perms.filter(codename='view_proveedor'))
+        # Puede ver y gestionar proveedores (necesario para facturas)
+        encargado.permissions.add(*proveedor_perms)
         # Puede gestionar usuarios
         encargado.permissions.add(*user_perms)
         # Puede gestionar configuracion de la tienda
