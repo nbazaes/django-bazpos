@@ -601,6 +601,8 @@ textarea.form-control, textarea.input {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  position: static;
+  left: auto;
 }
 
 .modal-body {
