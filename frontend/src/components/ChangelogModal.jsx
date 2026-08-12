@@ -20,9 +20,9 @@ export default function ChangelogModal({ entries, onClose, dismissable = true })
       <div className="modal-dialog modal-xl">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">
-              <i className="bi bi-megaphone me-2" />
-              Novedades
+            <h5 className="modal-title d-flex align-items-center">
+              <i className="bi bi-megaphone" style={{ marginRight: '8px' }} />
+              <span>Novedades</span>
             </h5>
             <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">&times;</button>
           </div>
