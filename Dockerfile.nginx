@@ -12,6 +12,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ .
+COPY CHANGELOG.md /app/CHANGELOG.md
 RUN npm run build
 
 # Stage 2: Serve with nginx

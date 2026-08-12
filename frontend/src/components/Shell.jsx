@@ -4,6 +4,8 @@ import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
 import { STORE_NAME } from "../lib/config";
 import TitleContext from "../lib/usePageTitle";
+import ChangelogModal from "./ChangelogModal";
+import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
 const vendedorLinks = [
   { to: "/", label: "Dashboard", end: true },
@@ -43,6 +45,16 @@ export default function Shell() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const embed = searchParams.get("embed") === "1";
+  const [changelogModal, setChangelogModal] = useState(null);
+  const unseenChangelog = getUnseenChangelog();
+
+  useEffect(() => {
+    if (embed) return;
+    if (unseenChangelog.length > 0) {
+      setChangelogModal({ entries: unseenChangelog, dismissable: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embed]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -71,6 +83,15 @@ export default function Shell() {
     clearTokens();
     setShowLogoutModal(false);
     navigate("/login");
+  }
+
+  function openChangelog() {
+    setChangelogModal({ entries: getFullChangelog(), dismissable: false });
+  }
+
+  function closeChangelog() {
+    markChangelogSeen();
+    setChangelogModal(null);
   }
 
   if (embed) {
@@ -135,7 +156,19 @@ export default function Shell() {
           )}
 
           <div className="sidebar-version">
-            {STORE_NAME} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+            <button
+              type="button"
+              className="sidebar-changelog-btn"
+              onClick={openChangelog}
+              title="Ver novedades"
+            >
+              <i className="bi bi-megaphone" />
+              <span>Novedades</span>
+              {unseenChangelog.length > 0 && <span className="changelog-dot" aria-label="Hay novedades nuevas" />}
+            </button>
+            <div>
+              {STORE_NAME} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+            </div>
           </div>
         </aside>
 
@@ -203,6 +236,14 @@ export default function Shell() {
             </div>
           </div>
         </div>
+      )}
+
+      {changelogModal && (
+        <ChangelogModal
+          entries={changelogModal.entries}
+          dismissable={changelogModal.dismissable}
+          onClose={closeChangelog}
+        />
       )}
     </TitleContext.Provider>
   );

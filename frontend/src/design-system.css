@@ -893,6 +893,39 @@ textarea.form-control, textarea.input {
   border-top: 1px solid var(--border-default);
 }
 
+.sidebar-version .sidebar-changelog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  opacity: 1;
+}
+.sidebar-version .sidebar-changelog-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.changelog-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1.5px solid var(--bg-elevated);
+}
+
 /* ====== HAMBURGER ====== */
 .topbar-left {
   display: flex;

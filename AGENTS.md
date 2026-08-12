@@ -38,6 +38,19 @@ python manage.py create_admin
 python manage.py seed_data
 ```
 
+## Release & Changelog
+- `CHANGELOG.md` (repo root) is bundled into the frontend at build time (`import.meta.env.CHANGELOG` in `vite.config.js`) and shown to users in a "Novedades" modal (auto-opens once per new version via localStorage `bazpos_changelog_seen`, plus a "Novedades" button in the sidebar).
+- To cut a release (after feature commits are on the branch):
+  ```bash
+  cd frontend
+  npm run release -- patch   # or minor | major
+  # → bumps package.json version + LLM-drafts a CHANGELOG.md entry
+  ```
+  Review/edit `../CHANGELOG.md` (LLM drafts; it's user-facing Chilean Spanish), then commit as `git commit -am "version X.Y.Z"` (matches the repo's existing "version X.Y.Z" pattern). The LLM call is optional — it falls back to a plain commit-subject list if no API key is set.
+- `npm run changelog` regenerates an entry without bumping the version.
+- LLM config (OpenRouter, free auto-routing) via env vars read from shell env or `frontend/.env`: `BAZPOS_LLM_API_KEY` (sk-or-…), `BAZPOS_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`), `BAZPOS_LLM_MODEL` (default `openrouter/auto:free`).
+- `Dockerfile.nginx` copies `CHANGELOG.md` into the build context so the bundled modal stays in sync with the deployed version.
+
 ## Architecture
 - Three services via Docker Compose: MariaDB, Django + Gunicorn, and nginx. Frontend SPA is built into the nginx container (`Dockerfile.nginx` two-stage build) and served from the same origin as the API.
 - Default API base is a relative path (`/api`). CORS is only needed when the frontend dev server runs on a different origin.
