@@ -163,6 +163,7 @@ export default function Shell() {
               title="Ver novedades"
             >
               <i className="bi bi-megaphone" />
+	      <span></span>
               <span>Novedades</span>
               {unseenChangelog.length > 0 && <span className="changelog-dot" aria-label="Hay novedades nuevas" />}
             </button>
