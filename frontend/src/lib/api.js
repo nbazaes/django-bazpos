@@ -3,7 +3,7 @@ import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "./auth
 
 function redirectToLogin() {
   clearTokens();
-  window.location.href = "/registration/login.html";
+  window.location.href = "/login";
 }
 
 async function rawRequest(path, { method = "GET", body, headers = {} } = {}) {
@@ -20,7 +20,9 @@ async function rawRequest(path, { method = "GET", body, headers = {} } = {}) {
   return response;
 }
 
-async function refreshAccessToken() {
+let refreshPromise = null;
+
+async function doRefresh() {
   const refresh = getRefreshToken();
   if (!refresh) return false;
   const response = await fetch(`${API_BASE}/auth/token/refresh/`, {
@@ -32,8 +34,17 @@ async function refreshAccessToken() {
     return false;
   }
   const data = await response.json();
-  saveTokens({ access: data.access, refresh });
+  saveTokens({ access: data.access, refresh: data.refresh });
   return true;
+}
+
+function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 export async function apiRequest(path, options = {}) {
