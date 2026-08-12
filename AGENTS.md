@@ -40,13 +40,15 @@ python manage.py seed_data
 
 ## Release & Changelog
 - `CHANGELOG.md` (repo root) is bundled into the frontend at build time (`import.meta.env.CHANGELOG` in `vite.config.js`) and shown to users in a "Novedades" modal (auto-opens once per new version via localStorage `bazpos_changelog_seen`, plus a "Novedades" button in the sidebar).
-- To cut a release (after feature commits are on the branch):
+- To cut a release (after feature commits are on the branch), control the version with `npm version` (default: bumps `package.json`, commits the bare version `X.Y.Z`, and creates tag `vX.Y.Z`), then generate the changelog:
   ```bash
   cd frontend
-  npm run release -- patch   # or minor | major
-  # → bumps package.json version + LLM-drafts a CHANGELOG.md entry
+  npm version X.Y.Z   # X.Y.Z = whatever you decide; or npm version patch|minor|major
+  npm run release     # LLM-drafts a CHANGELOG.md entry for the version it finds in package.json
+  git add ../CHANGELOG.md
+  git commit -m "changelog X.Y.Z"
   ```
-  Review/edit `../CHANGELOG.md` (LLM drafts; it's user-facing Chilean Spanish), then commit as `git commit -am "version X.Y.Z"` (matches the repo's existing "version X.Y.Z" pattern). The LLM call is optional — it falls back to a plain commit-subject list if no API key is set.
+  Review/edit `../CHANGELOG.md` (LLM drafts; it's user-facing Chilean Spanish) before committing. `npm run release` never bumps the version — it only generates the changelog entry for whatever version is already in `package.json`. The LLM call is optional — it falls back to a plain commit-subject list if no API key is set.
 - `npm run changelog` regenerates an entry without bumping the version.
 - LLM config (OpenRouter, free auto-routing) via env vars read from shell env or `frontend/.env`: `BAZPOS_LLM_API_KEY` (sk-or-…), `BAZPOS_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`), `BAZPOS_LLM_MODEL` (default `openrouter/auto:free`).
 - `Dockerfile.nginx` copies `CHANGELOG.md` into the build context so the bundled modal stays in sync with the deployed version.

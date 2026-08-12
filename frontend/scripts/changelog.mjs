@@ -73,6 +73,7 @@ function getCommitsSince(since) {
       (c) =>
         c.subject &&
         !/^version\s+\d+\.\d+\.\d+/i.test(c.subject) &&
+        !/^\d+\.\d+\.\d+$/i.test(c.subject) &&
         (isUserFacingKey(c.subject) || !INTERNAL_PREFIXES.test(c.subject)),
     );
 }
@@ -173,13 +174,24 @@ function renderEntry(version, sections) {
   return parts.join("\n");
 }
 
-function insertEntry(entryText) {
+function dropEntryBlock(lines, version) {
+  const start = lines.findIndex((l) => new RegExp(`^##\\s+\\[${version}\\]`).test(l.trim()));
+  if (start === -1) return lines;
+  let end = start + 1;
+  while (end < lines.length && !/^##\s+\[/.test(lines[end].trim())) end++;
+  return [...lines.slice(0, start), ...lines.slice(end)];
+}
+
+function insertEntry(entryText, version) {
   if (!fs.existsSync(CHANGELOG_PATH)) {
     fs.writeFileSync(CHANGELOG_PATH, `# Changelog\n\n${entryText}\n`);
     return;
   }
-  const original = fs.readFileSync(CHANGELOG_PATH, "utf-8");
-  const lines = original.split("\n");
+  let original = fs.readFileSync(CHANGELOG_PATH, "utf-8");
+  let lines = original.split("\n");
+  lines = dropEntryBlock(lines, version);
+  original = lines.join("\n");
+  lines = original.split("\n");
   const firstReleaseIdx = lines.findIndex((l) => /^##\s+\[/.test(l.trim()));
   const entryLines = entryText.split("\n");
   const newContent =
@@ -199,10 +211,25 @@ async function main() {
   const pkg = JSON.parse(fs.readFileSync(PKG_PATH, "utf-8"));
   const version = versionArg || pkg.version;
 
-  const lastReleaseHash = git(`git log --grep='^version ' --format=%H -1`);
-  const prevVersion = lastReleaseHash
-    ? git(`git log --format=%s -1 ${lastReleaseHash}`).match(/(\d+\.\d+\.\d+)/)?.[1]
-    : undefined;
+  const versionCommits = git(
+    `git log --format='%H%x09%s' --grep='^version\\s\\+\\?[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+' --grep='^[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+$'`,
+  )
+    .split("\n")
+    .map((line) => {
+      const [hash, subject] = line.split("\t");
+      return { hash, subject: (subject || "").trim(), version: (subject || "").match(/(\d+\.\d+\.\d+)/)?.[1] };
+    })
+    .filter((c) => c.hash && c.version);
+
+  let lastReleaseHash;
+  let prevVersion;
+  for (const c of versionCommits) {
+    if (c.version !== version) {
+      lastReleaseHash = c.hash;
+      prevVersion = c.version;
+      break;
+    }
+  }
 
   const commits = getCommitsSince(lastReleaseHash);
   if (commits.length === 0) {
@@ -233,7 +260,7 @@ async function main() {
     process.exit(0);
   }
 
-  insertEntry(entry);
+  insertEntry(entry, version);
   console.log(entry);
   console.log(`\n✍️  Changelog ${usedLLM ? "redactado por IA" : "básico"} escrito en ${CHANGELOG_PATH}`);
   console.log("Revíselo y edítelo antes de commitear.");
