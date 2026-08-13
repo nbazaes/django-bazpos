@@ -64,6 +64,7 @@ python manage.py seed_data
 ## API
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `auth/token/`, `auth/token/refresh/`, `auth/me/`
+- `store-name/` (public, no auth): returns `{"name": settings.STORE_NAME}` — runtime store name
 - `dashboard/stats/`
 - CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `devoluciones`, `ubicaciones`, `pedidos`, `configuracion`, `pedidos-proveedor`
 - Health check: `/health/` (used by Docker healthcheck)
@@ -92,6 +93,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `LANGUAGE_CODE = "es-cl"` (Chilean Spanish). DRF responses may be in Spanish from the DB.
 - `RequestLogMiddleware` is first in `MIDDLEWARE` to log all requests to a ring buffer (viewable at `/admin/logs/` by superusers).
 - `ALLOWED_HOSTS` reads from `DJANGO_ALLOWED_HOSTS` comma-separated env var.
+- `STORE_NAME` (settings) reads the env var of the same name. It is served publicly at `/api/store-name/`. In production the app container reads `STORE_NAME` from `.env`; the frontend fetches it at runtime (see `frontend/src/lib/storeName.js`), falling back to the build-time `VITE_STORE_NAME`. Edit `.env` → `docker compose up -d` to change the name without rebuilding the nginx image.
 
 ## Frontend Rules
 - Plain JSX with ESLint only. No TypeScript.

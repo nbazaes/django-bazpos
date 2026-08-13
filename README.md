@@ -152,6 +152,7 @@ Para producción con Docker copiar `.env.production.example` → `.env`.
 | `ADMIN_USER` | Superusuario creado por `create_admin` (Docker) |
 | `ADMIN_EMAIL` | Email del superusuario (Docker) |
 | `ADMIN_PASS` | Password del superusuario (Docker) |
+| `STORE_NAME` | Nombre de la tienda servido en runtime por `/api/store-name/` (default: `BAZPOS`) |
 
 ### Frontend
 
@@ -161,7 +162,7 @@ Copiar `frontend/.env.example` → `frontend/.env`.
 |---|---|
 | `VITE_API_BASE_URL` | Ruta del API. Default `/api` (mismo origen en producción). Para dev separado: `http://localhost:8000/api` |
 | `VITE_BACKEND_URL` | URL base del backend para redirecciones/media. Default vacío (mismo origen) |
-| `VITE_STORE_NAME` | Nombre mostrado en la UI (default: `BAZPOS`) |
+| `VITE_STORE_NAME` | Nombre mostrado en la UI (default: `BAZPOS`). Fallback compilado; en producción el nombre real lo sirve el backend en runtime desde `STORE_NAME` |
 
 ## Estructura del Proyecto
 

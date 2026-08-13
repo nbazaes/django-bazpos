@@ -4,7 +4,7 @@ import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
-import { STORE_NAME } from "../lib/config";
+import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useDebounce } from "../lib/hooks";
 import { getUser, isGerente } from "../lib/auth";
@@ -263,7 +263,7 @@ export default function VentaPage() {
     const total = totalConDescuento;
     const config = getStoreConfig();
     return {
-      tienda: STORE_NAME,
+      tienda: getStoreName(),
       telefono: config.telefono,
       direccion: config.direccion,
       tipo_documento: tipoDocumento,

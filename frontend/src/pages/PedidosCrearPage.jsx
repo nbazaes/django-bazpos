@@ -4,7 +4,7 @@ import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { STORE_NAME } from "../lib/config";
+import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/useToast";
 
@@ -254,7 +254,7 @@ export default function PedidosCrearPage() {
       </head>
       <body>
         <div class="center">
-          <div class="store">${STORE_NAME}</div>
+          <div class="store">${getStoreName()}</div>
           ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
           ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
           <div class="title">${titulo}</div>

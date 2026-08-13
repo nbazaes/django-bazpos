@@ -8,7 +8,7 @@ import {
   usePedido,
   usePedidos,
 } from "../lib/queries";
-import { STORE_NAME } from "../lib/config";
+import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/useToast";
 import { getUser, isGerente } from "../lib/auth";
@@ -209,7 +209,7 @@ export default function PedidosHistorial() {
       </head>
       <body>
         <div class="center">
-          <div class="store">${STORE_NAME}</div>
+          <div class="store">${getStoreName()}</div>
           ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
           ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
           <div class="title">${titulo}</div>
