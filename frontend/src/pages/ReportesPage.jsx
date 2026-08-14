@@ -33,13 +33,8 @@ export default function ReportesPage() {
   const [tab, setTab] = useState("ventas-diarias");
 
   const hoy = new Date();
-  const [monthValue, setMonthValue] = useState(() => {
-    const yr = hoy.getFullYear();
-    const mo = String(hoy.getMonth() + 1).padStart(2, "0");
-    return `${yr}-${mo}`;
-  });
-
-  const [anio, mes] = monthValue.split("-").map(Number);
+  const [mes, setMes] = useState(hoy.getMonth() + 1);
+  const [anio, setAnio] = useState(hoy.getFullYear());
 
   const { data, error, isLoading } = useReportesStats({ mes, anio });
 
@@ -100,13 +95,33 @@ export default function ReportesPage() {
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
           Mes:
-          <input
-            type="month"
+          <select
             className="form-control"
-            value={monthValue}
-            onChange={(e) => setMonthValue(e.target.value)}
-            style={{ maxWidth: 200 }}
-          />
+            value={mes}
+            onChange={(e) => setMes(Number(e.target.value))}
+            style={{ maxWidth: 150 }}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>
+                {new Date(anio, m - 1, 1).toLocaleString("es-CL", { month: "long" })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
+          Año:
+          <select
+            className="form-control"
+            value={anio}
+            onChange={(e) => setAnio(Number(e.target.value))}
+            style={{ maxWidth: 110 }}
+          >
+            {Array.from({ length: 5 }, (_, i) => hoy.getFullYear() - i).map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </label>
         {data && (
           <div className="stat-card stat-card-success" style={{ marginBottom: 0 }}>
