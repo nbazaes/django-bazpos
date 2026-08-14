@@ -148,7 +148,7 @@ export default function ReportesPage() {
 
       {data && tab === "ventas-diarias" && (
         <PageCard title="Historial de ventas diarias">
-          {chartData && data.ventas_diarias.length > 0 ? (
+          {chartData && (data.ventas_diarias || []).length > 0 ? (
             <div style={{ height: 400 }}>
               <Line data={chartData} options={chartOptions} />
             </div>
@@ -160,7 +160,7 @@ export default function ReportesPage() {
 
       {data && tab === "top-productos" && (
         <PageCard title="Top 10 productos más vendidos del mes">
-          {data.top_productos_mes.length > 0 ? (
+          {(data.top_productos_mes || []).length > 0 ? (
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>
@@ -193,7 +193,7 @@ export default function ReportesPage() {
 
       {data && tab === "stock-critico" && (
         <PageCard title="Stock crítico">
-          {data.stock_critico.length > 0 ? (
+          {(data.stock_critico || []).length > 0 ? (
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>
@@ -228,7 +228,7 @@ export default function ReportesPage() {
 
       {data && tab === "ventas-vendedor" && (
         <PageCard title="Ventas por vendedor del mes">
-          {data.ventas_por_vendedor_mes.length > 0 ? (
+          {(data.ventas_por_vendedor_mes || []).length > 0 ? (
             <div className="table-responsive">
               <table className="table table-sm table-bordered">
                 <thead>
