@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
+from gerenteApp.models import PrecioHistorico
 from vendedorApp.models import (
     AjusteStock,
     Anulacion,
@@ -30,6 +31,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
     stock_actual = serializers.IntegerField(read_only=True)
     ubicaciones_stock = serializers.SerializerMethodField()
+    ultima_fecha_llegada = serializers.DateField(read_only=True, allow_null=True)
 
     class Meta:
         model = Producto
@@ -51,6 +53,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "proveedor",
             "proveedor_nombre",
             "ubicaciones_stock",
+            "ultima_fecha_llegada",
         ]
 
     def get_ubicaciones_stock(self, obj):
@@ -78,6 +81,7 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
     producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
     codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
     producto_oem = serializers.CharField(source="producto.oem", read_only=True)
+    producto_marca = serializers.CharField(source="producto.marca", read_only=True)
 
     class Meta:
         model = DetalleVenta
@@ -87,6 +91,7 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
             "codigo_producto",
             "producto_oem",
             "producto_nombre",
+            "producto_marca",
             "cantidad",
             "precio_unitario",
             "precio_descontado",
@@ -119,6 +124,7 @@ class VentaSerializer(serializers.ModelSerializer):
             "tipo_documento_display",
             "venta_origen",
             "cliente_nombre",
+            "documento_html",
             "detalles",
             "productos_devueltos",
         ]
@@ -424,6 +430,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "pedido_origen",
             "convertido",
             "fecha_creacion",
+            "motivo_cancelacion",
             "detalles",
         ]
 
@@ -451,6 +458,10 @@ class CrearPedidoSerializer(serializers.Serializer):
     metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
     items = PedidoDetalleInputSerializer(many=True)
     es_cotizacion = serializers.BooleanField(default=False)
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido._meta.get_field("estado_documento").choices,
+        default=Pedido.EstadoDocumento.SIN_BOLETEAR,
+    )
 
     def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import ROUND_HALF_UP, ROUND_UP
@@ -496,7 +507,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             costo_envio=costo_envio,
             metodo_pago=validated_data["metodo_pago"],
             estado=Pedido.Estado.PENDIENTE_RETIRAR,
-            estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+            estado_documento=validated_data.get("estado_documento", Pedido.EstadoDocumento.SIN_BOLETEAR),
             es_cotizacion=es_cotizacion,
         )
 
@@ -529,6 +540,47 @@ class CrearPedidoSerializer(serializers.Serializer):
                 sumar_envio=item.get("sumar_envio", True),
                 stellantis=item.get("stellantis", False),
             )
+
+        if not es_cotizacion:
+            from datetime import date, timedelta
+            from django.db.models import Q
+            from vendedorApp.models import PedidoProveedorDia, ItemPedidoProveedor
+
+            for item in items:
+                producto_id = item.get("producto_id")
+                producto = None
+                if producto_id:
+                    try:
+                        producto = Producto.objects.get(producto_id=producto_id)
+                    except Producto.DoesNotExist:
+                        producto = None
+
+                fecha = date.today()
+                dia_hoy = PedidoProveedorDia.objects.filter(fecha=fecha).first()
+                if dia_hoy and dia_hoy.finalizado:
+                    fecha = date.today() + timedelta(days=1)
+
+                dia, _ = PedidoProveedorDia.objects.get_or_create(fecha=fecha)
+
+                if producto:
+                    ItemPedidoProveedor.objects.get_or_create(
+                        dia=dia,
+                        producto=producto,
+                        defaults={"proveedor": producto.proveedor},
+                    )
+                else:
+                    if not ItemPedidoProveedor.objects.filter(
+                        dia=dia,
+                        proveedor_id=item["proveedor_id"],
+                        nombre_custom=item["nombre"],
+                    ).exists():
+                        ItemPedidoProveedor.objects.create(
+                            dia=dia,
+                            producto=None,
+                            proveedor_id=item["proveedor_id"],
+                            nombre_custom=item["nombre"],
+                            codigo_proveedor_custom=item["codigo_proveedor"],
+                        )
 
         if not es_cotizacion:
             venta = Venta.objects.create(
@@ -655,3 +707,25 @@ class AgregarItemPedidoProveedorSerializer(serializers.Serializer):
                 {"proveedor_id": "Debe seleccionar un proveedor para un producto personalizado"}
             )
         return data
+
+
+class PrecioHistoricoSerializer(serializers.ModelSerializer):
+    factura_numero = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PrecioHistorico
+        fields = [
+            "id",
+            "precio_costo_anterior",
+            "precio_costo_nuevo",
+            "precio_venta_anterior",
+            "precio_venta_nuevo",
+            "fecha",
+            "factura",
+            "factura_numero",
+        ]
+
+    def get_factura_numero(self, obj):
+        if obj.factura:
+            return obj.factura.numero_factura
+        return None

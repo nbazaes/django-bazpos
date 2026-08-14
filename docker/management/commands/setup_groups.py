@@ -95,6 +95,16 @@ class Command(BaseCommand):
             content_type__model='storeconfig',
         )
 
+        # vendedorApp: PedidoProveedorDia, ItemPedidoProveedor
+        pedido_proveedor_dia_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='pedidoproveedordia',
+        )
+        item_pedido_proveedor_perms = Permission.objects.filter(
+            content_type__app_label='vendedorApp',
+            content_type__model='itempedidoproveedor',
+        )
+
         # ── 1. Vendedor ──
         vendedor, created = Group.objects.get_or_create(name='Vendedor')
         vendedor.permissions.clear()
@@ -106,6 +116,7 @@ class Command(BaseCommand):
             *pedido_perms,
             *detalle_pedido_perms,
             *store_config_perms.filter(codename='view_storeconfig'),
+            *pedido_proveedor_dia_perms.filter(codename='add_pedidoproveedordia'),
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Vendedor' {status} con permisos."))
@@ -120,12 +131,15 @@ class Command(BaseCommand):
         encargado.permissions.add(*producto_perms)
         # Puede gestionar facturas
         encargado.permissions.add(*factura_perms, *detalle_factura_perms, *precio_historico_perms)
-        # Puede ver proveedores (necesario para facturas)
-        encargado.permissions.add(*proveedor_perms.filter(codename='view_proveedor'))
+        # Puede ver y gestionar proveedores (necesario para facturas)
+        encargado.permissions.add(*proveedor_perms)
         # Puede gestionar usuarios
         encargado.permissions.add(*user_perms)
         # Puede gestionar configuracion de la tienda
         encargado.permissions.add(*store_config_perms)
+        # Puede gestionar pedidos a proveedores
+        encargado.permissions.add(*pedido_proveedor_dia_perms, *item_pedido_proveedor_perms)
+        encargado.permissions.add(*ubicacion_perms)
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Encargado' {status} con permisos."))
 
@@ -141,6 +155,7 @@ class Command(BaseCommand):
         bodeguero.permissions.add(*stock_ubicacion_perms)
         bodeguero.permissions.add(*ubicacion_perms)
         bodeguero.permissions.add(*store_config_perms.filter(codename='view_storeconfig'))
+        bodeguero.permissions.add(*pedido_proveedor_dia_perms.filter(codename='add_pedidoproveedordia'))
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Bodeguero' {status} con permisos."))
 
@@ -163,6 +178,9 @@ class Command(BaseCommand):
             *precio_historico_perms,
             *user_perms,
             *store_config_perms,
+            *pedido_proveedor_dia_perms,
+            *item_pedido_proveedor_perms,
+            *ubicacion_perms,
         )
         status = "creado" if created else "actualizado"
         self.stdout.write(self.style.SUCCESS(f"Grupo 'Gerente' {status} con permisos."))

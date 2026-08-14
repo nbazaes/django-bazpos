@@ -1,0 +1,62 @@
+services:
+  db:
+    image: mariadb:12
+    container_name: bazpos_db
+    restart: always
+    env_file: .env
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - bazpos
+
+  app:
+    image: ${APP_IMAGE}
+    container_name: bazpos_app
+    restart: always
+    env_file: .env
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health/').read().decode())\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - bazpos
+
+  nginx:
+    image: ${NGINX_IMAGE}
+    container_name: bazpos_nginx
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+    volumes:
+      - static_files:/var/www/static:ro
+      - media_files:/var/www/media:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - bazpos
+
+volumes:
+  mysql_data:
+  static_files:
+  media_files:
+
+networks:
+  bazpos:
+    driver: bridge

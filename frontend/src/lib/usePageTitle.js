@@ -1,14 +1,15 @@
 import { createContext, useContext, useEffect } from "react";
-import { STORE_NAME } from "./config";
+import { useStoreName } from "./storeName";
 
 const TitleContext = createContext(() => {});
 
 export function usePageTitle(title) {
   const setTitle = useContext(TitleContext);
+  const storeName = useStoreName();
   useEffect(() => {
     setTitle(title);
-    document.title = `${STORE_NAME} — ${title}`;
-  }, [title, setTitle]);
+    document.title = `${storeName} — ${title}`;
+  }, [title, setTitle, storeName]);
 }
 
 export default TitleContext;

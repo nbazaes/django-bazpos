@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
@@ -8,11 +8,14 @@ import {
   useCreateFactura,
   useFactura,
   useImpuesto,
-  useBuscarProductoFactura,
   useProveedores,
   useUpdateFactura,
+  useUbicaciones,
 } from "../lib/queries";
 import { calcularPrecioVenta } from "../lib/tax";
+import { useDebounce } from "../lib/hooks";
+import { apiRequest } from "../lib/api";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 
 function todayLocal() {
   const now = new Date();
@@ -30,39 +33,92 @@ export default function FacturaFormPage() {
 
   const [step, setStep] = useState(isEdit ? "items" : "header");
   const [header, setHeader] = useState({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
-  const [productoId, setProductoId] = useState("");
-  const [searchCodigo, setSearchCodigo] = useState("");
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
-  const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
   const [createUrl, setCreateUrl] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [ubicacionModalIdx, setUbicacionModalIdx] = useState(null);
+  const searchRequestRef = useRef(0);
 
   const { data: proveedoresData } = useProveedores({ page_size: 200 });
   const { data: facturaData } = useFactura(id);
   const { data: impuestoData } = useImpuesto();
-  const { data: productoSearchData, isFetching: buscandoProducto } = useBuscarProductoFactura(searchCodigo);
+  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
   const checkMutation = useCheckFacturaExiste();
   const createMutation = useCreateFactura();
   const updateMutation = useUpdateFactura();
 
+  const ubicaciones = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData?.results]);
+
   useEffect(() => {
-    if (!searchCodigo || buscandoProducto) return;
-    if (!productoSearchData) return;
-    if (productoSearchData.encontrado) {
-      const p = productoSearchData.producto;
-      setItems((prev) => [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1, margen_utilidad: Number(p.margen_utilidad) || 0 }]);
-      setProductoId("");
-      setSearchCodigo("");
-      setError("");
-    } else {
-      setShowCreatePrompt(true);
-      setError("Producto no encontrado");
+    fetchStoreConfig();
+  }, []);
+
+  const buscarProductos = useCallback(async (texto) => {
+    if (!texto) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productoSearchData, buscandoProducto]);
+    setSearching(true);
+    const reqId = ++searchRequestRef.current;
+    try {
+      const result = await apiRequest(`/productos/?texto=${encodeURIComponent(texto)}&sin_stock=true&page_size=50`);
+      if (reqId !== searchRequestRef.current) return;
+      const productos = Array.isArray(result) ? result : result.results || [];
+      setSearchResults(productos);
+      if (productos.length === 0) {
+        setError("Producto no encontrado");
+      } else {
+        setError("");
+      }
+    } catch (err) {
+      if (reqId !== searchRequestRef.current) return;
+      setError(err.message);
+      setSearchResults([]);
+    } finally {
+      if (reqId === searchRequestRef.current) setSearching(false);
+    }
+  }, []);
+
+  const debouncedSearch = useDebounce(searchText.trim(), 250);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) buscarProductos(debouncedSearch);
+    });
+    return () => { cancelled = true; };
+  }, [debouncedSearch, buscarProductos]);
+
+  function agregarDesdeBusqueda(producto) {
+    setItems((prev) => {
+      const exists = prev.find((it) => it.producto_id === producto.producto_id);
+      if (exists) return prev;
+      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+      return [...prev, {
+        producto_id: producto.producto_id,
+        codigo_producto: producto.codigo_producto,
+        codigo_proveedor: producto.codigo_proveedor || "",
+        nombre: producto.nombre,
+        proveedor_nombre: producto.proveedor_nombre || "",
+        precio: producto.precio_costo,
+        cantidad: 1,
+        margen_utilidad: Number(producto.margen_utilidad) || 0,
+        ubicaciones: defaultUbicacion
+          ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
+          : [],
+      }];
+    });
+    setSearchText("");
+    setSearchResults([]);
+    setError("");
+  }
 
   const proveedores = useMemo(() => proveedoresData?.results ?? [], [proveedoresData?.results]);
   const taxPercent = impuestoData?.tax_percent ?? 0;
@@ -76,14 +132,20 @@ export default function FacturaFormPage() {
         proveedor_id: facturaData.proveedor,
         fecha: facturaData.fecha,
       });
+      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
       setItems(
         (facturaData.detalles || []).map((d) => ({
           producto_id: d.producto,
           codigo_producto: d.codigo_producto,
+          codigo_proveedor: d.codigo_proveedor || "",
           nombre: d.nombre,
+          proveedor_nombre: d.proveedor_nombre || "",
           precio: d.costo_compra,
           cantidad: d.cantidad,
           margen_utilidad: Number(d.margen_utilidad) || 0,
+          ubicaciones: defaultUbicacion
+            ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: d.cantidad }]
+            : [],
         }))
       );
     }
@@ -102,9 +164,21 @@ export default function FacturaFormPage() {
     setItems((prev) => {
       const exists = prev.find((it) => it.producto_id === p.producto_id);
       if (exists) return prev;
-      return [...prev, { producto_id: p.producto_id, codigo_producto: p.codigo_producto, nombre: p.nombre, precio: p.precio_costo, cantidad: 1, margen_utilidad: Number(p.margen_utilidad) || 0 }];
+      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+      return [...prev, {
+        producto_id: p.producto_id,
+        codigo_producto: p.codigo_producto,
+        codigo_proveedor: p.codigo_proveedor || "",
+        nombre: p.nombre,
+        proveedor_nombre: p.proveedor_nombre || "",
+        precio: p.precio_costo,
+        cantidad: 1,
+        margen_utilidad: Number(p.margen_utilidad) || 0,
+        ubicaciones: defaultUbicacion
+          ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
+          : [],
+      }];
     });
-    setProductoId("");
     setError("");
     setShowCreatedSuccess(true);
     setTimeout(() => {
@@ -118,20 +192,13 @@ export default function FacturaFormPage() {
     return () => window.removeEventListener("message", handleProductCreated);
   }, [handleProductCreated]);
 
-  function buscarProducto() {
-    const codigo = productoId.trim();
-    if (!codigo) return;
-    setSearchCodigo(codigo);
-  }
-
   function abrirCrearProducto() {
     const params = new URLSearchParams();
-    if (productoId) params.set("codigo_producto", productoId);
+    if (searchText) params.set("codigo_producto", searchText);
     if (header.proveedor_id) params.set("proveedor", String(header.proveedor_id));
     params.set("from_factura", "1");
     params.set("embed", "1");
     setCreateUrl(`/productos/crear?${params.toString()}`);
-    setShowCreatePrompt(false);
     setShowCreateModal(true);
   }
 
@@ -171,7 +238,12 @@ export default function FacturaFormPage() {
       numero_factura: Number(header.numero_factura),
       proveedor_id: Number(header.proveedor_id),
       fecha: header.fecha,
-      productos: items.map((it) => ({ producto_id: Number(it.producto_id), precio: Number(it.precio), cantidad: Number(it.cantidad) })),
+      productos: items.map((it) => ({
+        producto_id: Number(it.producto_id),
+        precio: Number(it.precio),
+        cantidad: Number(it.cantidad),
+        ubicaciones: (it.ubicaciones || []).filter((u) => u.ubicacion_id && u.cantidad > 0),
+      })),
     };
     const mutation = id ? updateMutation : createMutation;
     mutation.mutate(id ? { id, data: payload } : payload, {
@@ -190,7 +262,29 @@ export default function FacturaFormPage() {
     });
   }
 
+  function getUbicacionSummary(item) {
+    const ubs = item.ubicaciones || [];
+    const valid = ubs.filter((u) => u.ubicacion_id);
+    if (valid.length === 0) return "Sin ubicación";
+    if (valid.length === 1) {
+      const ub = ubicaciones.find((u) => u.id === valid[0].ubicacion_id);
+      return ub ? ub.nombre : "—";
+    }
+    return `${valid.length} ubicaciones`;
+  }
+
   const saving = createMutation.isPending || updateMutation.isPending;
+
+  const ubicacionesInvalidas = useMemo(() => {
+    return items.some((it) => {
+      const ubs = it.ubicaciones || [];
+      if (ubs.length === 0) return false;
+      const hasEmpty = ubs.some((u) => !u.ubicacion_id);
+      if (hasEmpty) return true;
+      const total = ubs.reduce((s, u) => s + (u.cantidad || 0), 0);
+      return total !== (it.cantidad || 0);
+    });
+  }, [items]);
 
   const headerField = (label, disabled, value, onChange, type) => (
     <div className="col-md-4 form-group">
@@ -286,45 +380,131 @@ export default function FacturaFormPage() {
           headerReadonlyFields
         )}
 
-        <div className="page-actions">
-          <input className="form-control" style={{ maxWidth: 260 }} placeholder="Código producto" value={productoId} onChange={(e) => setProductoId(e.target.value)} />
-          <button type="button" className="btn btn-secondary" onClick={buscarProducto}>
-            {buscandoProducto ? "Buscando..." : "Agregar producto"}
-          </button>
+        <div className="page-actions mb-0">
+          <input
+            className="form-control"
+            style={{ maxWidth: 400 }}
+            placeholder="Buscar por código, OEM o nombre..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-sm table-bordered">
-            <thead><tr><th>Código</th><th>Nombre</th><th>Precio costo</th><th>Precio con IVA</th><th>Cantidad</th><th style={{ whiteSpace: "nowrap" }}>Margen utilidad (%)</th><th>Precio venta</th><th></th></tr></thead>
-            <tbody>
-              {items.map((it, idx) => (
-                <tr key={`${it.producto_id}-${idx}`}>
-                  <td>{it.codigo_producto}</td>
-                  <td>{it.nombre}</td>
-                  <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
-                  <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
-                  <td>
-                    <StepperInput
-                      value={it.cantidad}
-                      onChange={(val) => {
-                        const next = [...items];
-                        next[idx].cantidad = val;
-                        setItems(next);
-                      }}
-                      min={1}
-                      inputStyle={{ width: 64, fontSize: "0.85rem" }}
-                      decrementLabel={`Disminuir cantidad de ${it.nombre}`}
-                      incrementLabel={`Aumentar cantidad de ${it.nombre}`}
-                    />
-                  </td>
-                  <td><input className="form-control form-control-sm" type="number" step="0.01" style={{ width: 80 }} value={it.margen_utilidad} onChange={(e) => { const next = [...items]; next[idx].margen_utilidad = e.target.value; setItems(next); }} /></td>
-                  <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, whiteSpace: "nowrap" }}>${calcularPrecioVenta(it.precio, it.margen_utilidad).toLocaleString()}</td>
-                  <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}></i></td>
+        {searching && (
+          <div className="text-secondary mt-2" style={{ fontSize: "0.85rem" }}>Buscando...</div>
+        )}
+
+        {searchResults.length > 0 && (
+          <div className="table-responsive mt-2 mb-3">
+            <table className="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Cód. Proveedor</th>
+                  <th>Proveedor</th>
+                  <th>Nombre</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {searchResults.map((p) => {
+                  const alreadyAdded = items.some((it) => it.producto_id === p.producto_id);
+                  return (
+                    <tr key={p.producto_id}>
+                      <td style={{ whiteSpace: "nowrap" }}>{p.codigo_producto}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>{p.codigo_proveedor || "—"}</td>
+                      <td>{p.proveedor_nombre || "—"}</td>
+                      <td>{p.nombre}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {alreadyAdded ? (
+                          <span className="badge" style={{ background: "var(--gray-200)", color: "var(--gray-600)" }}>Agregado</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary"
+                            onClick={() => agregarDesdeBusqueda(p)}
+                          >
+                            Agregar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!searching && searchText.trim() && searchResults.length === 0 && (
+          <div className="mt-2 mb-3">
+            <span className="text-secondary">Producto no encontrado. </span>
+            <button type="button" className="btn btn-sm btn-primary" onClick={abrirCrearProducto}>
+              Crear producto
+            </button>
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div className="table-responsive mt-3">
+            <table className="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Cód. Proveedor</th>
+                  <th>Proveedor</th>
+                  <th>Nombre</th>
+                  <th>Precio costo</th>
+                  <th>Precio con IVA</th>
+                  <th>Cantidad</th>
+                  <th style={{ whiteSpace: "nowrap" }}>Margen utilidad (%)</th>
+                  <th>Precio venta</th>
+                  <th>Ubicación</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, idx) => (
+                  <tr key={`${it.producto_id}-${idx}`}>
+                    <td style={{ whiteSpace: "nowrap" }}>{it.codigo_producto}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{it.codigo_proveedor || "—"}</td>
+                    <td>{it.proveedor_nombre || "—"}</td>
+                    <td>{it.nombre}</td>
+                    <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
+                    <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
+                    <td>
+                      <StepperInput
+                        value={it.cantidad}
+                        onChange={(val) => {
+                          const next = [...items];
+                          next[idx].cantidad = val;
+                          setItems(next);
+                        }}
+                        min={1}
+                        inputStyle={{ width: 64, fontSize: "0.85rem" }}
+                        decrementLabel={`Disminuir cantidad de ${it.nombre}`}
+                        incrementLabel={`Aumentar cantidad de ${it.nombre}`}
+                      />
+                    </td>
+                    <td><input className="form-control form-control-sm" type="number" step="0.01" style={{ width: 80 }} value={it.margen_utilidad} onChange={(e) => { const next = [...items]; next[idx].margen_utilidad = e.target.value; setItems(next); }} /></td>
+                    <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, whiteSpace: "nowrap" }}>${calcularPrecioVenta(it.precio, it.margen_utilidad).toLocaleString()}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={() => setUbicacionModalIdx(idx)}
+                        title="Repartir stock en ubicaciones"
+                      >
+                        {getUbicacionSummary(it)}
+                      </button>
+                    </td>
+                    <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}></i></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="flex justify-end mb-4 text-right">
           <div>
@@ -339,7 +519,7 @@ export default function FacturaFormPage() {
               Volver
             </button>
           )}
-          <button className="btn btn-primary" type="submit" disabled={saving}>
+          <button className="btn btn-primary" type="submit" disabled={saving || ubicacionesInvalidas}>
             {saving ? "Guardando..." : "Guardar factura"}
           </button>
         </div>
@@ -347,30 +527,163 @@ export default function FacturaFormPage() {
     </PageCard>
   );
 
+  const renderUbicacionModal = () => {
+    if (ubicacionModalIdx === null) return null;
+    const item = items[ubicacionModalIdx];
+    if (!item) return null;
+
+    const itemUbicaciones = item.ubicaciones || [];
+    const totalUbicado = itemUbicaciones.reduce((sum, u) => sum + (u.cantidad || 0), 0);
+    const restante = (item.cantidad || 0) - totalUbicado;
+    const hasEmptyUbicacion = itemUbicaciones.some((u) => !u.ubicacion_id);
+
+    return (
+      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setUbicacionModalIdx(null); }}>
+        <div className="modal-dialog" style={{ maxWidth: 520 }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Repartir stock — {item.nombre}</h5>
+              <button type="button" className="modal-close" onClick={() => setUbicacionModalIdx(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <span className="text-secondary">Cantidad total a repartir: </span>
+                <strong>{item.cantidad}</strong>
+                {restante !== 0 && (
+                  <span style={{ color: restante < 0 ? "var(--danger)" : "var(--warning)", marginLeft: 8 }}>
+                    {restante < 0 ? `Excedente: ${Math.abs(restante)}` : `Restante por asignar: ${restante}`}
+                  </span>
+                )}
+                {restante === 0 && (
+                  <span className="text-success" style={{ marginLeft: 8 }}>Completo</span>
+                )}
+              </div>
+
+              {itemUbicaciones.map((ub, ui) => (
+                <div key={ui} className="row mb-2 align-items-center">
+                  <div className="col">
+                    <select
+                      className="form-control form-control-sm"
+                      value={ub.ubicacion_id || ""}
+                      onChange={(e) => {
+                        const next = [...items];
+                        const ubs = [...next[ubicacionModalIdx].ubicaciones];
+                        ubs[ui] = { ...ubs[ui], ubicacion_id: e.target.value ? Number(e.target.value) : null };
+                        next[ubicacionModalIdx] = { ...next[ubicacionModalIdx], ubicaciones: ubs };
+                        setItems(next);
+                      }}
+                    >
+                      <option value="">Seleccione</option>
+                      {ubicaciones.map((u) => (
+                        <option key={u.id} value={u.id}>{u.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-auto" style={{ width: 100 }}>
+                    <input
+                      className="form-control form-control-sm"
+                      type="number"
+                      min={0}
+                      value={ub.cantidad}
+                      onChange={(e) => {
+                        const next = [...items];
+                        const ubs = [...next[ubicacionModalIdx].ubicaciones];
+                        ubs[ui] = { ...ubs[ui], cantidad: Number(e.target.value) || 0 };
+                        next[ubicacionModalIdx] = { ...next[ubicacionModalIdx], ubicaciones: ubs };
+                        setItems(next);
+                      }}
+                    />
+                  </div>
+                  <div className="col-auto">
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ color: "var(--danger)" }}
+                      onClick={() => {
+                        const next = [...items];
+                        const ubs = next[ubicacionModalIdx].ubicaciones.filter((_, i) => i !== ui);
+                        next[ubicacionModalIdx] = { ...next[ubicacionModalIdx], ubicaciones: ubs };
+                        setItems(next);
+                      }}
+                    >
+                      <i className="bi bi-trash" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary mt-2"
+                onClick={() => {
+                  const next = [...items];
+                  const ubs = [...next[ubicacionModalIdx].ubicaciones, { ubicacion_id: null, cantidad: 0 }];
+                  next[ubicacionModalIdx] = { ...next[ubicacionModalIdx], ubicaciones: ubs };
+                  setItems(next);
+                }}
+              >
+                + Agregar ubicación
+              </button>
+
+              {restante > 0 && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => {
+                      const next = [...items];
+                      const ubs = next[ubicacionModalIdx].ubicaciones.filter((u) => u.ubicacion_id);
+                      if (ubs.length > 0) {
+                        const perLocation = Math.floor(restante / ubs.length);
+                        let extra = restante - perLocation * ubs.length;
+                        const updated = ubs.map((u) => {
+                          const add = perLocation + (extra > 0 ? 1 : 0);
+                          if (extra > 0) extra--;
+                          return { ...u, cantidad: (u.cantidad || 0) + add };
+                        });
+                        next[ubicacionModalIdx] = { ...next[ubicacionModalIdx], ubicaciones: updated };
+                        setItems(next);
+                      }
+                    }}
+                  >
+                    Repartir restante equitativamente
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const next = [...items];
+                  const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+                  next[ubicacionModalIdx] = {
+                    ...next[ubicacionModalIdx],
+                    ubicaciones: defaultUbicacion
+                      ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: next[ubicacionModalIdx].cantidad }]
+                      : [],
+                  };
+                  setItems(next);
+                }}
+              >
+                Reset a ubicación por defecto
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setUbicacionModalIdx(null)} disabled={restante !== 0 || hasEmptyUbicacion}>
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       {step === "header" && renderStepHeader()}
       {step === "items" && renderStepItems()}
-
-      {showCreatePrompt && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Producto no encontrado</h5>
-                <button type="button" className="modal-close" onClick={() => { setShowCreatePrompt(false); setSearchCodigo(""); }}>&times;</button>
-              </div>
-              <div className="modal-body">
-                <p className="mb-0 text-secondary">No existe ese código. ¿Desea crear un producto ahora?</p>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowCreatePrompt(false); setSearchCodigo(""); }}>Cancelar</button>
-                <button type="button" className="btn btn-primary" onClick={abrirCrearProducto}>Crear producto</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderUbicacionModal()}
 
       {showCreateModal && (
         <div className="modal" role="dialog" aria-modal="true">

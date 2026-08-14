@@ -115,6 +115,24 @@ export function useProductoPorCodigo(codigo) {
   });
 }
 
+// ── Producto detalle ──
+
+export function useUltimaFacturaProducto(productoId) {
+  return useQuery({
+    queryKey: ["productos", "ultima-factura", productoId],
+    queryFn: () => apiRequest(`/productos/${productoId}/ultima-factura/`),
+    enabled: !!productoId,
+  });
+}
+
+export function useHistorialPrecios(productoId, params = {}) {
+  return useQuery({
+    queryKey: ["productos", "historial-precios", productoId, params],
+    queryFn: () => apiRequest(`/productos/${productoId}/historial-precios/${buildQuery(params)}`),
+    enabled: !!productoId,
+  });
+}
+
 // ── Ventas ──
 
 export function useVentas(params = {}) {
@@ -263,10 +281,10 @@ export function useCambiarEstadoPedido() {
 export function useMarcarRetiro() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, persona_retiro }) =>
+    mutationFn: ({ pedidoId, persona_retiro, estado_documento }) =>
       apiRequest(`/pedidos/${pedidoId}/marcar-retiro/`, {
         method: "POST",
-        body: { persona_retiro },
+        body: { persona_retiro, estado_documento },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
@@ -276,11 +294,14 @@ export function useMarcarRetiro() {
   });
 }
 
-export function useDesactivarPedido() {
+export function useCancelarPedido() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (pedidoId) =>
-      apiRequest(`/pedidos/${pedidoId}/desactivar/`, { method: "POST" }),
+    mutationFn: ({ pedidoId, motivo }) =>
+      apiRequest(`/pedidos/${pedidoId}/cancelar/`, {
+        method: "POST",
+        body: { motivo },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
       qc.invalidateQueries({ queryKey: queryKeys.ventas.all });
@@ -291,10 +312,10 @@ export function useDesactivarPedido() {
 export function useConvertirCotizacion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, detalle_ids }) =>
+    mutationFn: ({ pedidoId, detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento }) =>
       apiRequest(`/pedidos/${pedidoId}/convertir-a-pedido/`, {
         method: "POST",
-        body: { detalle_ids },
+        body: { detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });

@@ -79,10 +79,16 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
+class UbicacionCantidadInputSerializer(serializers.Serializer):
+    ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
+    cantidad = serializers.IntegerField(min_value=1)
+
+
 class FacturaDetalleInputSerializer(serializers.Serializer):
     producto_id = serializers.IntegerField()
     precio = serializers.IntegerField(min_value=0)
     cantidad = serializers.IntegerField(min_value=1)
+    ubicaciones = UbicacionCantidadInputSerializer(many=True, required=False)
 
 
 class FacturaSerializer(serializers.ModelSerializer):
@@ -109,7 +115,9 @@ class DetalleFacturaSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(source="producto.nombre", read_only=True)
     marca = serializers.CharField(source="producto.marca", read_only=True)
     codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
+    codigo_proveedor = serializers.CharField(source="producto.codigo_proveedor", read_only=True)
     codigo_oem = serializers.CharField(source="producto.oem", read_only=True)
+    proveedor_nombre = serializers.CharField(source="producto.proveedor.nombre", read_only=True)
     margen_utilidad = serializers.DecimalField(source="producto.margen_utilidad", max_digits=5, decimal_places=2, read_only=True)
 
     class Meta:
@@ -120,10 +128,12 @@ class DetalleFacturaSerializer(serializers.ModelSerializer):
             "nombre",
             "marca",
             "codigo_producto",
+            "codigo_proveedor",
             "codigo_oem",
             "cantidad",
             "costo_compra",
             "margen_utilidad",
+            "proveedor_nombre",
         ]
 
 
@@ -183,7 +193,18 @@ class FacturaUpsertSerializer(serializers.Serializer):
                     factura=factura,
                 )
 
-            if ubicacion_default:
+            ubicaciones_prod = item.get("ubicaciones", [])
+            if ubicaciones_prod:
+                for ub in ubicaciones_prod:
+                    ubicacion = Ubicacion.objects.get(pk=ub["ubicacion_id"])
+                    stock, _ = StockProductoUbicacion.objects.get_or_create(
+                        producto=producto,
+                        ubicacion=ubicacion,
+                        defaults={"cantidad": 0},
+                    )
+                    stock.cantidad += ub["cantidad"]
+                    stock.save()
+            elif ubicacion_default:
                 stock, _ = StockProductoUbicacion.objects.get_or_create(
                     producto=producto,
                     ubicacion=ubicacion_default,
@@ -212,19 +233,20 @@ class FacturaUpsertSerializer(serializers.Serializer):
         proveedor = Proveedor.objects.get(pk=validated_data["proveedor_id"])
         productos = validated_data["productos"]
 
-        ubicacion_default = Ubicacion.objects.first()
-
         detalles_anteriores = DetalleFactura.objects.filter(factura=instance).select_related("producto")
         for detalle in detalles_anteriores:
             producto = detalle.producto
-            if ubicacion_default:
-                stock_qs = StockProductoUbicacion.objects.filter(
-                    producto=producto, ubicacion=ubicacion_default
-                )
-                if stock_qs.exists():
-                    stock = stock_qs.first()
-                    stock.cantidad = max(0, stock.cantidad - detalle.cantidad)
-                    stock.save()
+            restante = detalle.cantidad
+            stocks = StockProductoUbicacion.objects.filter(
+                producto=producto
+            ).order_by("-cantidad")
+            for stock in stocks:
+                if restante <= 0:
+                    break
+                deducir = min(stock.cantidad, restante)
+                stock.cantidad -= deducir
+                restante -= deducir
+                stock.save()
 
         PrecioHistorico.objects.filter(factura=instance).delete()
         detalles_anteriores.delete()
@@ -238,6 +260,11 @@ class FacturaUpsertSerializer(serializers.Serializer):
 
 
 class StoreConfigSerializer(serializers.ModelSerializer):
+    ubicacion_por_defecto_nombre = serializers.SerializerMethodField()
+
     class Meta:
         model = StoreConfig
-        fields = ["id", "telefono", "direccion", "tax_percent", "timezone"]
+        fields = ["id", "telefono", "direccion", "tax_percent", "timezone", "ubicacion_por_defecto", "ubicacion_por_defecto_nombre"]
+
+    def get_ubicacion_por_defecto_nombre(self, obj):
+        return obj.ubicacion_por_defecto.nombre if obj.ubicacion_por_defecto else None

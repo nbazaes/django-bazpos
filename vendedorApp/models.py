@@ -51,12 +51,12 @@ class ProductoManager(models.Manager):
 
 class Producto(models.Model):
     producto_id = models.AutoField(primary_key=True, verbose_name='producto_id')
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, db_index=True)
     codigo_producto = models.CharField(max_length=50, unique=True)
-    oem = models.CharField(max_length=50)
+    oem = models.CharField(max_length=50, db_index=True)
     oem_alternativo = models.TextField(null=True, blank=True, verbose_name="OEM alternativos")
-    codigo_proveedor = models.CharField(max_length=50, blank=True, default="", verbose_name="Código proveedor")
-    marca = models.CharField(max_length=100, blank=True, default='')
+    codigo_proveedor = models.CharField(max_length=50, blank=True, default="", verbose_name="Código proveedor", db_index=True)
+    marca = models.CharField(max_length=100, blank=True, default='', db_index=True)
     descripcion = models.TextField()
     precio = models.IntegerField(blank=True, null=True)
     precio_costo = models.IntegerField()
@@ -71,6 +71,9 @@ class Producto(models.Model):
 
     class Meta:
         db_table = 'productos'
+        indexes = [
+            models.Index(fields=['marca', 'nombre']),
+        ]
 
     def __str__(self):
         return f'{self.nombre}'
@@ -100,7 +103,7 @@ class Producto(models.Model):
 
 class Venta(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
-    fecha_venta = models.DateTimeField(default=timezone.now)
+    fecha_venta = models.DateTimeField(default=timezone.now, db_index=True)
     monto_total = models.IntegerField()
     monto_subtotal = models.IntegerField(default=0)
     descuento_porcentaje = models.IntegerField(default=0)
@@ -118,12 +121,14 @@ class Venta(models.Model):
     estado = models.CharField(
         max_length=2, 
         choices=Estado.choices, 
-        default=Estado.PENDIENTE
+        default=Estado.PENDIENTE,
+        db_index=True,
     )
     tipo_documento = models.CharField(
         max_length=2,
         choices=TipoDocumento.choices,
         default=TipoDocumento.VENTA,
+        db_index=True,
     )
     venta_origen = models.ForeignKey(
         'self',
@@ -134,9 +139,13 @@ class Venta(models.Model):
         verbose_name='Venta origen',
     )
     cliente_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre del cliente")
+    documento_html = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = 'ventas'
+        indexes = [
+            models.Index(fields=['estado', 'fecha_venta']),
+        ]
 
     def __str__(self):
         return f'{self.fecha_venta}'
@@ -203,7 +212,7 @@ class AjusteStock(models.Model):
     cantidad_anterior = models.IntegerField()
     cantidad_nueva = models.IntegerField()
     motivo = models.TextField()
-    fecha_ajuste = models.DateField(default=fecha_hoy)
+    fecha_ajuste = models.DateField(default=fecha_hoy, db_index=True)
 
     class Meta:
         db_table = "ajustes_stock"
@@ -250,6 +259,7 @@ class Pedido(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE_RETIRAR = "PR", "Pendiente por retirar"
         RETIRADO = "RE", "Retirado"
+        CANCELADO = "CA", "Cancelado"
 
     class EstadoDocumento(models.TextChoices):
         SIN_BOLETEAR = "SB", "Sin boletear"
@@ -271,6 +281,7 @@ class Pedido(models.Model):
         max_length=2,
         choices=Estado.choices,
         default=Estado.PENDIENTE_RETIRAR,
+        db_index=True,
     )
     estado_documento = models.CharField(
         max_length=2,
@@ -280,7 +291,7 @@ class Pedido(models.Model):
     persona_retiro = models.CharField(max_length=200, blank=True, default="")
     fecha_retiro = models.DateTimeField(null=True, blank=True)
     stock_descontado = models.BooleanField(default=False)
-    activo = models.BooleanField(default=True)
+    activo = models.BooleanField(default=True, db_index=True)
     venta = models.ForeignKey(
         Venta,
         on_delete=models.SET_NULL,
@@ -297,7 +308,8 @@ class Pedido(models.Model):
         related_name="pedidos_derivados",
         verbose_name="Pedido origen (cotización)",
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+    motivo_cancelacion = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "pedidos"

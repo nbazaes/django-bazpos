@@ -1,7 +1,13 @@
 from datetime import date, timedelta
+<<<<<<< HEAD
+=======
+from decimal import Decimal
+>>>>>>> main
 
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
 from django.db import transaction
+from django.conf import settings
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -22,16 +28,19 @@ from vendedorApp.serializers import (
     PedidoProveedorDiaSerializer,
     PedidoProveedorDiaHistorialSerializer,
     PedidoSerializer,
+    PrecioHistoricoSerializer,
     ProductoSerializer,
     RegistrarVentaSerializer,
     VentaSerializer,
 )
 from vendedorApp.pagination import (
+    DefaultPagination,
     DevolucionPagination,
     PedidoPagination,
     ProductoPagination,
     VentaPagination,
 )
+from gerenteApp.models import DetalleFactura, StoreConfig
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_BODEGUERO,
@@ -58,33 +67,100 @@ class DashboardStatsView(APIView):
             .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
         )
 
+        devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=hoy)
+        anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=hoy)
+
+        def _nombre(row):
+            nombre = f"{row.get('usuario__first_name', '')} {row.get('usuario__last_name', '')}".strip()
+            return nombre if nombre else row.get("usuario__username", "")
+
         if es_gerente:
-            total_dia = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
-            cant_ventas_dia = ventas_hoy.count()
-            ventas_por_vendedor = (
-                ventas_hoy.values("usuario__first_name", "usuario__last_name", "usuario__username")
-                .annotate(total=Sum("monto_total"), cantidad=Count("id"))
-                .order_by("-total")
+            total_vendido = (
+                ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
+            ) + (
+                anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
             )
-            desglose = []
+            monto_devuelto = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+            monto_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            total_dia = total_vendido - monto_devuelto - monto_anulaciones
+            cant_ventas_dia = ventas_hoy.count()
+
+            ventas_por_vendedor = (
+                ventas_hoy.values("usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username")
+                .annotate(total=Sum("monto_total"), cantidad=Count("id"))
+            )
+            devueltos_por_usuario = {
+                r["usuario_id"]: r["total"]
+                for r in devoluciones_hoy.values("usuario_id").annotate(total=Sum("monto_devuelto"))
+            }
+            anulados_por_usuario = {
+                r["usuario_id"]: r["total"]
+                for r in anulaciones_hoy.values("usuario_id").annotate(total=Sum("venta__monto_total"))
+            }
+
+            filas = {}
             for row in ventas_por_vendedor:
-                nombre = f"{row['usuario__first_name']} {row['usuario__last_name']}".strip()
-                desglose.append(
-                    {
-                        "vendedor": nombre if nombre else row["usuario__username"],
-                        "total": row["total"],
-                        "cantidad": row["cantidad"],
+                uid = row["usuario_id"]
+                filas[uid] = {
+                    "vendedor": _nombre(row),
+                    "total_vendido": row["total"],
+                    "devoluciones": devueltos_por_usuario.get(uid, 0),
+                    "anulaciones": anulados_por_usuario.get(uid, 0),
+                    "cantidad": row["cantidad"],
+                }
+            for row in devoluciones_hoy.values(
+                "usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username"
+            ).distinct():
+                uid = row["usuario_id"]
+                if uid not in filas:
+                    filas[uid] = {
+                        "vendedor": _nombre(row),
+                        "total_vendido": 0,
+                        "devoluciones": devueltos_por_usuario.get(uid, 0),
+                        "anulaciones": 0,
+                        "cantidad": 0,
                     }
+            for row in anulaciones_hoy.values(
+                "usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username"
+            ).distinct():
+                uid = row["usuario_id"]
+                if uid not in filas:
+                    filas[uid] = {
+                        "vendedor": _nombre(row),
+                        "total_vendido": 0,
+                        "devoluciones": 0,
+                        "anulaciones": anulados_por_usuario.get(uid, 0),
+                        "cantidad": 0,
+                    }
+
+            desglose = []
+            for uid, fila in filas.items():
+                fila["total"] = (
+                    fila["total_vendido"] - fila["devoluciones"] - fila["anulaciones"]
                 )
+                desglose.append(fila)
+            desglose.sort(key=lambda d: d["total"], reverse=True)
         else:
             ventas_propias = ventas_hoy.filter(usuario=user)
-            total_dia = ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
+            anulaciones_propias = anulaciones_hoy.filter(usuario=user)
+            devoluciones_propias = devoluciones_hoy.filter(usuario=user)
+            total_vendido = (
+                ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
+            ) + (
+                anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            )
+            monto_devuelto = devoluciones_propias.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+            monto_anulaciones = anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+            total_dia = total_vendido - monto_devuelto - monto_anulaciones
             cant_ventas_dia = ventas_propias.count()
             nombre = f"{user.first_name} {user.last_name}".strip()
             desglose = [
                 {
                     "vendedor": nombre if nombre else user.username,
                     "total": total_dia,
+                    "total_vendido": total_vendido,
+                    "devoluciones": monto_devuelto,
+                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                 }
             ]
@@ -154,6 +230,9 @@ class DashboardStatsView(APIView):
                 "es_gerente": es_gerente,
                 "ventas_dia": {
                     "total": total_dia,
+                    "total_vendido": total_vendido,
+                    "devoluciones": monto_devuelto,
+                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                     "desglose": desglose,
                 },
@@ -277,12 +356,20 @@ class ProductoViewSet(viewsets.ModelViewSet):
         "ajustar_stock": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "historial_ajustes": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "ignorar_stock": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "ultima_factura": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "historial_precios": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
         queryset = super().get_queryset()
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
+
+        if self.action == 'retrieve' or (self.action == 'list' and texto):
+            ultima_fecha = DetalleFactura.objects.filter(
+                producto_id=OuterRef("producto_id")
+            ).values("factura__fecha").order_by("-factura__fecha")[:1]
+            queryset = queryset.annotate(ultima_fecha_llegada=Subquery(ultima_fecha))
 
         if texto:
             queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto) | Q(codigo_proveedor__icontains=texto))
@@ -405,6 +492,31 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
         return Response({"ok": True})
 
+    @action(detail=True, methods=["get"], url_path="ultima-factura")
+    def ultima_factura(self, request, pk=None):
+        producto = self.get_object()
+        last = DetalleFactura.objects.filter(
+            producto=producto
+        ).select_related("factura__proveedor").order_by("-factura__fecha").first()
+        if not last:
+            return Response(None)
+        return Response({
+            "factura_id": last.factura.id,
+            "numero_factura": last.factura.numero_factura,
+            "fecha": last.factura.fecha,
+            "proveedor_nombre": last.factura.proveedor.nombre,
+        })
+
+    @action(detail=True, methods=["get"], url_path="historial-precios")
+    def historial_precios(self, request, pk=None):
+        producto = self.get_object()
+        historial = producto.precios_historicos.select_related("factura").order_by("-fecha")
+        paginator = DefaultPagination()
+        paginator.page_size = 10
+        page = paginator.paginate_queryset(historial, request)
+        serializer = PrecioHistoricoSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
 
 class DeducirStockInputSerializer(serializers.Serializer):
     producto_id = serializers.IntegerField()
@@ -435,6 +547,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         "deducir_stock": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "anular": [ROLE_ENCARGADO, ROLE_GERENTE],
         "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "documento": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
@@ -453,6 +566,14 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             )
         if tipo_documento:
             queryset = queryset.filter(tipo_documento=tipo_documento)
+
+        fecha_desde = self.request.query_params.get("fecha_desde", "").strip()
+        fecha_hasta = self.request.query_params.get("fecha_hasta", "").strip()
+
+        if fecha_desde:
+            queryset = queryset.filter(fecha_venta__date__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_venta__date__lte=fecha_hasta)
 
         user = self.request.user
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
@@ -733,6 +854,97 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["get"], url_path="documento")
+    def documento(self, request, pk=None):
+        venta = self.get_object()
+
+        if venta.documento_html:
+            return HttpResponse(venta.documento_html, content_type="text/html; charset=utf-8")
+
+        es_cotizacion = venta.tipo_documento == Venta.TipoDocumento.COTIZACION
+        config = StoreConfig.current()
+
+        detalles = venta.detalleventa_set.select_related("producto").all()
+
+        items_html = ""
+        for d in detalles:
+            if es_cotizacion:
+                label = f'{d.cantidad} x {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+            else:
+                label = f'{d.cantidad} x {d.producto.codigo_producto} - {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+            items_html += f'\n<div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;"><span>{label}</span><span>${d.subtotal}</span></div>'
+
+        titulo = "COTIZACION" if es_cotizacion else "COMPROBANTE DE VENTA"
+
+        tax_percent = float(config.tax_percent)
+        factor = Decimal("1") + (Decimal(str(tax_percent)) / Decimal("100"))
+        total_neto = int(round(Decimal(str(venta.monto_total)) / factor))
+        impuesto = venta.monto_total - total_neto
+
+        totales_html = ""
+        if not es_cotizacion:
+            desc_html = ""
+            if venta.descuento_porcentaje > 0:
+                monto_desc = venta.monto_subtotal - venta.monto_total
+                desc_html = f'<div class="totals-row"><span>Descuento ({venta.descuento_porcentaje}%)</span><span>-${monto_desc}</span></div>'
+            totales_html = f'<hr /><div class="totals-row"><span>Subtotal</span><span>${venta.monto_subtotal}</span></div>{desc_html}<div class="totals-row"><span>Neto</span><span>${total_neto}</span></div><div class="totals-row"><span>Impuesto</span><span>${impuesto}</span></div><div class="totals-row"><span class="bold">Total</span><span class="bold">${venta.monto_total}</span></div>'
+
+        disclaimer = '<p class="disclaimer">Cotización válida hasta agotar stock</p>' if es_cotizacion else ""
+
+        from django.utils.formats import date_format
+        fecha_str = date_format(venta.fecha_venta, format="SHORT_DATETIME_FORMAT", use_l10n=True)
+
+        direccion_line = f'<p class="address">{config.direccion}</p>' if config.direccion else ""
+        telefono_line = f'<p class="address">{config.telefono}</p>' if config.telefono else ""
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>{titulo}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@page {{ size: letter; margin: 12mm; }}
+body {{
+font-family: "JetBrains Mono", monospace;
+margin: 0;
+padding: 1.25rem;
+font-size: 0.8rem;
+line-height: 1.5;
+color: #1a1a1a;
+background: #faf9f6;
+}}
+h1 {{ margin: 0 0 4px; text-align: center; font-size: 1rem; }}
+.subtitle {{ text-align: center; margin: 0 0 4px; }}
+.address {{ text-align: center; font-size: 0.7rem; color: #666; margin: 0 0 4px; }}
+.doc-number {{ text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 4px; }}
+.date {{ text-align: center; font-size: 0.75rem; color: #666; margin-bottom: 8px; }}
+hr {{ border: none; border-top: 1px dashed #999; margin: 8px 0; }}
+.totals-row {{ display: flex; justify-content: space-between; }}
+.disclaimer {{ text-align: center; color: #999; font-size: 0.7rem; margin-top: 8px; }}
+.bold {{ font-weight: bold; }}
+</style>
+</head>
+<body>
+<h1>{settings.STORE_NAME}</h1>
+{direccion_line}
+{telefono_line}
+<p class="subtitle">{titulo}</p>
+<p class="doc-number">#{venta.id}</p>
+<p class="date">{fecha_str}</p>
+<hr />
+{items_html}
+{totales_html}
+{disclaimer}
+<p class="disclaimer">Documento carece de validez legal</p>
+</body>
+</html>"""
+
+        venta.documento_html = html
+        venta.save(update_fields=["documento_html"])
+
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
+
 
 class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
@@ -759,6 +971,9 @@ class CambiarEstadoPedidoSerializer(serializers.Serializer):
 
 class MarcarRetiroSerializer(serializers.Serializer):
     persona_retiro = serializers.CharField(max_length=200, trim_whitespace=True)
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido.EstadoDocumento.choices, required=False
+    )
 
 
 class ConvertirCotizacionSerializer(serializers.Serializer):
@@ -766,6 +981,14 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         min_length=1,
     )
+    nombre_cliente = serializers.CharField(max_length=200, required=False, default="")
+    telefono_cliente = serializers.CharField(max_length=50, required=False, default="")
+    metodo_pago = serializers.CharField(max_length=2, required=False, default="EF")
+    estado_documento = serializers.CharField(max_length=2, required=False, default="SB")
+
+
+class CancelarPedidoSerializer(serializers.Serializer):
+    motivo = serializers.CharField(max_length=500, trim_whitespace=True)
 
 
 class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -778,14 +1001,34 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "cambiar_estado": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "marcar_retiro": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
-        "desactivar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "cancelar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "convertir_a_pedido": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
-        return Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
+        queryset = Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
             "detalles__proveedor", "detalles__producto"
         ).order_by("-fecha_creacion")
+
+        estado = self.request.query_params.get("estado", "").strip()
+        search = self.request.query_params.get("search", "").strip()
+        fecha_desde = self.request.query_params.get("fecha_desde", "").strip()
+        fecha_hasta = self.request.query_params.get("fecha_hasta", "").strip()
+
+        if estado == "CO":
+            queryset = queryset.filter(es_cotizacion=True)
+        elif estado:
+            queryset = queryset.filter(estado=estado, es_cotizacion=False)
+        if search:
+            queryset = queryset.filter(
+                Q(id__startswith=search) | Q(nombre_cliente__icontains=search)
+            )
+        if fecha_desde:
+            queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
+
+        return queryset
 
     def create(self, request, *args, **kwargs):
         serializer = CrearPedidoSerializer(data=request.data, context={"request": request})
@@ -851,16 +1094,21 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             pedido.fecha_retiro = timezone.now()
             if not pedido.stock_descontado:
                 self._descontar_stock_pedido(pedido)
-            pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado"])
+            if "estado_documento" in serializer.validated_data:
+                pedido.estado_documento = serializer.validated_data["estado_documento"]
+            pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado", "estado_documento"])
 
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
 
-    @action(detail=True, methods=["post"], url_path="desactivar")
-    def desactivar(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="cancelar")
+    def cancelar(self, request, pk=None):
         pedido = self.get_object()
-        pedido.activo = False
-        pedido.save(update_fields=["activo"])
-        return Response({"ok": True})
+        serializer = CancelarPedidoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pedido.estado = Pedido.Estado.CANCELADO
+        pedido.motivo_cancelacion = serializer.validated_data["motivo"]
+        pedido.save(update_fields=["estado", "motivo_cancelacion"])
+        return Response(PedidoSerializer(pedido, context={"request": request}).data)
 
     def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
@@ -889,6 +1137,10 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         serializer = ConvertirCotizacionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         detalle_ids = serializer.validated_data["detalle_ids"]
+        nombre_cliente = serializer.validated_data.get("nombre_cliente") or cotizacion.nombre_cliente
+        telefono_cliente = serializer.validated_data.get("telefono_cliente") or cotizacion.telefono_cliente
+        metodo_pago = serializer.validated_data.get("metodo_pago") or cotizacion.metodo_pago or "EF"
+        estado_documento = serializer.validated_data.get("estado_documento") or "SB"
 
         detalles_originales = cotizacion.detalles.filter(id__in=detalle_ids)
         if not detalles_originales.exists():
@@ -916,14 +1168,14 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         with transaction.atomic():
             nuevo_pedido = Pedido.objects.create(
                 usuario=request.user,
-                nombre_cliente=cotizacion.nombre_cliente,
-                telefono_cliente=cotizacion.telefono_cliente,
+                nombre_cliente=nombre_cliente,
+                telefono_cliente=telefono_cliente,
                 monto_subtotal=monto_subtotal,
                 monto_total=monto_total,
                 costo_envio=costo_envio,
-                metodo_pago=cotizacion.metodo_pago,
+                metodo_pago=metodo_pago,
                 estado=Pedido.Estado.PENDIENTE_RETIRAR,
-                estado_documento=Pedido.EstadoDocumento.SIN_BOLETEAR,
+                estado_documento=estado_documento,
                 es_cotizacion=False,
                 pedido_origen=cotizacion,
             )
@@ -944,6 +1196,33 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     stellantis=d.stellantis,
                 )
 
+                fecha = date.today()
+                dia_hoy = PedidoProveedorDia.objects.filter(fecha=fecha).first()
+                if dia_hoy and dia_hoy.finalizado:
+                    fecha = date.today() + timedelta(days=1)
+
+                dia, _ = PedidoProveedorDia.objects.get_or_create(fecha=fecha)
+
+                if d.producto:
+                    ItemPedidoProveedor.objects.get_or_create(
+                        dia=dia,
+                        producto=d.producto,
+                        defaults={"proveedor": d.proveedor},
+                    )
+                else:
+                    if not ItemPedidoProveedor.objects.filter(
+                        dia=dia,
+                        proveedor=d.proveedor,
+                        nombre_custom=d.nombre,
+                    ).exists():
+                        ItemPedidoProveedor.objects.create(
+                            dia=dia,
+                            producto=None,
+                            proveedor=d.proveedor,
+                            nombre_custom=d.nombre,
+                            codigo_proveedor_custom=d.codigo_proveedor,
+                        )
+
             venta = Venta.objects.create(
                 usuario=request.user,
                 monto_total=monto_total,
@@ -960,9 +1239,6 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         )
 
 
-from datetime import date, timedelta
-
-
 class PedidoProveedorViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     pagination_class = None
@@ -970,7 +1246,7 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],
         "retrieve": [ROLE_ENCARGADO, ROLE_GERENTE],
         "create": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "agregar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "agregar_item": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "toggle_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "eliminar_item": [ROLE_ENCARGADO, ROLE_GERENTE],
         "finalizar": [ROLE_ENCARGADO, ROLE_GERENTE],

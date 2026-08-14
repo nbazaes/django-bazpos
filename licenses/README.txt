@@ -6,9 +6,9 @@ incluidos en `static/vendor/` y `static/`.
 
 Archivos incluidos:
 - LICENSE-BOOTSTRAP.txt
-- LICENSE-SB_ADMIN_2.txt
 - LICENSE-CHARTJS.txt
 - LICENSE-DATATABLES.txt
 - LICENSE-JQUERY.txt
 - LICENSE-JQUERY-EASING.txt
 - LICENSE-FONT-AWESOME.txt
+- LICENSE-BOOTSTRAP-ICONS.txt

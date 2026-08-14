@@ -4,7 +4,7 @@ import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { STORE_NAME } from "../lib/config";
+import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/useToast";
 
@@ -43,7 +43,6 @@ export default function PedidosCrearPage() {
   useEffect(() => {
     fetchStoreConfig();
   }, []);
-  const { data: productosData } = useProductos({ page_size: 200 });
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
 
@@ -51,9 +50,22 @@ export default function PedidosCrearPage() {
   const [producto, setProducto] = useState({ ...productoVacio });
   const [items, setItems] = useState([]);
   const [metodoPago, setMetodoPago] = useState("EF");
+  const [estadoDocumento, setEstadoDocumento] = useState("SB");
   const [productoTexto, setProductoTexto] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [mostrarProductos, setMostrarProductos] = useState(false);
   const productosRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(productoTexto.trim());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [productoTexto]);
+
+  const { data: productosData } = useProductos(
+    searchQuery ? { texto: searchQuery, page_size: 10 } : { page_size: 10 },
+  );
 
   const itemTotalPreview = useMemo(() => {
     return calcularItemTotal(
@@ -83,16 +95,8 @@ export default function PedidosCrearPage() {
   }, []);
 
   const productosFiltrados = useMemo(() => {
-    const q = productoTexto.trim().toLowerCase();
-    if (!q) return [];
-    return (productosData?.results ?? [])
-      .filter(
-        (p) =>
-          p.nombre.toLowerCase().includes(q) ||
-          p.oem.toLowerCase().includes(q) ||
-          p.codigo_producto.toLowerCase().includes(q),
-      )
-      .slice(0, 10);
+    if (!productoTexto.trim()) return [];
+    return productosData?.results ?? [];
   }, [productoTexto, productosData]);
 
   function seleccionarProductoExistente(p) {
@@ -169,6 +173,7 @@ export default function PedidosCrearPage() {
       nombre_cliente: cliente.nombre.trim(),
       telefono_cliente: cliente.telefono.trim(),
       metodo_pago: metodoPago,
+      estado_documento: estadoDocumento,
       items: items.map((it) => ({
         producto_id: it.producto_id,
         codigo_proveedor: it.codigo_proveedor,
@@ -205,6 +210,7 @@ export default function PedidosCrearPage() {
 
     const filas = (documento.detalles || []).map((d) => `
       <tr>
+        ${!esCotizacion ? `<td>${d.codigo_proveedor || "—"}</td><td>${d.oem || "—"}</td>` : ""}
         <td>${d.nombre}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
@@ -248,7 +254,7 @@ export default function PedidosCrearPage() {
       </head>
       <body>
         <div class="center">
-          <div class="store">${STORE_NAME}</div>
+          <div class="store">${getStoreName()}</div>
           ${storeConfig.direccion ? `<div class="address">${storeConfig.direccion}</div>` : ""}
           ${storeConfig.telefono ? `<div class="address">${storeConfig.telefono}</div>` : ""}
           <div class="title">${titulo}</div>
@@ -262,7 +268,7 @@ export default function PedidosCrearPage() {
         </div>
         <table>
           <thead>
-            <tr><th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
@@ -540,6 +546,14 @@ export default function PedidosCrearPage() {
                 <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
                   <option value="EF">Efectivo</option>
                   <option value="TJ">Tarjeta</option>
+                </select>
+              </div>
+              <div className="form-group mb-0">
+                <label>Documento</label>
+                <select className="form-control" value={estadoDocumento} onChange={(e) => setEstadoDocumento(e.target.value)}>
+                  <option value="SB">Sin boletear</option>
+                  <option value="BO">Boleteado</option>
+                  <option value="FA">Facturado</option>
                 </select>
               </div>
             </div>

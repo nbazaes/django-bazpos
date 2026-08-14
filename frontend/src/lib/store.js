@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-let cachedConfig = { telefono: "", direccion: "", timezone: "America/Santiago" };
+let cachedConfig = { telefono: "", direccion: "", timezone: "America/Santiago", ubicacion_por_defecto: null, ubicacion_por_defecto_nombre: null };
 
 export function getStoreConfig() {
   return cachedConfig;
@@ -18,6 +18,8 @@ export async function fetchStoreConfig() {
         telefono: data[0].telefono || "",
         direccion: data[0].direccion || "",
         timezone: data[0].timezone || "America/Santiago",
+        ubicacion_por_defecto: data[0].ubicacion_por_defecto ?? null,
+        ubicacion_por_defecto_nombre: data[0].ubicacion_por_defecto_nombre ?? null,
       };
     }
   } catch {

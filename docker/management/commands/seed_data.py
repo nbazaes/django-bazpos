@@ -1,3 +1,4 @@
+import os
 import random
 from datetime import datetime, timedelta
 
@@ -159,7 +160,7 @@ class Command(BaseCommand):
             username = f"vendedor{i+1}"
             user = User.objects.create_user(
                 username=username,
-                password="vendedor123",
+                password=os.getenv("SEED_VENDEDOR_PASS", "vendedor123"),
                 first_name=fake.first_name(),
                 last_name=fake.last_name(),
                 email=f"{username}@bazpos.cl",
@@ -172,7 +173,7 @@ class Command(BaseCommand):
             username = f"gerente{i+1}"
             user = User.objects.create_user(
                 username=username,
-                password="gerente123",
+                password=os.getenv("SEED_GERENTE_PASS", "gerente123"),
                 first_name=fake.first_name(),
                 last_name=fake.last_name(),
                 email=f"{username}@bazpos.cl",

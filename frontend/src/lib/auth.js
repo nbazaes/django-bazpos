@@ -1,20 +1,15 @@
 const ACCESS_KEY = "bazpos_access";
 const REFRESH_KEY = "bazpos_refresh";
-const EXPIRES_KEY = "bazpos_expires";
 const USER_KEY = "bazpos_user";
-const TOKEN_LIFETIME_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 export function saveTokens(tokens) {
-  const expiresAt = Date.now() + TOKEN_LIFETIME_MS;
   localStorage.setItem(ACCESS_KEY, tokens.access || "");
   localStorage.setItem(REFRESH_KEY, tokens.refresh || "");
-  localStorage.setItem(EXPIRES_KEY, expiresAt.toString());
 }
 
 export function clearTokens() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(EXPIRES_KEY);
   localStorage.removeItem(USER_KEY);
 }
 
@@ -40,14 +35,23 @@ export function getUser() {
   }
 }
 
-export function isLoggedIn() {
-  const expiresAt = localStorage.getItem(EXPIRES_KEY);
-  if (!expiresAt) return false;
-  if (Date.now() > parseInt(expiresAt)) {
-    clearTokens();
-    return false;
+function decodeToken(token) {
+  try {
+    const payload = token.split(".")[1];
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(decodeURIComponent(Array.from(json, (c) => `%${c.charCodeAt(0).toString(16).padStart(2, "0")}`).join("")));
+  } catch {
+    return null;
   }
-  return Boolean(getAccessToken());
+}
+
+export function isLoggedIn() {
+  const access = getAccessToken();
+  const refresh = getRefreshToken();
+  if (!access && !refresh) return false;
+  if (refresh) return true;
+  const payload = decodeToken(access);
+  return Boolean(payload && payload.exp && Date.now() < payload.exp * 1000);
 }
 
 export function isGerente(user) {
