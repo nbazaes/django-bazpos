@@ -3,13 +3,8 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-<<<<<<< HEAD
 from vendedorApp.api import DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReportesStatsView, VentaViewSet
-from .api_views import MeView
-=======
-from vendedorApp.api import DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, VentaViewSet
 from .api_views import MeView, StoreNameView
->>>>>>> main
 
 router = DefaultRouter()
 router.register("productos", ProductoViewSet, basename="producto")

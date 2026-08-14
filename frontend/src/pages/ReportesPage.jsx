@@ -39,7 +39,7 @@ export default function ReportesPage() {
     return `${yr}-${mo}`;
   });
 
-  const [mes, anio] = monthValue.split("-").map(Number);
+  const [anio, mes] = monthValue.split("-").map(Number);
 
   const { data, error, isLoading } = useReportesStats({ mes, anio });
 
