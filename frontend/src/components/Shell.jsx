@@ -53,6 +53,7 @@ export default function Shell() {
   useEffect(() => {
     if (embed) return;
     if (unseenChangelog.length > 0) {
+      markChangelogSeen();
       setChangelogModal({ entries: unseenChangelog, dismissable: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
