@@ -1,8 +1,5 @@
 from datetime import date, timedelta
-<<<<<<< HEAD
-=======
 from decimal import Decimal
->>>>>>> main
 
 from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
 from django.db import transaction
