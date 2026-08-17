@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { formatDateTime } from "../lib/format";
 import {
   useCambiarEstadoPedido,
@@ -366,7 +367,7 @@ export default function PedidosHistorial() {
         <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} count={count} pageSize={pageSize} />
       </div>
 
-      {detalleId && detalleData && (
+      {detalleId && detalleData && createPortal(
         <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDetalleId(null)}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
@@ -438,9 +439,9 @@ export default function PedidosHistorial() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {retiroId && retiroData && (
+      {retiroId && retiroData && createPortal(
         <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setRetiroId(null)}>
           <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
@@ -502,9 +503,9 @@ export default function PedidosHistorial() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {cancelarId && (
+      {cancelarId && createPortal(
         <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setCancelarId(null)}>
           <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
@@ -539,9 +540,9 @@ export default function PedidosHistorial() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {convertirId && convertirData && (
+      {convertirId && convertirData && createPortal(
         <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setConvertirId(null)}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
@@ -653,7 +654,7 @@ export default function PedidosHistorial() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
     </>
   );
