@@ -25,15 +25,38 @@ function todayLocal() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+const FACTURA_STORAGE_KEY = "bazpos_factura_pending";
+
+function readStoredFactura() {
+  try {
+    const saved = localStorage.getItem(FACTURA_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        step: parsed.step === "items" ? "items" : "header",
+        header: parsed.header || { numero_factura: "", proveedor_id: "", fecha: todayLocal() },
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+      };
+    }
+  } catch {
+    localStorage.removeItem(FACTURA_STORAGE_KEY);
+  }
+  return null;
+}
+
 export default function FacturaFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   usePageTitle(isEdit ? "Editar factura" : "Crear factura");
 
-  const [step, setStep] = useState(isEdit ? "items" : "header");
-  const [header, setHeader] = useState({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
-  const [items, setItems] = useState([]);
+  const [initialDraft] = useState(() => (isEdit ? null : readStoredFactura()));
+  const [step, setStep] = useState(initialDraft ? initialDraft.step : isEdit ? "items" : "header");
+  const [header, setHeader] = useState(
+    initialDraft ? initialDraft.header : { numero_factura: "", proveedor_id: "", fecha: todayLocal() }
+  );
+  const [items, setItems] = useState(initialDraft ? initialDraft.items : []);
+  const [showDraftBanner, setShowDraftBanner] = useState(Boolean(initialDraft));
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -58,6 +81,26 @@ export default function FacturaFormPage() {
   useEffect(() => {
     fetchStoreConfig();
   }, []);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const hasContent = header.numero_factura || header.proveedor_id || items.length > 0;
+    if (hasContent) {
+      localStorage.setItem(FACTURA_STORAGE_KEY, JSON.stringify({ step, header, items }));
+    } else {
+      localStorage.removeItem(FACTURA_STORAGE_KEY);
+    }
+  }, [step, header, items, isEdit]);
+
+  function descartarBorrador() {
+    localStorage.removeItem(FACTURA_STORAGE_KEY);
+    setStep("header");
+    setHeader({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
+    setItems([]);
+    setShowDraftBanner(false);
+    setError("");
+    setWarning("");
+  }
 
   const buscarProductos = useCallback(async (texto) => {
     if (!texto) {
@@ -210,6 +253,7 @@ export default function FacturaFormPage() {
       {
         onSuccess: (data) => {
           if (data.exists) {
+            localStorage.removeItem(FACTURA_STORAGE_KEY);
             setWarning("Factura ya ingresada.");
             setTimeout(() => {
               setWarning("");
@@ -248,6 +292,7 @@ export default function FacturaFormPage() {
     const mutation = id ? updateMutation : createMutation;
     mutation.mutate(id ? { id, data: payload } : payload, {
       onSuccess: (data) => {
+        localStorage.removeItem(FACTURA_STORAGE_KEY);
         if (data?.existing) {
           setWarning("Factura ya ingresada.");
           setTimeout(() => {
@@ -275,16 +320,19 @@ export default function FacturaFormPage() {
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const ubicacionesInvalidas = useMemo(() => {
-    return items.some((it) => {
-      const ubs = it.ubicaciones || [];
-      if (ubs.length === 0) return false;
-      const hasEmpty = ubs.some((u) => !u.ubicacion_id);
-      if (hasEmpty) return true;
-      const total = ubs.reduce((s, u) => s + (u.cantidad || 0), 0);
-      return total !== (it.cantidad || 0);
-    });
-  }, [items]);
+  const esUbicacionInvalida = (it) => {
+    const ubs = it.ubicaciones || [];
+    if (ubs.length === 0) return false;
+    if (ubs.some((u) => !u.ubicacion_id)) return true;
+    const total = ubs.reduce((s, u) => s + (u.cantidad || 0), 0);
+    return total !== (it.cantidad || 0);
+  };
+
+  const ubicacionesInvalidas = useMemo(() => items.some(esUbicacionInvalida), [items]);
+  const productosInvalidos = useMemo(
+    () => items.filter(esUbicacionInvalida).map((it) => it.nombre),
+    [items]
+  );
 
   const headerField = (label, disabled, value, onChange, type) => (
     <div className="col-md-4 form-group">
@@ -464,8 +512,10 @@ export default function FacturaFormPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, idx) => (
-                  <tr key={`${it.producto_id}-${idx}`}>
+                {items.map((it, idx) => {
+                  const rowInvalida = esUbicacionInvalida(it);
+                  return (
+                  <tr key={`${it.producto_id}-${idx}`} style={rowInvalida ? { background: "var(--danger-soft)" } : undefined}>
                     <td style={{ whiteSpace: "nowrap" }}>{it.codigo_producto}</td>
                     <td style={{ whiteSpace: "nowrap" }}>{it.codigo_proveedor || "—"}</td>
                     <td>{it.proveedor_nombre || "—"}</td>
@@ -491,16 +541,23 @@ export default function FacturaFormPage() {
                     <td>
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline-secondary"
+                        className={`btn btn-sm ${rowInvalida ? "btn-outline-danger" : "btn-outline-secondary"}`}
                         onClick={() => setUbicacionModalIdx(idx)}
                         title="Repartir stock en ubicaciones"
                       >
                         {getUbicacionSummary(it)}
+                        {rowInvalida && <i className="bi bi-exclamation-triangle-fill" style={{ marginLeft: 6 }} aria-label="Repartir stock incompleto"></i>}
                       </button>
+                      {rowInvalida && (
+                        <div className="text-danger" style={{ fontSize: "0.72rem", marginTop: 4 }}>
+                          Repartir stock incompleto
+                        </div>
+                      )}
                     </td>
                     <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}></i></td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -512,6 +569,12 @@ export default function FacturaFormPage() {
             <div className="text-xl font-display font-bold">Total con IVA ({taxPercent}%): ${totalFacturaConIva}</div>
           </div>
         </div>
+
+        {ubicacionesInvalidas && (
+          <div className="alert alert-danger">
+            Debe repartir correctamente el stock de: {productosInvalidos.join(", ")}
+          </div>
+        )}
 
         <div className="flex gap-2">
           {!isEdit && (
@@ -681,6 +744,16 @@ export default function FacturaFormPage() {
 
   return (
     <>
+      {showDraftBanner && !isEdit && (
+        <div className="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>
+            Borrador recuperado{header.numero_factura ? ` — factura N° ${header.numero_factura}` : ""} ({items.length} producto{items.length === 1 ? "" : "s"}).
+          </span>
+          <button type="button" className="btn btn-sm btn-secondary" onClick={descartarBorrador}>
+            Descartar borrador
+          </button>
+        </div>
+      )}
       {step === "header" && renderStepHeader()}
       {step === "items" && renderStepItems()}
       {renderUbicacionModal()}
