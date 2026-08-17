@@ -5,6 +5,7 @@ import { toggleTheme, getStoredTheme } from "../lib/theme";
 import { useStoreName } from "../lib/storeName";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
+import ChatWidget from "./ChatWidget";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
 const vendedorLinks = [
@@ -249,6 +250,8 @@ export default function Shell() {
           onClose={closeChangelog}
         />
       )}
+
+      <ChatWidget />
     </TitleContext.Provider>
   );
 }

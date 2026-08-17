@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
 from vendedorApp.api import CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReportesStatsView, VentaViewSet
 from .api_views import MeView, StoreNameView
@@ -27,5 +28,7 @@ urlpatterns = [
     path("reportes/stats/", ReportesStatsView.as_view(), name="reportes_stats"),
     path("cierre-caja/", CierreCajaView.as_view(), name="cierre_caja"),
     path("cierre-caja/historial/", CierreCajaHistorialView.as_view(), name="cierre_caja_historial"),
+    path("chat/state/", ChatStateView.as_view(), name="chat_state"),
+    path("chat/messages/", ChatMessageCreateView.as_view(), name="chat_message_create"),
     path("", include(router.urls)),
 ]
