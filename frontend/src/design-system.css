@@ -633,6 +633,43 @@ textarea.form-control, textarea.input {
 }
 .close:hover, .modal-close:hover { color: var(--text-primary); }
 
+/* ====== STEPPER INPUT ====== */
+.stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.stepper-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+.stepper-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.stepper-btn.stepper-active {
+  color: var(--accent);
+}
+.stepper-btn.stepper-active:hover:not(:disabled) {
+  color: var(--accent-hover);
+}
+
 /* ====== BADGES ====== */
 .badge {
   display: inline-flex;

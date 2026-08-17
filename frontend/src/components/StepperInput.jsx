@@ -1,75 +1,81 @@
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function StepperButton({ onClick, active, label, children }) {
+  const onClickRef = useRef(null);
   const intervalRef = useRef(null);
   const timeoutRef = useRef(null);
+  const [pressed, setPressed] = useState(false);
 
-  const clearTimers = () => {
+  useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
+
+  const release = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     intervalRef.current = null;
     timeoutRef.current = null;
-  };
+    setPressed(false);
+  }, []);
+
+  useEffect(() => release, [release]);
+
+  useEffect(() => {
+    if (!pressed) return;
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("blur", release);
+    };
+  }, [pressed, release]);
 
   const startRepeat = () => {
-    if (!onClick) return;
-    onClick();
+    if (!onClickRef.current) return;
+    if (intervalRef.current || timeoutRef.current) return;
+    onClickRef.current();
     timeoutRef.current = setTimeout(() => {
       intervalRef.current = setInterval(() => {
-        onClick();
+        if (!onClickRef.current) {
+          release();
+          return;
+        }
+        onClickRef.current();
       }, 80);
     }, 250);
+    setPressed(true);
   };
 
-  const handleMouseDown = (e) => {
+  const handlePointerDown = (e) => {
     e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      // some browsers throw if the pointer is already released
+    }
     startRepeat();
   };
 
-  const handleTouchStart = (e) => {
+  const handleKeyDown = (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    startRepeat();
+    onClickRef.current?.();
   };
 
   return (
     <button
       type="button"
+      className={`stepper-btn${active ? " stepper-active" : ""}`}
+      disabled={!onClick}
       aria-label={label}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 28,
-        height: 28,
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-sm)",
-        background: "var(--bg-input)",
-        color: active ? "var(--accent)" : "var(--text-secondary)",
-        fontSize: "1.1rem",
-        fontWeight: 700,
-        lineHeight: 1,
-        cursor: onClick ? "pointer" : "not-allowed",
-        transition: "all var(--transition)",
-        WebkitTapHighlightColor: "transparent",
-        opacity: onClick ? 1 : 0.5,
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={clearTimers}
-      onMouseLeave={clearTimers}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={clearTimers}
+      onPointerDown={handlePointerDown}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onPointerLeave={release}
+      onKeyDown={handleKeyDown}
       onClick={(e) => e.preventDefault()}
-      onMouseEnter={(e) => {
-        if (!onClick) return;
-        e.currentTarget.style.background = "var(--bg-hover)";
-        e.currentTarget.style.borderColor = active ? "var(--accent)" : "var(--border-light)";
-        e.currentTarget.style.color = active ? "var(--accent-hover)" : "var(--text-primary)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--bg-input)";
-        e.currentTarget.style.borderColor = "var(--border-default)";
-        e.currentTarget.style.color = active ? "var(--accent)" : "var(--text-secondary)";
-      }}
     >
       {children}
     </button>

@@ -526,9 +526,11 @@ export default function FacturaFormPage() {
                       <StepperInput
                         value={it.cantidad}
                         onChange={(val) => {
-                          const next = [...items];
-                          next[idx].cantidad = val;
-                          setItems(next);
+                          setItems((prev) => {
+                            const next = [...prev];
+                            next[idx].cantidad = val;
+                            return next;
+                          });
                         }}
                         min={1}
                         inputStyle={{ width: 64, fontSize: "0.85rem" }}
