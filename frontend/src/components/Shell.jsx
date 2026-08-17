@@ -22,6 +22,7 @@ const gerenteLinks = [
   { to: "/usuarios", label: "Usuarios" },
   { to: "/facturas", label: "Facturas" },
   { to: "/reportes", label: "Reportes" },
+  { to: "/cierre-caja", label: "Cierre de caja" },
   { to: "/configuracion", label: "Configuración" },
 ];
 

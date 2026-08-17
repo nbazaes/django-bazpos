@@ -108,6 +108,17 @@ class Venta(models.Model):
     monto_subtotal = models.IntegerField(default=0)
     descuento_porcentaje = models.IntegerField(default=0)
 
+    class MetodoPago(models.TextChoices):
+        EFECTIVO = "EF", "Efectivo"
+        TARJETA = "TJ", "Tarjeta"
+        TRANSFERENCIA = "TR", "Transferencia"
+        CHEQUE = "CH", "Cheque"
+
+    class Documento(models.TextChoices):
+        BOLETA = "BO", "Boleta"
+        FACTURA = "FA", "Factura"
+        OTROS = "OT", "Otros"
+
     class TipoDocumento(models.TextChoices):
         VENTA = 'VE', 'Venta'
         COTIZACION = 'CO', 'Cotizacion'
@@ -140,6 +151,13 @@ class Venta(models.Model):
     )
     cliente_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre del cliente")
     documento_html = models.TextField(blank=True, default="")
+    documento = models.CharField(
+        max_length=2,
+        choices=Documento.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
 
     class Meta:
         db_table = 'ventas'
@@ -149,6 +167,22 @@ class Venta(models.Model):
 
     def __str__(self):
         return f'{self.fecha_venta}'
+
+
+class PagoVenta(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name="pagos")
+    metodo_pago = models.CharField(
+        max_length=2,
+        choices=Venta.MetodoPago.choices,
+        db_index=True,
+    )
+    monto = models.IntegerField()
+
+    class Meta:
+        db_table = "pagos_ventas"
+
+    def __str__(self):
+        return f'{self.get_metodo_pago_display()} ${self.monto}'
 
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
@@ -342,3 +376,30 @@ class PedidoDetalle(models.Model):
 
     def __str__(self):
         return f"{self.nombre} x1"
+
+
+class CierreCaja(models.Model):
+    fecha = models.DateField(db_index=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    total_vendido = models.IntegerField(default=0)
+    total_devoluciones = models.IntegerField(default=0)
+    total_anulaciones = models.IntegerField(default=0)
+    total_final = models.IntegerField(default=0)
+    cantidad_ventas = models.IntegerField(default=0)
+    efectivo = models.IntegerField(default=0)
+    tarjeta = models.IntegerField(default=0)
+    transferencia = models.IntegerField(default=0)
+    cheque = models.IntegerField(default=0)
+    pago_sin_clasificar = models.IntegerField(default=0)
+    boleta = models.IntegerField(default=0)
+    factura = models.IntegerField(default=0)
+    otros = models.IntegerField(default=0)
+    doc_sin_clasificar = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "cierres_caja"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Cierre de caja {self.fecha}"

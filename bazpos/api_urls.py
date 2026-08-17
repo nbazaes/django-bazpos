@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReportesStatsView, VentaViewSet
+from vendedorApp.api import CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReportesStatsView, VentaViewSet
 from .api_views import MeView, StoreNameView
 
 router = DefaultRouter()
@@ -25,5 +25,7 @@ urlpatterns = [
     path("store-name/", StoreNameView.as_view(), name="store_name"),
     path("dashboard/stats/", DashboardStatsView.as_view(), name="dashboard_stats"),
     path("reportes/stats/", ReportesStatsView.as_view(), name="reportes_stats"),
+    path("cierre-caja/", CierreCajaView.as_view(), name="cierre_caja"),
+    path("cierre-caja/historial/", CierreCajaHistorialView.as_view(), name="cierre_caja_historial"),
     path("", include(router.urls)),
 ]

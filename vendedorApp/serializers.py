@@ -12,6 +12,7 @@ from vendedorApp.models import (
     DetalleVenta,
     Devolucion,
     ItemPedidoProveedor,
+    PagoVenta,
     Pedido,
     PedidoDetalle,
     PedidoProveedorDia,
@@ -99,11 +100,21 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
         ]
 
 
+class PagoVentaSerializer(serializers.ModelSerializer):
+    metodo_pago_display = serializers.CharField(source="get_metodo_pago_display", read_only=True)
+
+    class Meta:
+        model = PagoVenta
+        fields = ["id", "metodo_pago", "metodo_pago_display", "monto"]
+
+
 class VentaSerializer(serializers.ModelSerializer):
     detalles = DetalleVentaSerializer(many=True, source="detalleventa_set", read_only=True)
+    pagos = PagoVentaSerializer(many=True, read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
     tipo_documento_display = serializers.CharField(source="get_tipo_documento_display", read_only=True)
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
+    documento_display = serializers.CharField(source="get_documento_display", read_only=True, allow_null=True)
     productos_devueltos = serializers.SerializerMethodField()
     monto_descuento = serializers.SerializerMethodField()
 
@@ -125,6 +136,9 @@ class VentaSerializer(serializers.ModelSerializer):
             "venta_origen",
             "cliente_nombre",
             "documento_html",
+            "documento",
+            "documento_display",
+            "pagos",
             "detalles",
             "productos_devueltos",
         ]
@@ -170,6 +184,11 @@ def _distribute_discount(monto_subtotal, monto_total, descuento_porcentaje, item
     return [floored[i] // items_data[i][0] for i in range(n)]
 
 
+class PagoVentaInputSerializer(serializers.Serializer):
+    metodo_pago = serializers.ChoiceField(choices=Venta.MetodoPago.choices)
+    monto = serializers.IntegerField(min_value=1)
+
+
 class RegistrarVentaSerializer(serializers.Serializer):
     productos = VentaDetalleInputSerializer(many=True)
     total = serializers.IntegerField(min_value=0)
@@ -182,6 +201,13 @@ class RegistrarVentaSerializer(serializers.Serializer):
     )
     venta_origen = serializers.IntegerField(required=False, allow_null=True)
     cliente_nombre = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    documento = serializers.ChoiceField(
+        choices=Venta.Documento.choices,
+        default=Venta.Documento.BOLETA,
+        required=False,
+        allow_null=True,
+    )
+    pagos = PagoVentaInputSerializer(many=True, required=False)
 
     def validate_venta_origen(self, value):
         if value is None:
@@ -212,6 +238,17 @@ class RegistrarVentaSerializer(serializers.Serializer):
                              f"Subtotal={subtotal}, descuento={descuento}%, esperado={expected}, recibido={total}"
                 })
 
+        pagos = data.get("pagos")
+        if pagos is not None:
+            suma = sum(p["monto"] for p in pagos)
+            if suma != total:
+                diferencia = total - suma
+                signo = "faltan" if diferencia > 0 else "sobran"
+                raise serializers.ValidationError({
+                    "pagos": f"La suma de los pagos (${suma}) no coincide con el total (${total}). "
+                             f"{signo.capitalize()} ${abs(diferencia)}."
+                })
+
         return data
 
     @transaction.atomic
@@ -223,6 +260,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
         monto_subtotal = validated_data.get("monto_subtotal", total)
         tipo_documento = validated_data.get("tipo_documento", Venta.TipoDocumento.VENTA)
         estado = Venta.Estado.COMPLETADA if tipo_documento == Venta.TipoDocumento.VENTA else Venta.Estado.PENDIENTE
+        pagos_data = validated_data.get("pagos")
 
         items_data = []
         for item in productos:
@@ -251,7 +289,23 @@ class RegistrarVentaSerializer(serializers.Serializer):
             tipo_documento=tipo_documento,
             venta_origen_id=validated_data.get("venta_origen"),
             cliente_nombre=validated_data.get("cliente_nombre", "") or "",
+            documento=validated_data.get("documento"),
         )
+
+        if tipo_documento == Venta.TipoDocumento.VENTA:
+            if pagos_data:
+                for pago in pagos_data:
+                    PagoVenta.objects.create(
+                        venta=venta,
+                        metodo_pago=pago["metodo_pago"],
+                        monto=pago["monto"],
+                    )
+            else:
+                PagoVenta.objects.create(
+                    venta=venta,
+                    metodo_pago=Venta.MetodoPago.EFECTIVO,
+                    monto=total,
+                )
 
         for i, (cantidad, producto, subtotal) in enumerate(items_data):
             DetalleVenta.objects.create(

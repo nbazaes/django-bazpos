@@ -1,18 +1,19 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Sum
+from django.db.models import Case, CharField, Count, F, Max, OuterRef, Q, Subquery, Sum, Value, When
 from django.db import transaction
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, CierreCaja, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, PagoVenta, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AgregarItemPedidoProveedorSerializer,
     AjustarStockInputSerializer,
@@ -335,6 +336,206 @@ class ReportesStatsView(APIView):
                 "stock_critico": stock_critico,
             }
         )
+
+
+def calcular_cierre(fecha):
+    ventas_hoy = (
+        Venta.objects.filter(fecha_venta__date=fecha, estado=Venta.Estado.COMPLETADA)
+        .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
+    )
+
+    devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=fecha)
+    anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=fecha)
+
+    total_vendido = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
+    total_devoluciones = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+    total_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
+    total_final = total_vendido - total_devoluciones - total_anulaciones
+    cantidad_ventas = ventas_hoy.count()
+
+    # ── Desglose por medio de pago ──
+    ventas_ve = ventas_hoy.exclude(tipo_documento=Venta.TipoDocumento.PEDIDO)
+    ventas_pedido = ventas_hoy.filter(
+        tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=True
+    )
+
+    pagos_ve = (
+        PagoVenta.objects.filter(venta__in=ventas_ve)
+        .values("metodo_pago")
+        .annotate(total=Sum("monto"))
+    )
+    pagos_ve_map = {p["metodo_pago"]: p["total"] for p in pagos_ve}
+    ve_ids_con_pagos = set(
+        PagoVenta.objects.filter(venta__in=ventas_ve).values_list("venta_id", flat=True)
+    )
+    sin_clasificar_pago = (
+        ventas_ve.exclude(pk__in=ve_ids_con_pagos).aggregate(total=Sum("monto_total"))["total"] or 0
+    )
+
+    pagos_pedido = (
+        ventas_pedido.values("pedido__metodo_pago")
+        .annotate(total=Sum("monto_total"))
+    )
+    pagos_pedido_map = {p["pedido__metodo_pago"]: p["total"] for p in pagos_pedido}
+
+    efectivo = pagos_ve_map.get(Venta.MetodoPago.EFECTIVO, 0) + pagos_pedido_map.get("EF", 0)
+    tarjeta = pagos_ve_map.get(Venta.MetodoPago.TARJETA, 0) + pagos_pedido_map.get("TJ", 0)
+    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0)
+    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0)
+
+    # ── Desglose por documento ──
+    docs_ve = (
+        ventas_ve.values("documento")
+        .annotate(total=Sum("monto_total"))
+    )
+    docs_ve_map = {d["documento"]: d["total"] for d in docs_ve}
+    docs_pedido = (
+        ventas_pedido.values("pedido__estado_documento")
+        .annotate(total=Sum("monto_total"))
+    )
+    docs_pedido_map = {d["pedido__estado_documento"]: d["total"] for d in docs_pedido}
+
+    boleta = docs_ve_map.get(Venta.Documento.BOLETA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.BOLETEADO, 0)
+    factura = docs_ve_map.get(Venta.Documento.FACTURA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.FACTURADO, 0)
+    otros = docs_ve_map.get(Venta.Documento.OTROS, 0)
+    doc_sin_clasificar = (
+        docs_ve_map.get(None, 0)
+        + docs_pedido_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
+    )
+
+    return {
+        "fecha": str(fecha),
+        "total_vendido": total_vendido,
+        "total_devoluciones": total_devoluciones,
+        "total_anulaciones": total_anulaciones,
+        "total_final": total_final,
+        "cantidad_ventas": cantidad_ventas,
+        "pagos": {
+            "efectivo": efectivo,
+            "tarjeta": tarjeta,
+            "transferencia": transferencia,
+            "cheque": cheque,
+            "sin_clasificar": sin_clasificar_pago,
+        },
+        "documentos": {
+            "boleta": boleta,
+            "factura": factura,
+            "otros": otros,
+            "sin_clasificar": doc_sin_clasificar,
+        },
+    }
+
+
+class CierreCajaView(APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def _authorize(self, request):
+        if not has_any_role(request.user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            raise PermissionDenied("No tiene permisos para acceder al cierre de caja")
+
+    def get(self, request):
+        self._authorize(request)
+        fecha_str = request.query_params.get("fecha", "").strip()
+        if fecha_str:
+            try:
+                fecha = date.fromisoformat(fecha_str)
+            except ValueError:
+                return Response({"error": "Fecha inválida"}, status=400)
+        else:
+            fecha = timezone.localtime(timezone.now()).date()
+
+        stats = calcular_cierre(fecha)
+        cierre = CierreCaja.objects.filter(fecha=fecha).first()
+        stats["guardado"] = cierre is not None
+        if cierre:
+            stats["cierre_guardado"] = {
+                "id": cierre.id,
+                "fecha": str(cierre.fecha),
+                "usuario": cierre.usuario.username if cierre.usuario else None,
+                "created_at": cierre.created_at,
+            }
+        return Response(stats)
+
+    def post(self, request):
+        self._authorize(request)
+        fecha_str = request.data.get("fecha", "")
+        if fecha_str:
+            try:
+                fecha = date.fromisoformat(fecha_str)
+            except (ValueError, TypeError):
+                return Response({"error": "Fecha inválida"}, status=400)
+        else:
+            fecha = timezone.localtime(timezone.now()).date()
+
+        stats = calcular_cierre(fecha)
+        cierre = CierreCaja.objects.create(
+            fecha=fecha,
+            usuario=request.user,
+            total_vendido=stats["total_vendido"],
+            total_devoluciones=stats["total_devoluciones"],
+            total_anulaciones=stats["total_anulaciones"],
+            total_final=stats["total_final"],
+            cantidad_ventas=stats["cantidad_ventas"],
+            efectivo=stats["pagos"]["efectivo"],
+            tarjeta=stats["pagos"]["tarjeta"],
+            transferencia=stats["pagos"]["transferencia"],
+            cheque=stats["pagos"]["cheque"],
+            pago_sin_clasificar=stats["pagos"]["sin_clasificar"],
+            boleta=stats["documentos"]["boleta"],
+            factura=stats["documentos"]["factura"],
+            otros=stats["documentos"]["otros"],
+            doc_sin_clasificar=stats["documentos"]["sin_clasificar"],
+        )
+
+        stats["guardado"] = True
+        stats["cierre_guardado"] = {
+            "id": cierre.id,
+            "fecha": str(cierre.fecha),
+            "usuario": cierre.usuario.username if cierre.usuario else None,
+            "created_at": cierre.created_at,
+        }
+        return Response(stats, status=status.HTTP_201_CREATED)
+
+
+class CierreCajaHistorialView(APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        if not has_any_role(request.user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            return Response(
+                {"error": "No tiene permisos para acceder al cierre de caja"},
+                status=403,
+            )
+
+        cierres = CierreCaja.objects.select_related("usuario").all()
+        data = [
+            {
+                "id": c.id,
+                "fecha": str(c.fecha),
+                "usuario": c.usuario.username if c.usuario else None,
+                "created_at": c.created_at,
+                "total_vendido": c.total_vendido,
+                "total_devoluciones": c.total_devoluciones,
+                "total_anulaciones": c.total_anulaciones,
+                "total_final": c.total_final,
+                "cantidad_ventas": c.cantidad_ventas,
+                "pagos": {
+                    "efectivo": c.efectivo,
+                    "tarjeta": c.tarjeta,
+                    "transferencia": c.transferencia,
+                    "cheque": c.cheque,
+                    "sin_clasificar": c.pago_sin_clasificar,
+                },
+                "documentos": {
+                    "boleta": c.boleta,
+                    "factura": c.factura,
+                    "otros": c.otros,
+                    "sin_clasificar": c.doc_sin_clasificar,
+                },
+            }
+            for c in cierres
+        ]
+        return Response(data)
 
 
 class ProductoViewSet(viewsets.ModelViewSet):

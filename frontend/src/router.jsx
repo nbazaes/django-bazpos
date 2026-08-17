@@ -19,6 +19,7 @@ import PedidosProveedoresPage from "./pages/PedidosProveedoresPage";
 import UbicacionPage from "./pages/UbicacionPage";
 import ConfiguracionPage from "./pages/ConfiguracionPage";
 import ReportesPage from "./pages/ReportesPage";
+import CierreCajaPage from "./pages/CierreCajaPage";
 import StaticPage from "./pages/StaticPage";
 
 export const router = createBrowserRouter([
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
               { path: "pedidos-proveedores", element: <PedidosProveedoresPage /> },
               { path: "configuracion", element: <ConfiguracionPage /> },
               { path: "reportes", element: <ReportesPage /> },
+              { path: "cierre-caja", element: <CierreCajaPage /> },
             ],
           },
         ],

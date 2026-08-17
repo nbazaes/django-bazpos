@@ -50,6 +50,10 @@ export default function VentaPage() {
   const [confirmMode, setConfirmMode] = useState("VE");
   const [clienteNombre, setClienteNombre] = useState("");
   const [ocultarTotales, setOcultarTotales] = useState(false);
+  const [medioPago, setMedioPago] = useState("EF");
+  const [documentoFiscal, setDocumentoFiscal] = useState("BO");
+  const [esMixto, setEsMixto] = useState(false);
+  const [pagosMixtos, setPagosMixtos] = useState({ EF: 0, TJ: 0, TR: 0, CH: 0 });
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [lastDocumento, setLastDocumento] = useState(null);
@@ -84,6 +88,10 @@ export default function VentaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const cotizacionParam = searchParams.get("cotizacion");
   const cotizacionOrigenId = cotizacionParam ? parseInt(cotizacionParam) : null;
+
+  const totalPagosMixtos = Object.values(pagosMixtos).reduce((a, b) => a + (Number(b) || 0), 0);
+  const diferenciaPagos = totalConDescuento - totalPagosMixtos;
+  const pagosValidos = !esMixto || diferenciaPagos === 0;
 
   useEffect(() => {
     if (!cotizacionOrigenId) return;
@@ -422,6 +430,11 @@ export default function VentaPage() {
       const discounted = Math.round(subtotal * (1 - discount / 100));
       const total = discount > 0 ? roundTotal(discounted) : subtotal;
       await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
+      const pagos = esMixto
+        ? Object.entries(pagosMixtos)
+            .filter(([, monto]) => Number(monto) > 0)
+            .map(([metodo_pago, monto]) => ({ metodo_pago, monto: Number(monto) }))
+        : [{ metodo_pago: medioPago, monto: total }];
       const result = await apiRequest("/ventas/", {
         method: "POST",
         body: {
@@ -430,6 +443,7 @@ export default function VentaPage() {
           monto_subtotal: subtotal,
           tipo_documento: tipoDocumento,
           productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
+          ...(tipoDocumento === "VE" ? { pagos, documento: documentoFiscal } : {}),
           ...(clienteNombre.trim() ? { cliente_nombre: clienteNombre.trim() } : {}),
           ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
         },
@@ -446,6 +460,10 @@ export default function VentaPage() {
       setShowConfirmVenta(false);
       setClienteNombre("");
       setOcultarTotales(false);
+      setMedioPago("EF");
+      setDocumentoFiscal("BO");
+      setEsMixto(false);
+      setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
       setShowPreview(true);
       setShowVentaSuccess(true);
       if (cotizacionOrigenId) {
@@ -848,7 +866,7 @@ export default function VentaPage() {
           </div>
         </div>
         <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setShowConfirmVenta(true); }}>
+          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago("EF"); setDocumentoFiscal("BO"); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
           <button className="btn btn-outline" disabled={!carro.length} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
@@ -866,7 +884,7 @@ export default function VentaPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">{confirmMode === "CO" ? "Generar cotización" : "Confirmar venta"}</h5>
-                <button type="button" className="modal-close" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); }}>
+                <button type="button" className="modal-close" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>
                   &times;
                 </button>
               </div>
@@ -890,6 +908,88 @@ export default function VentaPage() {
                       <span className="checkbox-custom__mark" />
                       <span className="checkbox-custom__label">Ocultar totales en la cotización</span>
                     </label>
+                  </div>
+                )}
+                {confirmMode === "VE" && (
+                  <div className="row mb-3">
+                    <div className="col-md-6">
+                      <label className="font-weight-bold">Documento:</label>
+                      <select
+                        className="form-control"
+                        value={documentoFiscal}
+                        onChange={(e) => setDocumentoFiscal(e.target.value)}
+                      >
+                        <option value="BO">Boleta</option>
+                        <option value="FA">Factura</option>
+                        <option value="OT">Otros</option>
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="font-weight-bold">Medio de pago:</label>
+                      <select
+                        className="form-control"
+                        value={medioPago}
+                        onChange={(e) => setMedioPago(e.target.value)}
+                        disabled={esMixto}
+                      >
+                        <option value="EF">Efectivo</option>
+                        <option value="TJ">Tarjeta</option>
+                        <option value="TR">Transferencia</option>
+                        <option value="CH">Cheque</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {confirmMode === "VE" && (
+                  <div className="form-group mb-3">
+                    <label className="checkbox-custom" style={{ cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={esMixto}
+                        onChange={(e) => setEsMixto(e.target.checked)}
+                      />
+                      <span className="checkbox-custom__mark" />
+                      <span className="checkbox-custom__label">Mixto (pagar con varios medios)</span>
+                    </label>
+                  </div>
+                )}
+                {confirmMode === "VE" && esMixto && (
+                  <div className="row mb-3">
+                    {[
+                      ["EF", "Efectivo"],
+                      ["TJ", "Tarjeta"],
+                      ["TR", "Transferencia"],
+                      ["CH", "Cheque"],
+                    ].map(([code, label]) => (
+                      <div className="col-md-3" key={code}>
+                        <label className="font-weight-bold">{label}:</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          min={0}
+                          step={1000}
+                          value={pagosMixtos[code]}
+                          onChange={(e) =>
+                            setPagosMixtos((prev) => ({
+                              ...prev,
+                              [code]: e.target.value === "" ? 0 : Number(e.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                    <div className="col-12 mt-2">
+                      {diferenciaPagos === 0 ? (
+                        <div className="text-success">
+                          Suma de pagos: ${totalPagosMixtos.toLocaleString()} — coincide con el total.
+                        </div>
+                      ) : (
+                        <div className="text-danger">
+                          Suma de pagos: ${totalPagosMixtos.toLocaleString()} —{" "}
+                          {diferenciaPagos > 0 ? "faltan" : "sobran"} ${Math.abs(diferenciaPagos).toLocaleString()}.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 <p className="mb-3 text-secondary">Revise el detalle antes de confirmar:</p>
@@ -967,8 +1067,8 @@ export default function VentaPage() {
                 )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); }}>Cancelar</button>
-                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>Cancelar</button>
+                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos)}>
                   {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
               </div>

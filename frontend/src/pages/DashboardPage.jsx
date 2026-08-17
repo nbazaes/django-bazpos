@@ -108,6 +108,15 @@ export default function DashboardPage() {
         <>
           <div className="welcome-section">
             <h1>Bienvenido, {user?.first_name || user?.username}</h1>
+            {data.es_gerente && (
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate("/cierre-caja")}
+                style={{ marginTop: "0.5rem" }}
+              >
+                Cierre de caja
+              </button>
+            )}
           </div>
           <div className="row mb-4">
             <div className="col-md-4">

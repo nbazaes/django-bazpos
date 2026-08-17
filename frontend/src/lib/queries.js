@@ -57,6 +57,11 @@ export const queryKeys = {
   },
   dashboard: ["dashboard", "stats"],
   reportes: (params) => ["reportes", "stats", params],
+  cierreCaja: {
+    all: ["cierre-caja"],
+    detail: (fecha) => ["cierre-caja", "detail", fecha],
+    historial: ["cierre-caja", "historial"],
+  },
 };
 
 function paginatedResult(data) {
@@ -577,6 +582,36 @@ export function useReportesStats(params = {}) {
     queryFn: () => apiRequest(`/reportes/stats/${buildQuery(params)}`),
     placeholderData: placeholderData(),
     staleTime: 60_000,
+  });
+}
+
+// ── Cierre de caja ──
+
+export function useCierreCaja(fecha) {
+  return useQuery({
+    queryKey: queryKeys.cierreCaja.detail(fecha),
+    queryFn: () => apiRequest(`/cierre-caja/${buildQuery({ fecha })}`),
+    enabled: !!fecha,
+    staleTime: 30_000,
+  });
+}
+
+export function useGuardarCierre() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fecha) =>
+      apiRequest("/cierre-caja/", { method: "POST", body: { fecha } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.cierreCaja.all });
+    },
+  });
+}
+
+export function useCierreCajaHistorial() {
+  return useQuery({
+    queryKey: queryKeys.cierreCaja.historial,
+    queryFn: () => apiRequest("/cierre-caja/historial/"),
+    staleTime: 30_000,
   });
 }
 

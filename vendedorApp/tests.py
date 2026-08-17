@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.db.models import Sum
 from django.test import TestCase
 from django.utils import timezone
 
@@ -9,6 +10,7 @@ from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig
 from vendedorApp.models import (
     Anulacion,
     AjusteStock,
+    CierreCaja,
     DetalleDevolucion,
     Devolucion,
     ItemPedidoProveedor,
@@ -195,6 +197,64 @@ class VentaApiTest(BaseTest):
         resp = auth_client(self.gerente).get("/api/ventas/")
         self.assertEqual(resp.data["count"], 1)
         self.assertEqual(resp.data["results"][0]["usuario_nombre"], self.vendedor.username)
+
+    def test_create_venta_con_pago_simple(self):
+        total = self.producto.precio * 2
+        payload = self._payload(pagos=[{"metodo_pago": "TJ", "monto": total}], documento="FA")
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        venta = Venta.objects.get(id=resp.data["id"])
+        self.assertEqual(venta.documento, Venta.Documento.FACTURA)
+        pagos = list(venta.pagos.all())
+        self.assertEqual(len(pagos), 1)
+        self.assertEqual(pagos[0].metodo_pago, Venta.MetodoPago.TARJETA)
+        self.assertEqual(pagos[0].monto, total)
+
+    def test_create_venta_pago_mixto(self):
+        total = self.producto.precio * 2
+        mitad = total // 2
+        payload = self._payload(
+            pagos=[
+                {"metodo_pago": "EF", "monto": mitad},
+                {"metodo_pago": "TJ", "monto": total - mitad},
+            ]
+        )
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        venta = Venta.objects.get(id=resp.data["id"])
+        self.assertEqual(venta.pagos.count(), 2)
+        self.assertEqual(
+            venta.pagos.aggregate(total=Sum("monto"))["total"], total
+        )
+
+    def test_create_venta_pago_cheque(self):
+        total = self.producto.precio * 2
+        payload = self._payload(pagos=[{"metodo_pago": "CH", "monto": total}])
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        venta = Venta.objects.get(id=resp.data["id"])
+        self.assertEqual(venta.pagos.first().metodo_pago, Venta.MetodoPago.CHEQUE)
+
+    def test_create_venta_pago_mixto_suma_incorrecta(self):
+        total = self.producto.precio * 2
+        payload = self._payload(
+            pagos=[
+                {"metodo_pago": "EF", "monto": 1000},
+                {"metodo_pago": "TJ", "monto": 1000},
+            ]
+        )
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("pagos", resp.data)
+        self.assertIn("no coincide", str(resp.data["pagos"]))
+
+    def test_create_venta_sin_pagos_default_efectivo(self):
+        resp = auth_client(self.vendedor).post("/api/ventas/", self._payload(), format="json")
+        self.assertEqual(resp.status_code, 201)
+        venta = Venta.objects.get(id=resp.data["id"])
+        pago = venta.pagos.get()
+        self.assertEqual(pago.metodo_pago, Venta.MetodoPago.EFECTIVO)
+        self.assertEqual(pago.monto, venta.monto_total)
 
 
 class VentaStockActionsTest(BaseTest):
@@ -1015,3 +1075,150 @@ class StoreNameApiTest(TestCase):
         resp = self.client.get("/api/store-name/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("name", resp.data)
+
+
+class CierreCajaTest(BaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.producto = Producto.objects.create(
+            nombre="Producto C",
+            codigo_producto="PC001",
+            oem="OEM-C",
+            descripcion="Desc C",
+            precio_costo=5000,
+            stock_minimo=2,
+            stock_maximo=50,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=cls.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=cls.producto, ubicacion=cls.ubicacion, cantidad=100
+        )
+
+    def _crear_venta(self, pagos=None, documento=None, monto=None):
+        monto = monto or self.producto.precio * 2
+        payload = {
+            "productos": [
+                {
+                    "producto_id": self.producto.producto_id,
+                    "cantidad": 2,
+                    "precio": self.producto.precio,
+                }
+            ],
+            "total": monto,
+            "monto_subtotal": monto,
+        }
+        if pagos is not None:
+            payload["pagos"] = pagos
+        if documento:
+            payload["documento"] = documento
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        return resp.data["id"]
+
+    def _crear_pedido_venta(self, metodo_pago="EF", estado_documento="BO"):
+        pedido = Pedido.objects.create(
+            usuario=self.vendedor,
+            nombre_cliente="Cliente X",
+            telefono_cliente="99999999",
+            monto_subtotal=15000,
+            monto_total=15000,
+            costo_envio=4500,
+            metodo_pago=metodo_pago,
+            estado=Pedido.Estado.PENDIENTE_RETIRAR,
+            estado_documento=estado_documento,
+        )
+        venta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=15000,
+            monto_subtotal=15000,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.PEDIDO,
+        )
+        pedido.venta = venta
+        pedido.save(update_fields=["venta"])
+        return venta
+
+    def test_get_cierre_totales_y_breakdown(self):
+        self._crear_venta(
+            monto=18000,
+            pagos=[
+                {"metodo_pago": "EF", "monto": 10000},
+                {"metodo_pago": "TJ", "monto": 5000},
+                {"metodo_pago": "CH", "monto": 3000},
+            ],
+            documento="FA",
+        )
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="BO")
+
+        resp = auth_client(self.gerente).get("/api/cierre-caja/")
+        self.assertEqual(resp.status_code, 200)
+        stats = resp.data
+        self.assertEqual(stats["total_vendido"], 33000)
+        self.assertEqual(stats["cantidad_ventas"], 2)
+        self.assertEqual(stats["pagos"]["efectivo"], 25000)
+        self.assertEqual(stats["pagos"]["tarjeta"], 5000)
+        self.assertEqual(stats["pagos"]["cheque"], 3000)
+        self.assertEqual(stats["pagos"]["transferencia"], 0)
+        self.assertEqual(stats["documentos"]["factura"], 18000)
+        self.assertEqual(stats["documentos"]["boleta"], 15000)
+        self.assertFalse(stats["guardado"])
+
+    def test_get_cierre_resta_devoluciones_y_anulaciones(self):
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
+        venta_anulada = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=9000,
+            monto_subtotal=9000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        Anulacion.objects.create(venta=venta_anulada, usuario=self.vendedor, motivo="Test")
+        venta_anulada.estado = Venta.Estado.CANCELADA
+        venta_anulada.save()
+
+        venta_devuelta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=12000,
+            monto_subtotal=12000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        Devolucion.objects.create(
+            venta=venta_devuelta,
+            usuario=self.vendedor,
+            motivo="Test",
+            monto_devuelto=3000,
+        )
+
+        resp = auth_client(self.gerente).get("/api/cierre-caja/")
+        stats = resp.data
+        self.assertEqual(stats["total_vendido"], 30000)
+        self.assertEqual(stats["total_devoluciones"], 3000)
+        self.assertEqual(stats["total_anulaciones"], 9000)
+        self.assertEqual(stats["total_final"], 18000)
+
+    def test_post_cierre_append_only(self):
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "TR", "monto": 18000}], documento="OT")
+        resp = auth_client(self.gerente).post("/api/cierre-caja/", {}, format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(resp.data["guardado"])
+        self.assertEqual(CierreCaja.objects.count(), 1)
+
+        resp2 = auth_client(self.gerente).post("/api/cierre-caja/", {}, format="json")
+        self.assertEqual(resp2.status_code, 201)
+        self.assertEqual(CierreCaja.objects.count(), 2)
+
+        historial = auth_client(self.gerente).get("/api/cierre-caja/historial/")
+        self.assertEqual(len(historial.data), 2)
+        self.assertEqual(historial.data[0]["pagos"]["transferencia"], 18000)
+        self.assertEqual(historial.data[0]["documentos"]["otros"], 18000)
+
+    def test_cierre_solo_gerente_o_encargado(self):
+        resp = auth_client(self.vendedor).get("/api/cierre-caja/")
+        self.assertEqual(resp.status_code, 403)
+        resp = auth_client(self.vendedor).post("/api/cierre-caja/", {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_cierre_requiere_auth(self):
+        resp = self.client.get("/api/cierre-caja/")
+        self.assertEqual(resp.status_code, 401)
