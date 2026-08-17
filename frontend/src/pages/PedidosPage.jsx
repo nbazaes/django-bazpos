@@ -399,6 +399,24 @@ export default function PedidosPage() {
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleVentaData.usuario_nombre}</div>
                   <div className="col-md-4"><strong>Tipo:</strong> {detalleVentaData.tipo_documento_display || detalleVentaData.tipo_documento}</div>
                 </div>
+                <div className="row mb-4">
+                  <div className="col-md-4"><strong>Documento:</strong> {detalleVentaData.documento_display || "—"}</div>
+                  <div className="col-md-8">
+                    <strong>Pagos:</strong>{" "}
+                    {(detalleVentaData.pagos || []).length > 0 ? (
+                      <span>
+                        {(detalleVentaData.pagos || []).map((p, i) => (
+                          <span key={i}>
+                            {i > 0 && " · "}
+                            {p.metodo_pago_display} ${Number(p.monto || 0).toLocaleString()}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>

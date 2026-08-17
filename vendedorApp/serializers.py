@@ -110,11 +110,11 @@ class PagoVentaSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     detalles = DetalleVentaSerializer(many=True, source="detalleventa_set", read_only=True)
-    pagos = PagoVentaSerializer(many=True, read_only=True)
+    pagos = serializers.SerializerMethodField()
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
     tipo_documento_display = serializers.CharField(source="get_tipo_documento_display", read_only=True)
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
-    documento_display = serializers.CharField(source="get_documento_display", read_only=True, allow_null=True)
+    documento_display = serializers.SerializerMethodField()
     productos_devueltos = serializers.SerializerMethodField()
     monto_descuento = serializers.SerializerMethodField()
 
@@ -142,6 +142,32 @@ class VentaSerializer(serializers.ModelSerializer):
             "detalles",
             "productos_devueltos",
         ]
+
+    def get_pagos(self, obj):
+        pagos = list(obj.pagos.all())
+        if pagos:
+            return PagoVentaSerializer(pagos, many=True).data
+        if obj.tipo_documento == Venta.TipoDocumento.PEDIDO:
+            pedido = obj.pedido.first()
+            if pedido:
+                return [
+                    {
+                        "id": None,
+                        "metodo_pago": pedido.metodo_pago,
+                        "metodo_pago_display": pedido.get_metodo_pago_display(),
+                        "monto": obj.monto_total,
+                    }
+                ]
+        return []
+
+    def get_documento_display(self, obj):
+        if obj.documento:
+            return obj.get_documento_display()
+        if obj.tipo_documento == Venta.TipoDocumento.PEDIDO:
+            pedido = obj.pedido.first()
+            if pedido:
+                return pedido.get_estado_documento_display()
+        return None
 
     def get_monto_descuento(self, obj):
         if obj.descuento_porcentaje and obj.monto_subtotal:

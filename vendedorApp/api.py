@@ -733,7 +733,7 @@ class DeducirStockSerializer(serializers.Serializer):
 
 class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
-    queryset = Venta.objects.select_related("usuario").all().order_by("-fecha_venta")
+    queryset = Venta.objects.select_related("usuario").prefetch_related("pedido").all().order_by("-fecha_venta")
     serializer_class = VentaSerializer
     pagination_class = VentaPagination
     role_action_map = {

@@ -1238,3 +1238,31 @@ class CierreCajaTest(BaseTest):
     def test_cierre_requiere_auth(self):
         resp = self.client.get("/api/cierre-caja/")
         self.assertEqual(resp.status_code, 401)
+
+    def test_venta_detalle_muestra_pagos_y_documento(self):
+        vid = self._crear_venta(
+            monto=18000,
+            pagos=[
+                {"metodo_pago": "EF", "monto": 10000},
+                {"metodo_pago": "TJ", "monto": 8000},
+            ],
+            documento="FA",
+        )
+        resp = auth_client(self.vendedor).get(f"/api/ventas/{vid}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["documento_display"], "Factura")
+        pagos = resp.data["pagos"]
+        self.assertEqual(len(pagos), 2)
+        self.assertEqual(pagos[0]["metodo_pago"], "EF")
+        self.assertEqual(pagos[1]["metodo_pago_display"], "Tarjeta")
+        self.assertEqual(sum(p["monto"] for p in pagos), 18000)
+
+    def test_venta_pedido_muestra_pago_y_documento_del_pedido(self):
+        venta = self._crear_pedido_venta(metodo_pago="TJ", estado_documento="FA")
+        resp = auth_client(self.vendedor).get(f"/api/ventas/{venta.id}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["documento_display"], "Facturado")
+        pagos = resp.data["pagos"]
+        self.assertEqual(len(pagos), 1)
+        self.assertEqual(pagos[0]["metodo_pago_display"], "Tarjeta")
+        self.assertEqual(pagos[0]["monto"], 15000)
