@@ -814,7 +814,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         for detalle in detalles:
             producto = detalle.producto
             stocks = StockProductoUbicacion.objects.filter(
-                producto=producto, cantidad__gt=0
+                producto=producto, cantidad__gt=0, ubicacion__isnull=False
             ).select_related("ubicacion")
 
             ubicaciones_con_stock = list(stocks)

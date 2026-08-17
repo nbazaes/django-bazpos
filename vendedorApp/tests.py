@@ -344,6 +344,22 @@ class VentaStockActionsTest(BaseTest):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(len(resp.data[0]["ubicaciones"]), 2)
 
+    def test_ubicaciones_para_deducir_ignora_stock_sin_ubicacion(self):
+        u2 = Ubicacion.objects.create(nombre="Bodega Norte")
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=u2, cantidad=4
+        )
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=None, cantidad=3
+        )
+        venta_id = self._crear_venta()
+        resp = auth_client(self.vendedor).get(
+            f"/api/ventas/{venta_id}/ubicaciones-para-deducir/"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(len(resp.data[0]["ubicaciones"]), 2)
+
     def test_documento_html(self):
         venta_id = self._crear_venta()
         resp = auth_client(self.vendedor).get(f"/api/ventas/{venta_id}/documento/")
