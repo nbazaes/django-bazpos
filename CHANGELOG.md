@@ -4,6 +4,17 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.20.0] - 2026-08-17
+
+### Agregado
+
+- Chat interno entre usuarios activos para coordinarse directamente desde BAZPOS.
+- Nuevo cierre de caja con medios de pago, documentos, pagos mixtos, desglose diario e historial.
+
+### Corregido
+
+- El stock en “Sin ubicación” ya no provoca errores al elegir ubicaciones para deducir stock y sigue descontándose automáticamente.
+
 ## [1.19.1] - 2026-08-14
 
 ### Cambiado
