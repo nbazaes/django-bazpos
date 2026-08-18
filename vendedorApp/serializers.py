@@ -119,6 +119,8 @@ class VentaSerializer(serializers.ModelSerializer):
     montos_devueltos = serializers.SerializerMethodField()
     monto_devuelto = serializers.SerializerMethodField()
     monto_descuento = serializers.SerializerMethodField()
+    convertido = serializers.SerializerMethodField()
+    venta_derivada_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
@@ -136,6 +138,8 @@ class VentaSerializer(serializers.ModelSerializer):
             "tipo_documento",
             "tipo_documento_display",
             "venta_origen",
+            "convertido",
+            "venta_derivada_id",
             "cliente_nombre",
             "documento_html",
             "documento",
@@ -186,6 +190,25 @@ class VentaSerializer(serializers.ModelSerializer):
             .annotate(total=Sum("cantidad"))
         )
         return {d["producto_id"]: d["total"] for d in devueltos}
+
+    def _venta_derivada(self, obj):
+        return (
+            obj.ventas_derivadas
+            .exclude(estado=Venta.Estado.CANCELADA)
+            .order_by("id")
+            .first()
+        )
+
+    def get_convertido(self, obj):
+        if obj.tipo_documento != Venta.TipoDocumento.COTIZACION:
+            return False
+        return self._venta_derivada(obj) is not None
+
+    def get_venta_derivada_id(self, obj):
+        if obj.tipo_documento != Venta.TipoDocumento.COTIZACION:
+            return None
+        venta_derivada = self._venta_derivada(obj)
+        return venta_derivada.id if venta_derivada else None
 
     def get_montos_devueltos(self, obj):
         venta_detalles = {
@@ -274,6 +297,12 @@ class RegistrarVentaSerializer(serializers.Serializer):
             raise serializers.ValidationError("La cotización de origen no existe")
         if origen.tipo_documento != Venta.TipoDocumento.COTIZACION:
             raise serializers.ValidationError("El origen debe ser una cotización")
+        if (
+            origen.ventas_derivadas
+            .exclude(estado=Venta.Estado.CANCELADA)
+            .exists()
+        ):
+            raise serializers.ValidationError("Esta cotización ya fue convertida a venta")
         return value
 
     def validate(self, data):
@@ -574,6 +603,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     es_cotizacion = serializers.BooleanField(read_only=True)
     pedido_origen = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
     convertido = serializers.SerializerMethodField()
+    pedido_derivado_id = serializers.SerializerMethodField()
     lineas_devueltas = serializers.SerializerMethodField()
     lineas_total = serializers.SerializerMethodField()
     devuelto_parcial = serializers.SerializerMethodField()
@@ -604,6 +634,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "es_cotizacion",
             "pedido_origen",
             "convertido",
+            "pedido_derivado_id",
             "fecha_creacion",
             "motivo_cancelacion",
             "lineas_devueltas",
@@ -617,6 +648,17 @@ class PedidoSerializer(serializers.ModelSerializer):
         if not obj.es_cotizacion:
             return False
         return Pedido.objects.filter(pedido_origen=obj, activo=True).exists()
+
+    def get_pedido_derivado_id(self, obj):
+        if not obj.es_cotizacion:
+            return None
+        derivado = (
+            obj.pedidos_derivados
+            .filter(activo=True)
+            .order_by("id")
+            .first()
+        )
+        return derivado.id if derivado else None
 
     def get_lineas_devueltas(self, obj):
         return sum(1 for d in obj.detalles.all() if len(d.devoluciones.all()) > 0)

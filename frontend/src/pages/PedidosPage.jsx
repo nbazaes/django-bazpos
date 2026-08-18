@@ -362,8 +362,11 @@ export default function PedidosPage() {
                       </td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
-                        {v.tipo_documento === "CO" && v.estado === "PE" && (
+                        {v.tipo_documento === "CO" && !v.convertido && v.estado === "PE" && (
                           <button className="btn btn-sm btn-success me-1" onClick={() => navigate(`/ventas?cotizacion=${v.id}`)}>Convertir a venta</button>
+                        )}
+                        {v.tipo_documento === "CO" && v.convertido && v.venta_derivada_id && (
+                          <button className="btn btn-sm btn-success me-1" onClick={() => setDetalleVentaId(v.venta_derivada_id)}>Venta #{v.venta_derivada_id}</button>
                         )}
                         {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
                           <>

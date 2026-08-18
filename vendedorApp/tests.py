@@ -256,6 +256,54 @@ class VentaApiTest(BaseTest):
         self.assertEqual(pago.metodo_pago, Venta.MetodoPago.EFECTIVO)
         self.assertEqual(pago.monto, venta.monto_total)
 
+    def test_cotizacion_marca_convertida_con_venta_derivada(self):
+        total = self.producto.precio * 2
+        resp = auth_client(self.vendedor).post(
+            "/api/ventas/", self._payload(tipo_documento="CO"), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        cotizacion_id = resp.data["id"]
+
+        detail = auth_client(self.vendedor).get(f"/api/ventas/{cotizacion_id}/")
+        self.assertFalse(detail.data["convertido"])
+        self.assertIsNone(detail.data["venta_derivada_id"])
+
+        sale = auth_client(self.vendedor).post(
+            "/api/ventas/",
+            self._payload(
+                tipo_documento="VE",
+                venta_origen=cotizacion_id,
+                pagos=[{"metodo_pago": "EF", "monto": total}],
+            ),
+            format="json",
+        )
+        self.assertEqual(sale.status_code, 201)
+        sale_id = sale.data["id"]
+
+        detail = auth_client(self.vendedor).get(f"/api/ventas/{cotizacion_id}/")
+        self.assertTrue(detail.data["convertido"])
+        self.assertEqual(detail.data["venta_derivada_id"], sale_id)
+
+    def test_cotizacion_no_puede_convertirse_dos_veces(self):
+        total = self.producto.precio * 2
+        resp = auth_client(self.vendedor).post(
+            "/api/ventas/", self._payload(tipo_documento="CO"), format="json"
+        )
+        cotizacion_id = resp.data["id"]
+
+        payload = self._payload(
+            tipo_documento="VE",
+            venta_origen=cotizacion_id,
+            pagos=[{"metodo_pago": "EF", "monto": total}],
+        )
+        self.assertEqual(
+            auth_client(self.vendedor).post("/api/ventas/", payload, format="json").status_code,
+            201,
+        )
+        dup = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(dup.status_code, 400)
+        self.assertIn("ya fue convertida", str(dup.data))
+
 
 class VentaStockActionsTest(BaseTest):
     @classmethod

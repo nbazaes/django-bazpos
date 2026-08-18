@@ -419,7 +419,10 @@ export default function PedidosHistorial() {
                   <td className="hide-mobile">{p.telefono_cliente}</td>
                   <td>
                     {esCotizacion ? (
-                      <span className="badge badge-info">Cotización</span>
+                      <>
+                        <span className="badge badge-info">Cotización</span>
+                        {yaConvertido && <span className="badge badge-success ms-1">Convertida</span>}
+                      </>
                     ) : (
                       <>
                         <span className={estadoInfo.className}>{estadoInfo.label}</span>
@@ -448,6 +451,9 @@ export default function PedidosHistorial() {
                     <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>
                     {esCotizacion && !yaConvertido && (
                       <button className="btn btn-sm btn-warning me-1" onClick={() => abrirConvertir(p)}>Convertir a pedido</button>
+                    )}
+                    {esCotizacion && yaConvertido && p.pedido_derivado_id && (
+                      <button className="btn btn-sm btn-success me-1" onClick={() => setDetalleId(p.pedido_derivado_id)}>Pedido #{p.pedido_derivado_id}</button>
                     )}
                     {!esCotizacion && p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
