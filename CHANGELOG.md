@@ -4,6 +4,21 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.20.1] - 2026-08-18
+
+### Agregado
+
+- El historial de ventas ahora muestra el tipo de documento y el desglose de medios de pago.
+
+### Corregido
+
+- Los modales del historial de pedidos aparecen centrados correctamente y el menú lateral dejó de parpadear al pasar el cursor.
+- El control de cantidades ya no se queda atascado al repetir aumentos o disminuciones.
+
+### Rendimiento
+
+- Mejoró la velocidad de carga del detalle de ventas, especialmente en ventas asociadas a pedidos.
+
 ## [1.20.0] - 2026-08-17
 
 ### Agregado
