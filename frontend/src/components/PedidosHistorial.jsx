@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatDateTime } from "../lib/format";
 import {
   useCambiarEstadoPedido,
   useConvertirCotizacion,
   useCancelarPedido,
+  useDevolverPedido,
   useMarcarRetiro,
   usePedido,
   usePedidos,
+  useUbicaciones,
 } from "../lib/queries";
 import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
@@ -25,6 +27,7 @@ const DOCUMENTO_OPCIONES = [
 const ESTADO_BADGE = {
   PR: { className: "badge badge-warning", label: "Pendiente por retirar" },
   RE: { className: "badge badge-success", label: "Retirado" },
+  DE: { className: "badge badge-secondary", label: "Devuelto" },
   CA: { className: "badge badge-danger", label: "Cancelado" },
 };
 
@@ -42,6 +45,12 @@ export default function PedidosHistorial() {
   const [retiroDocumento, setRetiroDocumento] = useState("");
   const [cancelarId, setCancelarId] = useState(null);
   const [cancelarMotivo, setCancelarMotivo] = useState("");
+  const [devolverId, setDevolverId] = useState(null);
+  const [devolverMotivo, setDevolverMotivo] = useState("");
+  const [devolverSeleccion, setDevolverSeleccion] = useState({});
+  const [devolverMontos, setDevolverMontos] = useState({});
+  const [devolverReponer, setDevolverReponer] = useState({});
+  const [devolverUbicacion, setDevolverUbicacion] = useState({});
   const [convertirId, setConvertirId] = useState(null);
   const [convertirSeleccion, setConvertirSeleccion] = useState({});
   const [convertirNombre, setConvertirNombre] = useState("");
@@ -59,10 +68,16 @@ export default function PedidosHistorial() {
   const { data: detalleData } = usePedido(detalleId);
   const { data: retiroData } = usePedido(retiroId);
   const { data: convertirData } = usePedido(convertirId);
+  const { data: devolverData } = usePedido(devolverId);
+  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
   const cambiarDocumento = useCambiarEstadoPedido();
   const marcarRetiro = useMarcarRetiro();
   const cancelarPedido = useCancelarPedido();
+  const devolverPedido = useDevolverPedido();
   const convertirCotizacion = useConvertirCotizacion();
+
+  const ubicacionesList = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData]);
+  const esAdmin = isGerente(getUser());
 
   useEffect(() => {
     fetchStoreConfig();
@@ -106,6 +121,80 @@ export default function PedidosHistorial() {
     cancelarPedido.mutate(
       { pedidoId: cancelarId, motivo: cancelarMotivo.trim() },
       { onSuccess: () => { setCancelarId(null); setCancelarMotivo(""); } },
+    );
+  }
+
+  useEffect(() => {
+    if (!devolverData?.detalles?.length) return;
+    const sel = {};
+    const montos = {};
+    const rep = {};
+    const ubi = {};
+    for (const d of devolverData.detalles) {
+      sel[d.id] = true;
+      montos[d.id] = d.precio_final;
+      rep[d.id] = true;
+      ubi[d.id] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
+    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setDevolverSeleccion(sel);
+        setDevolverMontos(montos);
+        setDevolverReponer(rep);
+        setDevolverUbicacion(ubi);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [devolverData, ubicacionesList]);
+
+  const devolverTotalCalculado = useMemo(() => {
+    if (!devolverData?.detalles?.length) return 0;
+    let total = 0;
+    for (const d of devolverData.detalles) {
+      if (!devolverSeleccion[d.id]) continue;
+      total += Math.max(0, Number(devolverMontos[d.id] || 0));
+    }
+    return total;
+  }, [devolverData, devolverSeleccion, devolverMontos]);
+
+  function abrirDevolver(pedido) {
+    setDevolverId(pedido.id);
+    setDevolverMotivo("");
+  }
+
+  function confirmarDevolver() {
+    if (!devolverMotivo.trim()) return;
+    const productos = [];
+    for (const d of devolverData?.detalles || []) {
+      if (!devolverSeleccion[d.id]) continue;
+      const monto = Math.min(
+        Math.max(0, Number(devolverMontos[d.id] || 0)),
+        d.precio_final,
+      );
+      const item = {
+        pedido_detalle_id: d.id,
+        monto_devuelto: monto,
+        reponer_stock: devolverReponer[d.id] !== false,
+      };
+      if (item.reponer_stock && devolverData.stock_descontado) {
+        item.ubicacion_id = parseInt(devolverUbicacion[d.id] || 0, 10);
+      }
+      productos.push(item);
+    }
+    if (productos.length === 0) return;
+    devolverPedido.mutate(
+      { pedidoId: devolverId, motivo: devolverMotivo.trim(), productos },
+      {
+        onSuccess: () => {
+          addToast("Devolución registrada", "success");
+          setDevolverId(null);
+          setDevolverMotivo("");
+        },
+        onError: (err) => {
+          addToast(err.message || "Error al registrar la devolución", "danger");
+        },
+      },
     );
   }
 
@@ -348,7 +437,12 @@ export default function PedidosHistorial() {
                     {!esCotizacion && p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
                     )}
-                    <button className="btn btn-sm btn-danger" onClick={() => setCancelarId(p.id)}>Cancelar pedido</button>
+                    {!esCotizacion && esAdmin && (p.estado === "RE" || p.estado === "PR") && (
+                      <button className="btn btn-sm btn-warning me-1" onClick={() => abrirDevolver(p)}>Devolver</button>
+                    )}
+                    {(esCotizacion || (p.estado !== "DE" && p.estado !== "CA")) && (
+                      <button className="btn btn-sm btn-danger" onClick={() => setCancelarId(p.id)}>Cancelar pedido</button>
+                    )}
                   </td>
                 </tr>
               );
@@ -498,6 +592,127 @@ export default function PedidosHistorial() {
                   disabled={marcarRetiro.isPending || !retiroPersona.trim()}
                 >
                   {marcarRetiro.isPending ? "Guardando..." : "Confirmar retiro"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      , document.body)}
+
+      {devolverId && devolverData && createPortal(
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setDevolverId(null)}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Devolver pedido #{devolverData.id}</h5>
+                <button type="button" className="modal-close" onClick={() => setDevolverId(null)} disabled={devolverPedido.isPending}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">
+                  Seleccione las líneas a devolver y el monto que se reintegrará. Cada línea se devuelve completa (cantidad 1).
+                </p>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}>Sel.</th>
+                        <th>Cód. Prov.</th>
+                        <th>Producto</th>
+                        <th>Precio</th>
+                        <th>Monto a devolver</th>
+                        {devolverData.stock_descontado && <th>Reponer</th>}
+                        {devolverData.stock_descontado && <th>Ubicación</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(devolverData.detalles || []).map((d) => {
+                        const sel = !!devolverSeleccion[d.id];
+                        return (
+                          <tr key={d.id}>
+                            <td className="text-center">
+                              <input
+                                type="checkbox"
+                                checked={sel}
+                                onChange={(e) => setDevolverSeleccion({ ...devolverSeleccion, [d.id]: e.target.checked })}
+                                disabled={devolverPedido.isPending}
+                              />
+                            </td>
+                            <td>{d.codigo_proveedor || "—"}</td>
+                            <td>
+                              {d.nombre}
+                              <div className="text-muted" style={{ fontSize: "0.8rem" }}>{d.oem || ""}</div>
+                            </td>
+                            <td className="text-right">${d.precio_final}</td>
+                            <td>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                style={{ width: 130 }}
+                                min={0}
+                                max={d.precio_final}
+                                step={100}
+                                value={devolverMontos[d.id] ?? d.precio_final}
+                                onChange={(e) => setDevolverMontos({ ...devolverMontos, [d.id]: e.target.value })}
+                                disabled={!sel || devolverPedido.isPending}
+                              />
+                            </td>
+                            {devolverData.stock_descontado && (
+                              <td className="text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={devolverReponer[d.id] !== false}
+                                  onChange={(e) => setDevolverReponer({ ...devolverReponer, [d.id]: e.target.checked })}
+                                  disabled={!sel || devolverPedido.isPending}
+                                />
+                              </td>
+                            )}
+                            {devolverData.stock_descontado && (
+                              <td>
+                                <select
+                                  className="form-control form-control-sm"
+                                  value={devolverUbicacion[d.id] || ""}
+                                  onChange={(e) => setDevolverUbicacion({ ...devolverUbicacion, [d.id]: e.target.value })}
+                                  disabled={!sel || devolverReponer[d.id] === false || devolverPedido.isPending}
+                                >
+                                  {ubicacionesList.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.nombre}</option>
+                                  ))}
+                                </select>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {devolverTotalCalculado > 0 && (
+                    <div className="text-right mt-2 mb-3">
+                      <span className="font-weight-bold">Total a devolver: </span>
+                      <span className="text-danger font-weight-bold" style={{ fontSize: "1.1rem" }}>${devolverTotalCalculado}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="form-group mt-3">
+                  <label className="font-weight-bold">Motivo de devolución:</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={devolverMotivo}
+                    onChange={(e) => setDevolverMotivo(e.target.value)}
+                    placeholder="Describa el motivo de la devolución..."
+                    disabled={devolverPedido.isPending}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setDevolverId(null)} disabled={devolverPedido.isPending}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn btn-warning"
+                  onClick={confirmarDevolver}
+                  disabled={devolverPedido.isPending || !devolverMotivo.trim() || devolverTotalCalculado <= 0}
+                >
+                  {devolverPedido.isPending ? "Registrando..." : "Confirmar devolución"}
                 </button>
               </div>
             </div>

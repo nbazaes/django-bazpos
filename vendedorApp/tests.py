@@ -692,6 +692,210 @@ class PedidoApiTest(BaseTest):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def _crear_pedido_retirado(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item(), format="json"
+        )
+        pedido_id = resp.data["id"]
+        auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido_id}/cambiar-estado/",
+            {"estado": "RE"},
+            format="json",
+        )
+        pedido = Pedido.objects.get(id=pedido_id)
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido_id)
+        return pedido, detalle
+
+    def _devolver_payload(self, detalle, monto=None, reponer=True):
+        return {
+            "motivo": "Cliente devolvió el pedido",
+            "productos": [
+                {
+                    "pedido_detalle_id": detalle.id,
+                    "monto_devuelto": monto if monto is not None else detalle.precio_final,
+                    "reponer_stock": reponer,
+                    "ubicacion_id": self.ubicacion.id if reponer else None,
+                }
+            ],
+        }
+
+    def test_devolver_pedido_retirado(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        self.assertEqual(pedido.stock_descontado, True)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 9)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        devolucion = Devolucion.objects.get(id=resp.data["id"])
+        self.assertEqual(devolucion.monto_devuelto, detalle.precio_final)
+        self.assertEqual(devolucion.venta_id, pedido.venta_id)
+        self.assertEqual(resp.data["pedido_id"], pedido.id)
+
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.Estado.DEVUELTO)
+        self.assertTrue(pedido.activo)
+        self.assertEqual(pedido.venta.estado, Venta.Estado.COMPLETADA)
+
+        dd = DetalleDevolucion.objects.get(devolucion=devolucion)
+        self.assertEqual(dd.pedido_detalle_id, detalle.id)
+        self.assertEqual(dd.cantidad, 1)
+        self.assertEqual(dd.precio_unitario, detalle.precio_final)
+        self.assertEqual(dd.producto_id, self.producto.producto_id)
+
+        stock.refresh_from_db()
+        self.assertEqual(stock.cantidad, 10)
+
+    def test_devolver_pedido_pendiente_no_restaura_stock(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item(), format="json"
+        )
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        self.assertFalse(pedido.stock_descontado)
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido.id)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.Estado.DEVUELTO)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 10)
+
+    def test_devolver_pedido_linea_custom(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/",
+            {
+                "nombre_cliente": "Cliente Custom",
+                "telefono_cliente": "912345678",
+                "metodo_pago": "EF",
+                "items": [
+                    {
+                        "producto_id": None,
+                        "codigo_proveedor": "CUST1",
+                        "proveedor_id": self.proveedor.proveedor_id,
+                        "oem": "OEM-CUSTOM",
+                        "nombre": "Pieza Especial",
+                        "precio_costo": 20000,
+                        "porcentaje_utilidad": "30.00",
+                        "sumar_envio": True,
+                    }
+                ],
+            },
+            format="json",
+        )
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido.id)
+        self.assertIsNone(detalle.producto)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        devolucion = Devolucion.objects.get(id=resp.data["id"])
+        dd = DetalleDevolucion.objects.get(devolucion=devolucion)
+        self.assertIsNone(dd.producto)
+        self.assertEqual(dd.nombre, "Pieza Especial")
+        self.assertEqual(dd.precio_unitario, detalle.precio_final)
+
+    def test_devolver_pedido_monto_editado(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        monto = detalle.precio_final - 2000
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle, monto=monto),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        devolucion = Devolucion.objects.get(id=resp.data["id"])
+        self.assertEqual(devolucion.monto_devuelto, monto)
+
+    def test_devolver_pedido_excede_precio(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle, monto=detalle.precio_final + 1000),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_devolver_pedido_doble(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        client = auth_client(self.gerente)
+        resp = client.post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        resp = client.post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_devolver_pedido_reponer_requiere_ubicacion(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        payload = self._devolver_payload(detalle)
+        payload["productos"][0]["ubicacion_id"] = None
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            payload,
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_devolver_pedido_vendedor_denegado(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_devolver_cotizacion_denegado(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item(es_cotizacion=True), format="json"
+        )
+        cotizacion_id = resp.data["id"]
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{cotizacion_id}/devolver/",
+            {"motivo": "N/A", "productos": []},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_dashboard_resta_devolucion_pedido(self):
+        pedido, detalle = self._crear_pedido_retirado()
+        auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        resp = auth_client(self.gerente).get("/api/dashboard/stats/")
+        self.assertEqual(resp.data["ventas_dia"]["devoluciones"], detalle.precio_final)
+        self.assertEqual(
+            resp.data["ventas_dia"]["total"],
+            pedido.venta.monto_total - detalle.precio_final,
+        )
+
 
 class PedidoProveedorTest(BaseTest):
     @classmethod

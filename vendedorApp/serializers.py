@@ -367,12 +367,24 @@ class AnulacionSerializer(serializers.ModelSerializer):
 
 
 class DetalleDevolucionSerializer(serializers.ModelSerializer):
-    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
-    codigo_producto = serializers.CharField(source="producto.codigo_producto", read_only=True)
+    producto_nombre = serializers.SerializerMethodField()
+    codigo_producto = serializers.SerializerMethodField()
 
     class Meta:
         model = DetalleDevolucion
-        fields = ["id", "producto", "codigo_producto", "producto_nombre", "cantidad", "reponer_stock"]
+        fields = ["id", "producto", "codigo_producto", "producto_nombre", "cantidad", "precio_unitario", "reponer_stock"]
+
+    def get_producto_nombre(self, obj):
+        if obj.producto:
+            return obj.producto.nombre
+        return obj.nombre or (obj.pedido_detalle.nombre if obj.pedido_detalle else "")
+
+    def get_codigo_producto(self, obj):
+        if obj.producto:
+            return obj.producto.codigo_producto
+        if obj.pedido_detalle:
+            return obj.pedido_detalle.codigo_proveedor
+        return ""
 
 
 class DevolucionSerializer(serializers.ModelSerializer):
@@ -380,12 +392,18 @@ class DevolucionSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
     venta_fecha = serializers.DateTimeField(source="venta.fecha_venta", read_only=True)
     venta_usuario = serializers.CharField(source="venta.usuario.username", read_only=True)
+    venta_tipo = serializers.CharField(source="venta.tipo_documento", read_only=True)
+    pedido_id = serializers.SerializerMethodField()
     monto_devuelto = serializers.SerializerMethodField()
 
     class Meta:
         model = Devolucion
-        fields = ["id", "venta", "venta_fecha", "venta_usuario", "usuario_nombre", "motivo", "fecha_devolucion", "monto_devuelto", "detalles"]
+        fields = ["id", "venta", "venta_fecha", "venta_usuario", "usuario_nombre", "motivo", "fecha_devolucion", "monto_devuelto", "detalles", "venta_tipo", "pedido_id"]
         read_only_fields = ["id", "fecha_devolucion"]
+
+    def get_pedido_id(self, obj):
+        pedido = obj.venta.pedido.first()
+        return pedido.id if pedido else None
 
     def get_monto_devuelto(self, obj):
         if obj.monto_devuelto > 0:
@@ -412,6 +430,26 @@ class DevolucionInputSerializer(serializers.Serializer):
         ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
 
     productos = ProductoItem(many=True)
+
+
+class DevolverPedidoInputSerializer(serializers.Serializer):
+    motivo = serializers.CharField(trim_whitespace=False)
+
+    class LineaItem(serializers.Serializer):
+        pedido_detalle_id = serializers.IntegerField()
+        monto_devuelto = serializers.IntegerField(min_value=0)
+        reponer_stock = serializers.BooleanField(default=True)
+        ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
+
+    productos = LineaItem(many=True)
+
+    def validate(self, data):
+        ids = [p["pedido_detalle_id"] for p in data.get("productos", [])]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError(
+                {"productos": "No puede devolver la misma línea más de una vez"}
+            )
+        return data
 
 
 class AjusteItemSerializer(serializers.Serializer):

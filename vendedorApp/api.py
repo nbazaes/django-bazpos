@@ -23,6 +23,7 @@ from vendedorApp.serializers import (
     CrearPedidoSerializer,
     DevolucionInputSerializer,
     DevolucionSerializer,
+    DevolverPedidoInputSerializer,
     PedidoProveedorDiaSerializer,
     PedidoProveedorDiaHistorialSerializer,
     PedidoSerializer,
@@ -1201,6 +1202,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         "marcar_retiro": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "cancelar": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "convertir_a_pedido": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_queryset(self):
@@ -1307,6 +1309,107 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         pedido.motivo_cancelacion = serializer.validated_data["motivo"]
         pedido.save(update_fields=["estado", "motivo_cancelacion"])
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="devolver")
+    def devolver(self, request, pk=None):
+        pedido = self.get_object()
+
+        if pedido.es_cotizacion:
+            return Response({"error": "No se puede devolver una cotización"}, status=400)
+        if pedido.estado == Pedido.Estado.CANCELADO:
+            return Response({"error": "No se puede devolver un pedido cancelado"}, status=400)
+        if pedido.estado == Pedido.Estado.DEVUELTO:
+            return Response({"error": "Este pedido ya fue devuelto"}, status=400)
+        if pedido.venta is None:
+            return Response({"error": "Este pedido no tiene venta asociada"}, status=400)
+
+        serializer = DevolverPedidoInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        detalles_map = {d.id: d for d in pedido.detalles.select_related("producto").all()}
+
+        ya_devueltos = set(
+            DetalleDevolucion.objects.filter(
+                devolucion__venta=pedido.venta,
+                pedido_detalle__isnull=False,
+            ).values_list("pedido_detalle_id", flat=True)
+        )
+
+        lineas = []
+        monto_devuelto = 0
+        for item in data["productos"]:
+            pedido_detalle = detalles_map.get(item["pedido_detalle_id"])
+            if pedido_detalle is None:
+                return Response(
+                    {"error": f"Línea {item['pedido_detalle_id']} no pertenece a este pedido"},
+                    status=400,
+                )
+            if pedido_detalle.id in ya_devueltos:
+                return Response(
+                    {"error": f"La línea {pedido_detalle.nombre} ya fue devuelta"},
+                    status=400,
+                )
+
+            monto = item["monto_devuelto"]
+            if monto > pedido_detalle.precio_final:
+                return Response(
+                    {"error": f"El monto a devolver de {pedido_detalle.nombre} "
+                              f"no puede superar su precio (${pedido_detalle.precio_final})"},
+                    status=400,
+                )
+            monto_devuelto += monto
+
+            reponer = item["reponer_stock"]
+            if reponer and pedido.stock_descontado and pedido_detalle.producto:
+                ubicacion_id = item.get("ubicacion_id")
+                if not ubicacion_id:
+                    return Response(
+                        {"error": f"Debe especificar ubicación para reponer stock de {pedido_detalle.nombre}"},
+                        status=400,
+                    )
+                try:
+                    Ubicacion.objects.get(id=ubicacion_id)
+                except Ubicacion.DoesNotExist:
+                    return Response(
+                        {"error": f"Ubicación {ubicacion_id} no encontrada"},
+                        status=404,
+                    )
+
+            lineas.append((pedido_detalle, monto, reponer, item.get("ubicacion_id")))
+
+        with transaction.atomic():
+            devolucion = Devolucion.objects.create(
+                venta=pedido.venta,
+                usuario=request.user,
+                motivo=data["motivo"],
+                monto_devuelto=monto_devuelto,
+            )
+
+            for pedido_detalle, monto, reponer, ubicacion_id in lineas:
+                if reponer and pedido.stock_descontado and pedido_detalle.producto:
+                    stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                        producto=pedido_detalle.producto,
+                        ubicacion_id=ubicacion_id,
+                        defaults={"cantidad": 0},
+                    )
+                    stock.cantidad += 1
+                    stock.save()
+
+                DetalleDevolucion.objects.create(
+                    devolucion=devolucion,
+                    producto=pedido_detalle.producto,
+                    pedido_detalle=pedido_detalle,
+                    nombre=pedido_detalle.nombre,
+                    precio_unitario=monto,
+                    cantidad=1,
+                    reponer_stock=reponer,
+                )
+
+            pedido.estado = Pedido.Estado.DEVUELTO
+            pedido.save(update_fields=["estado"])
+
+        return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 
     def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
         from decimal import Decimal, ROUND_HALF_UP, ROUND_UP

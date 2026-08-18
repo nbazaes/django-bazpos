@@ -228,7 +228,16 @@ class Devolucion(models.Model):
 
 class DetalleDevolucion(models.Model):
     devolucion = models.ForeignKey(Devolucion, on_delete=models.CASCADE, related_name='detalles')
-    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, null=True, blank=True)
+    pedido_detalle = models.ForeignKey(
+        "PedidoDetalle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="devoluciones",
+    )
+    nombre = models.CharField(max_length=200, blank=True, default="")
+    precio_unitario = models.IntegerField(default=0)
     cantidad = models.PositiveIntegerField()
     reponer_stock = models.BooleanField(default=True)
 
@@ -293,6 +302,7 @@ class Pedido(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE_RETIRAR = "PR", "Pendiente por retirar"
         RETIRADO = "RE", "Retirado"
+        DEVUELTO = "DE", "Devuelto"
         CANCELADO = "CA", "Cancelado"
 
     class EstadoDocumento(models.TextChoices):

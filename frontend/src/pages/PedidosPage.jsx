@@ -461,15 +461,19 @@ export default function PedidosPage() {
                 <div className="row mb-4">
                   <div className="col-md-4"><strong>Fecha:</strong> {formatDateTime(detalleDevolucionData.fecha_devolucion)}</div>
                   <div className="col-md-4"><strong>Usuario:</strong> {detalleDevolucionData.usuario_nombre}</div>
-                  <div className="col-md-4"><strong>Venta original:</strong> #{detalleDevolucionData.venta}</div>
+                  <div className="col-md-4">
+                    <strong>Origen:</strong> Venta #{detalleDevolucionData.venta}
+                    {detalleDevolucionData.pedido_id ? ` · Pedido #${detalleDevolucionData.pedido_id}` : ""}
+                  </div>
                 </div>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Repuso stock</th></tr></thead>
+                    <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Monto devuelto</th><th>Repuso stock</th></tr></thead>
                     <tbody>
                       {(detalleDevolucionData.detalles || []).map((d) => (
                         <tr key={d.id}>
-                          <td>{d.codigo_producto}</td><td>{d.producto_nombre}</td><td>{d.cantidad}</td>
+                          <td>{d.codigo_producto || "—"}</td><td>{d.producto_nombre}</td><td>{d.cantidad}</td>
+                          <td>${d.precio_unitario || "0"}</td>
                           <td>{d.reponer_stock ? "Sí" : "No"}</td>
                         </tr>
                       ))}
