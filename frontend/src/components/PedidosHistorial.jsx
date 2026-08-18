@@ -131,6 +131,10 @@ export default function PedidosHistorial() {
     const rep = {};
     const ubi = {};
     for (const d of devolverData.detalles) {
+      if (d.devuelto) {
+        sel[d.id] = false;
+        continue;
+      }
       sel[d.id] = true;
       montos[d.id] = d.precio_final;
       rep[d.id] = true;
@@ -355,6 +359,7 @@ export default function PedidosHistorial() {
           <option value="">Todos los estados</option>
           <option value="PR">Pendiente por retirar</option>
           <option value="RE">Retirado</option>
+          <option value="DE">Devuelto</option>
           <option value="CA">Cancelado</option>
           <option value="CO">Cotización</option>
         </select>
@@ -416,7 +421,17 @@ export default function PedidosHistorial() {
                     {esCotizacion ? (
                       <span className="badge badge-info">Cotización</span>
                     ) : (
-                      <span className={estadoInfo.className}>{estadoInfo.label}</span>
+                      <>
+                        <span className={estadoInfo.className}>{estadoInfo.label}</span>
+                        {p.devuelto_parcial && (
+                          <span
+                            className="badge badge-warning ms-1"
+                            title={`Devueltas ${p.lineas_devueltas} de ${p.lineas_total} líneas — $${p.monto_devuelto}`}
+                          >
+                            Dev. parcial
+                          </span>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="hide-mobile">
@@ -627,6 +642,26 @@ export default function PedidosHistorial() {
                     <tbody>
                       {(devolverData.detalles || []).map((d) => {
                         const sel = !!devolverSeleccion[d.id];
+                        if (d.devuelto) {
+                          return (
+                            <tr key={d.id} className="table-secondary">
+                              <td className="text-center">
+                                <input type="checkbox" checked disabled />
+                              </td>
+                              <td>{d.codigo_proveedor || "—"}</td>
+                              <td>
+                                {d.nombre}
+                                <div className="text-muted" style={{ fontSize: "0.8rem" }}>{d.oem || ""}</div>
+                              </td>
+                              <td className="text-right">${d.precio_final}</td>
+                              <td colSpan={devolverData.stock_descontado ? 3 : 1}>
+                                <span className="badge badge-secondary">
+                                  Ya devuelto — ${d.monto_devuelto || 0}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        }
                         return (
                           <tr key={d.id}>
                             <td className="text-center">

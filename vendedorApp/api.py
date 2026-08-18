@@ -1207,7 +1207,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
 
     def get_queryset(self):
         queryset = Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
-            "detalles__proveedor", "detalles__producto"
+            "detalles__proveedor", "detalles__producto", "detalles__devoluciones"
         ).order_by("-fecha_creacion")
 
         estado = self.request.query_params.get("estado", "").strip()
@@ -1318,8 +1318,6 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             return Response({"error": "No se puede devolver una cotización"}, status=400)
         if pedido.estado == Pedido.Estado.CANCELADO:
             return Response({"error": "No se puede devolver un pedido cancelado"}, status=400)
-        if pedido.estado == Pedido.Estado.DEVUELTO:
-            return Response({"error": "Este pedido ya fue devuelto"}, status=400)
         if pedido.venta is None:
             return Response({"error": "Este pedido no tiene venta asociada"}, status=400)
 
@@ -1328,6 +1326,8 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         data = serializer.validated_data
 
         detalles_map = {d.id: d for d in pedido.detalles.select_related("producto").all()}
+        if not detalles_map:
+            return Response({"error": "Este pedido no tiene líneas para devolver"}, status=400)
 
         ya_devueltos = set(
             DetalleDevolucion.objects.filter(
@@ -1335,6 +1335,8 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                 pedido_detalle__isnull=False,
             ).values_list("pedido_detalle_id", flat=True)
         )
+        if len(ya_devueltos) >= len(detalles_map):
+            return Response({"error": "Este pedido ya fue devuelto por completo"}, status=400)
 
         lineas = []
         monto_devuelto = 0
@@ -1406,8 +1408,10 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     reponer_stock=reponer,
                 )
 
-            pedido.estado = Pedido.Estado.DEVUELTO
-            pedido.save(update_fields=["estado"])
+            lineas_devueltas_ids = {linea[0].id for linea in lineas}
+            if len(ya_devueltos | lineas_devueltas_ids) >= len(detalles_map):
+                pedido.estado = Pedido.Estado.DEVUELTO
+                pedido.save(update_fields=["estado"])
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 

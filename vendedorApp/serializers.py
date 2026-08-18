@@ -444,7 +444,12 @@ class DevolverPedidoInputSerializer(serializers.Serializer):
     productos = LineaItem(many=True)
 
     def validate(self, data):
-        ids = [p["pedido_detalle_id"] for p in data.get("productos", [])]
+        productos = data.get("productos", [])
+        if not productos:
+            raise serializers.ValidationError(
+                {"productos": "Debe seleccionar al menos una línea a devolver"}
+            )
+        ids = [p["pedido_detalle_id"] for p in productos]
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError(
                 {"productos": "No puede devolver la misma línea más de una vez"}
@@ -493,6 +498,8 @@ class AjusteStockSerializer(serializers.ModelSerializer):
 class PedidoDetalleSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.CharField(source="proveedor.nombre", read_only=True)
     producto_id = serializers.IntegerField(source="producto.producto_id", read_only=True)
+    devuelto = serializers.SerializerMethodField()
+    monto_devuelto = serializers.SerializerMethodField()
 
     class Meta:
         model = PedidoDetalle
@@ -509,7 +516,15 @@ class PedidoDetalleSerializer(serializers.ModelSerializer):
             "precio_final",
             "sumar_envio",
             "stellantis",
+            "devuelto",
+            "monto_devuelto",
         ]
+
+    def get_devuelto(self, obj):
+        return len(obj.devoluciones.all()) > 0
+
+    def get_monto_devuelto(self, obj):
+        return sum(dd.precio_unitario for dd in obj.devoluciones.all())
 
 
 class PedidoSerializer(serializers.ModelSerializer):
@@ -521,6 +536,10 @@ class PedidoSerializer(serializers.ModelSerializer):
     es_cotizacion = serializers.BooleanField(read_only=True)
     pedido_origen = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
     convertido = serializers.SerializerMethodField()
+    lineas_devueltas = serializers.SerializerMethodField()
+    lineas_total = serializers.SerializerMethodField()
+    devuelto_parcial = serializers.SerializerMethodField()
+    monto_devuelto = serializers.SerializerMethodField()
 
     class Meta:
         model = Pedido
@@ -549,6 +568,10 @@ class PedidoSerializer(serializers.ModelSerializer):
             "convertido",
             "fecha_creacion",
             "motivo_cancelacion",
+            "lineas_devueltas",
+            "lineas_total",
+            "devuelto_parcial",
+            "monto_devuelto",
             "detalles",
         ]
 
@@ -556,6 +579,26 @@ class PedidoSerializer(serializers.ModelSerializer):
         if not obj.es_cotizacion:
             return False
         return Pedido.objects.filter(pedido_origen=obj, activo=True).exists()
+
+    def get_lineas_devueltas(self, obj):
+        return sum(1 for d in obj.detalles.all() if len(d.devoluciones.all()) > 0)
+
+    def get_lineas_total(self, obj):
+        return len(obj.detalles.all())
+
+    def get_devuelto_parcial(self, obj):
+        total = len(obj.detalles.all())
+        if total == 0:
+            return False
+        devueltas = self.get_lineas_devueltas(obj)
+        return 0 < devueltas < total
+
+    def get_monto_devuelto(self, obj):
+        return sum(
+            dd.precio_unitario
+            for d in obj.detalles.all()
+            for dd in d.devoluciones.all()
+        )
 
 
 class PedidoDetalleInputSerializer(serializers.Serializer):

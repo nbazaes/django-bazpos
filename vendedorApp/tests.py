@@ -559,6 +559,12 @@ class PedidoApiTest(BaseTest):
             ],
         }
 
+    def _item_multi(self, n=2):
+        payload = self._item()
+        item = payload["items"][0]
+        payload["items"] = [dict(item, codigo_proveedor=f"CP{i+1}") for i in range(n)]
+        return payload
+
     def test_crear_pedido(self):
         resp = auth_client(self.vendedor).post(
             "/api/pedidos/", self._item(), format="json"
@@ -846,6 +852,101 @@ class PedidoApiTest(BaseTest):
         resp = client.post(
             f"/api/pedidos/{pedido.id}/devolver/",
             self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_devolver_pedido_parcial_dos_veces(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item_multi(2), format="json"
+        )
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido.id}/cambiar-estado/",
+            {"estado": "RE"},
+            format="json",
+        )
+        detalles = list(PedidoDetalle.objects.filter(pedido_id=pedido.id).order_by("id"))
+        self.assertEqual(len(detalles), 2)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 8)
+
+        client = auth_client(self.gerente)
+
+        resp = client.post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalles[0]),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.Estado.RETIRADO)
+        stock.refresh_from_db()
+        self.assertEqual(stock.cantidad, 9)
+
+        resp = client.get(f"/api/pedidos/{pedido.id}/")
+        self.assertTrue(resp.data["devuelto_parcial"])
+        self.assertEqual(resp.data["lineas_devueltas"], 1)
+        self.assertEqual(resp.data["lineas_total"], 2)
+        self.assertEqual(resp.data["monto_devuelto"], detalles[0].precio_final)
+        detalle_data = next(
+            d for d in resp.data["detalles"] if d["id"] == detalles[0].id
+        )
+        self.assertTrue(detalle_data["devuelto"])
+        self.assertEqual(detalle_data["monto_devuelto"], detalles[0].precio_final)
+
+        resp = client.post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalles[1]),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.Estado.DEVUELTO)
+        stock.refresh_from_db()
+        self.assertEqual(stock.cantidad, 10)
+
+        resp = client.get(f"/api/pedidos/{pedido.id}/")
+        self.assertFalse(resp.data["devuelto_parcial"])
+        self.assertEqual(resp.data["lineas_devueltas"], 2)
+        self.assertEqual(
+            resp.data["monto_devuelto"],
+            detalles[0].precio_final + detalles[1].precio_final,
+        )
+
+    def test_devolver_pedido_parcial_pendiente(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item_multi(2), format="json"
+        )
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        detalle = PedidoDetalle.objects.filter(pedido_id=pedido.id).order_by("id").first()
+
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.estado, Pedido.Estado.PENDIENTE_RETIRAR)
+
+        resp = auth_client(self.gerente).get(f"/api/pedidos/{pedido.id}/")
+        self.assertTrue(resp.data["devuelto_parcial"])
+        self.assertEqual(resp.data["lineas_devueltas"], 1)
+
+    def test_devolver_pedido_seleccion_vacia(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item(), format="json"
+        )
+        pedido_id = resp.data["id"]
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido_id}/devolver/",
+            {"motivo": "Sin líneas", "productos": []},
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
