@@ -977,7 +977,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        detalles_venta = {d.producto_id: d for d in venta.detalleventa_set.all()}
+        detalles_venta = {d.producto_id: d for d in venta.detalleventa_set.select_related("producto").all()}
         detalles_map = {pid: d.cantidad for pid, d in detalles_venta.items()}
 
         devueltos = {}
@@ -1017,7 +1017,18 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
                 dv = detalles_venta[pid]
                 price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
-                monto_devuelto += cantidad * price
+                monto_item = item.get("monto_devuelto")
+                if monto_item is None:
+                    monto_item = cantidad * price
+                else:
+                    max_monto = cantidad * price
+                    if monto_item > max_monto:
+                        return Response(
+                            {"error": f"El monto a devolver del producto {pid} "
+                                      f"no puede superar su valor (${max_monto})"},
+                            status=400,
+                        )
+                monto_devuelto += monto_item
 
                 if reponer:
                     ubicacion_id = item.get("ubicacion_id")
@@ -1044,6 +1055,8 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 DetalleDevolucion.objects.create(
                     devolucion=devolucion,
                     producto_id=pid,
+                    nombre=detalles_venta[pid].producto.nombre,
+                    precio_unitario=monto_item,
                     cantidad=cantidad,
                     reponer_stock=reponer,
                 )

@@ -45,6 +45,7 @@ export default function PedidosPage() {
   const [devolverMotivo, setDevolverMotivo] = useState("");
   const [devolverSeleccion, setDevolverSeleccion] = useState({});
   const [devolverCantidades, setDevolverCantidades] = useState({});
+  const [devolverMontos, setDevolverMontos] = useState({});
   const [devolverReponer, setDevolverReponer] = useState({});
   const [devolverUbicacion, setDevolverUbicacion] = useState({});
 
@@ -98,13 +99,16 @@ export default function PedidosPage() {
     const prodDevueltos = devolverVentaData.productos_devueltos || {};
     const sel = {};
     const cant = {};
+    const montos = {};
     const rep = {};
     const ubi = {};
     for (const d of devolverVentaData.detalles) {
       const devuelto = prodDevueltos[d.producto] || 0;
       const disponible = d.cantidad - devuelto;
+      const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
       sel[d.producto] = false;
       cant[d.producto] = disponible > 0 ? disponible : 1;
+      montos[d.producto] = disponible > 0 ? disponible * effPrice : 0;
       rep[d.producto] = true;
       ubi[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
     }
@@ -113,6 +117,7 @@ export default function PedidosPage() {
       if (!cancelled) {
         setDevolverSeleccion(sel);
         setDevolverCantidades(cant);
+        setDevolverMontos(montos);
         setDevolverReponer(rep);
         setDevolverUbicacion(ubi);
       }
@@ -129,12 +134,10 @@ export default function PedidosPage() {
       const disponible = d.cantidad - devuelto;
       if (disponible <= 0) continue;
       if (!devolverSeleccion[d.producto]) continue;
-      const cant = devolverCantidades[d.producto] || 1;
-      const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
-      total += cant * effPrice;
+      total += Math.max(0, Number(devolverMontos[d.producto] || 0));
     }
     return total;
-  }, [devolverVentaData, devolverSeleccion, devolverCantidades]);
+  }, [devolverVentaData, devolverSeleccion, devolverMontos]);
 
   const syncURL = (t, p, ps, s, tf, fd, fh) => {
     const params = { tab: t, page: String(p), page_size: String(ps) };
@@ -219,7 +222,10 @@ export default function PedidosPage() {
       const maxDisp = d.cantidad - devuelto;
       const cantidad = Math.min(devolverCantidades[d.producto] || 0, maxDisp);
       if (cantidad <= 0) continue;
-      const item = { producto_id: d.producto, cantidad, reponer_stock: devolverReponer[d.producto] };
+      const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
+      const maxMonto = cantidad * effPrice;
+      const monto = Math.min(Math.max(0, Number(devolverMontos[d.producto] || 0)), maxMonto);
+      const item = { producto_id: d.producto, cantidad, reponer_stock: devolverReponer[d.producto], monto_devuelto: monto };
       if (item.reponer_stock) {
         item.ubicacion_id = parseInt(devolverUbicacion[d.producto] || 0);
       }
@@ -343,7 +349,17 @@ export default function PedidosPage() {
                       {tipoFiltro === "CO" && <td>{v.cliente_nombre || "—"}</td>}
                       <td>${v.monto_total}</td>
                       <td>{v.tipo_documento_display || v.tipo_documento}</td>
-                      <td>{v.estado_display || v.estado}</td>
+                      <td>
+                        {v.estado_display || v.estado}
+                        {v.monto_devuelto > 0 && (
+                          <span
+                            className={`badge ms-1 ${v.monto_devuelto >= v.monto_total ? "badge-secondary" : "badge-warning"}`}
+                            title={`Devuelto $${v.monto_devuelto}`}
+                          >
+                            {v.monto_devuelto >= v.monto_total ? "Devuelto" : "Dev. parcial"}
+                          </span>
+                        )}
+                      </td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
                         {v.tipo_documento === "CO" && v.estado === "PE" && (
@@ -556,18 +572,33 @@ export default function PedidosPage() {
                 <button type="button" className="modal-close" onClick={closeDevolverModal} disabled={devolverMutation.isPending}>&times;</button>
               </div>
               <div className="modal-body">
-                <p className="mb-3">Seleccione los productos a devolver y si se repone el stock:</p>
+                <p className="mb-3">Seleccione los productos a devolver y el monto que se reintegrará. Los ya devueltos se muestran solo como referencia.</p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
-                    <thead><tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Precio efect.</th><th>Cant.</th><th>Reponer</th><th>Ubicación</th></tr></thead>
+                    <thead><tr><th>Sel.</th><th>Código</th><th>Producto</th><th>Vendido</th><th>Disponible</th><th>Precio efect.</th><th>Cant.</th><th>Monto a devolver</th><th>Reponer</th><th>Ubicación</th></tr></thead>
                     <tbody>
                       {(devolverVentaData.detalles || []).map((d) => {
                         const devuelto = (devolverVentaData.productos_devueltos || {})[d.producto] || 0;
                         const disponible = d.cantidad - devuelto;
-                        if (disponible <= 0) return null;
                         const sel = devolverSeleccion[d.producto] || false;
                         const cant = devolverCantidades[d.producto] || 1;
                         const effPrice = d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario;
+                        if (disponible <= 0) {
+                          const montoDevuelto = (devolverVentaData.montos_devueltos || {})[d.producto] || 0;
+                          return (
+                            <tr key={d.producto} className="table-secondary">
+                              <td><input type="checkbox" checked disabled /></td>
+                              <td>{d.codigo_producto}</td>
+                              <td>{d.producto_nombre}</td>
+                              <td>{d.cantidad}</td>
+                              <td>0</td>
+                              <td className="text-right">${effPrice}</td>
+                              <td colSpan={4}>
+                                <span className="badge badge-secondary">Ya devuelto — ${montoDevuelto}</span>
+                              </td>
+                            </tr>
+                          );
+                        }
                         return (
                           <tr key={d.producto}>
                             <td><input type="checkbox" checked={sel} onChange={(e) => setDevolverSeleccion({ ...devolverSeleccion, [d.producto]: e.target.checked })} disabled={devolverMutation.isPending} /></td>
@@ -590,6 +621,19 @@ export default function PedidosPage() {
                                 inputStyle={{ width: 56, fontSize: "0.85rem" }}
                                 decrementLabel={`Disminuir cantidad a devolver de ${d.producto_nombre}`}
                                 incrementLabel={`Aumentar cantidad a devolver de ${d.producto_nombre}`}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                style={{ width: 120 }}
+                                min={0}
+                                max={disponible * effPrice}
+                                step={100}
+                                value={devolverMontos[d.producto] ?? disponible * effPrice}
+                                onChange={(e) => setDevolverMontos({ ...devolverMontos, [d.producto]: e.target.value })}
+                                disabled={!sel || devolverMutation.isPending}
                               />
                             </td>
                             <td><input type="checkbox" checked={devolverReponer[d.producto] !== false} onChange={(e) => setDevolverReponer({ ...devolverReponer, [d.producto]: e.target.checked })} disabled={!sel || devolverMutation.isPending} /></td>

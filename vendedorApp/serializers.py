@@ -116,6 +116,8 @@ class VentaSerializer(serializers.ModelSerializer):
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     documento_display = serializers.SerializerMethodField()
     productos_devueltos = serializers.SerializerMethodField()
+    montos_devueltos = serializers.SerializerMethodField()
+    monto_devuelto = serializers.SerializerMethodField()
     monto_descuento = serializers.SerializerMethodField()
 
     class Meta:
@@ -141,6 +143,8 @@ class VentaSerializer(serializers.ModelSerializer):
             "pagos",
             "detalles",
             "productos_devueltos",
+            "montos_devueltos",
+            "monto_devuelto",
         ]
 
     def get_pagos(self, obj):
@@ -182,6 +186,32 @@ class VentaSerializer(serializers.ModelSerializer):
             .annotate(total=Sum("cantidad"))
         )
         return {d["producto_id"]: d["total"] for d in devueltos}
+
+    def get_montos_devueltos(self, obj):
+        venta_detalles = {
+            dv.producto_id: dv for dv in obj.detalleventa_set.all()
+        }
+        resultado = {}
+        for dd in DetalleDevolucion.objects.filter(devolucion__venta=obj):
+            pid = dd.producto_id
+            if pid is None:
+                continue
+            if dd.precio_unitario > 0:
+                monto = dd.precio_unitario
+            else:
+                dv = venta_detalles.get(pid)
+                if dv is None:
+                    monto = 0
+                else:
+                    price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
+                    monto = dd.cantidad * price
+            resultado[pid] = resultado.get(pid, 0) + monto
+        return resultado
+
+    def get_monto_devuelto(self, obj):
+        return (
+            obj.devoluciones.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+        )
 
 
 def _round_total(amount):
@@ -428,8 +458,16 @@ class DevolucionInputSerializer(serializers.Serializer):
         cantidad = serializers.IntegerField(min_value=1)
         reponer_stock = serializers.BooleanField(default=True)
         ubicacion_id = serializers.IntegerField(required=False, allow_null=True)
+        monto_devuelto = serializers.IntegerField(required=False, allow_null=True, min_value=0)
 
     productos = ProductoItem(many=True)
+
+    def validate(self, data):
+        if not data.get("productos"):
+            raise serializers.ValidationError(
+                {"productos": "Debe seleccionar al menos un producto a devolver"}
+            )
+        return data
 
 
 class DevolverPedidoInputSerializer(serializers.Serializer):

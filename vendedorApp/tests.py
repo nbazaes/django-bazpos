@@ -519,6 +519,99 @@ class AnularDevolverTest(BaseTest):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_devolver_monto_editado(self):
+        venta_id = self._crear_venta()
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta_id}/devolver/",
+            {
+                "motivo": "Devolución con reintegro parcial",
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 1,
+                        "reponer_stock": False,
+                        "monto_devuelto": 5000,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        devolucion = Devolucion.objects.get(id=resp.data["id"])
+        self.assertEqual(devolucion.monto_devuelto, 5000)
+        dd = DetalleDevolucion.objects.get(devolucion=devolucion)
+        self.assertEqual(dd.precio_unitario, 5000)
+        self.assertEqual(dd.nombre, self.producto.nombre)
+
+    def test_devolver_monto_excede_valor(self):
+        venta_id = self._crear_venta()
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta_id}/devolver/",
+            {
+                "motivo": "Devolución",
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 1,
+                        "reponer_stock": False,
+                        "monto_devuelto": self.producto.precio + 1000,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_devolver_parcial_dos_veces(self):
+        venta_id = self._crear_venta()
+        client = auth_client(self.gerente)
+        payload = {
+            "motivo": "Devolución parcial",
+            "productos": [
+                {
+                    "producto_id": self.producto.producto_id,
+                    "cantidad": 1,
+                    "reponer_stock": False,
+                }
+            ],
+        }
+        resp = client.post(
+            f"/api/ventas/{venta_id}/devolver/", payload, format="json"
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        resp = client.get(f"/api/ventas/{venta_id}/")
+        self.assertEqual(resp.data["monto_devuelto"], self.producto.precio)
+        self.assertEqual(
+            resp.data["montos_devueltos"],
+            {self.producto.producto_id: self.producto.precio},
+        )
+        self.assertEqual(
+            resp.data["productos_devueltos"],
+            {self.producto.producto_id: 1},
+        )
+
+        resp = client.post(
+            f"/api/ventas/{venta_id}/devolver/", payload, format="json"
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+
+        resp = client.get(f"/api/ventas/{venta_id}/")
+        self.assertEqual(resp.data["monto_devuelto"], self.producto.precio * 2)
+        self.assertEqual(
+            resp.data["productos_devueltos"],
+            {self.producto.producto_id: 2},
+        )
+
+    def test_devolver_seleccion_vacia(self):
+        venta_id = self._crear_venta()
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta_id}/devolver/",
+            {"motivo": "Sin productos", "productos": []},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
 
 class PedidoApiTest(BaseTest):
     @classmethod
