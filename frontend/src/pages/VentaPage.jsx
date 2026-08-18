@@ -50,8 +50,8 @@ export default function VentaPage() {
   const [confirmMode, setConfirmMode] = useState("VE");
   const [clienteNombre, setClienteNombre] = useState("");
   const [ocultarTotales, setOcultarTotales] = useState(false);
-  const [medioPago, setMedioPago] = useState("EF");
-  const [documentoFiscal, setDocumentoFiscal] = useState("BO");
+  const [medioPago, setMedioPago] = useState("");
+  const [documentoFiscal, setDocumentoFiscal] = useState("");
   const [esMixto, setEsMixto] = useState(false);
   const [pagosMixtos, setPagosMixtos] = useState({ EF: 0, TJ: 0, TR: 0, CH: 0 });
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
@@ -92,6 +92,9 @@ export default function VentaPage() {
   const totalPagosMixtos = Object.values(pagosMixtos).reduce((a, b) => a + (Number(b) || 0), 0);
   const diferenciaPagos = totalConDescuento - totalPagosMixtos;
   const pagosValidos = !esMixto || diferenciaPagos === 0;
+  const medioPagoResuelto = esMixto || medioPago !== "";
+  const documentoResuelto = documentoFiscal !== "";
+  const conflictoSeleccion = confirmMode === "VE" && (!medioPagoResuelto || !documentoResuelto);
 
   useEffect(() => {
     if (!cotizacionOrigenId) return;
@@ -460,8 +463,8 @@ export default function VentaPage() {
       setShowConfirmVenta(false);
       setClienteNombre("");
       setOcultarTotales(false);
-      setMedioPago("EF");
-      setDocumentoFiscal("BO");
+      setMedioPago("");
+      setDocumentoFiscal("");
       setEsMixto(false);
       setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
       setShowPreview(true);
@@ -866,7 +869,7 @@ export default function VentaPage() {
           </div>
         </div>
         <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago("EF"); setDocumentoFiscal("BO"); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
+          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
           <button className="btn btn-outline" disabled={!carro.length} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
@@ -919,6 +922,7 @@ export default function VentaPage() {
                         value={documentoFiscal}
                         onChange={(e) => setDocumentoFiscal(e.target.value)}
                       >
+                        <option value="">Seleccione documento...</option>
                         <option value="BO">Boleta</option>
                         <option value="FA">Factura</option>
                         <option value="OT">Otros</option>
@@ -932,12 +936,18 @@ export default function VentaPage() {
                         onChange={(e) => setMedioPago(e.target.value)}
                         disabled={esMixto}
                       >
+                        <option value="">Seleccione medio de pago...</option>
                         <option value="EF">Efectivo</option>
                         <option value="TJ">Tarjeta</option>
                         <option value="TR">Transferencia</option>
                         <option value="CH">Cheque</option>
                       </select>
                     </div>
+                  </div>
+                )}
+                {conflictoSeleccion && (
+                  <div className="alert alert-warning">
+                    Debe resolver el conflicto: seleccione el documento y el medio de pago para poder confirmar la venta.
                   </div>
                 )}
                 {confirmMode === "VE" && (
@@ -1068,7 +1078,7 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>Cancelar</button>
-                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos)}>
+                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}>
                   {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
               </div>
