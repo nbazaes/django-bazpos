@@ -6,9 +6,11 @@ import { usePageTitle } from "../lib/usePageTitle";
 import {
   useCreateProducto,
   useProducto,
+  useProductoPorCodigo,
   useProveedores,
   useUpdateProducto,
 } from "../lib/queries";
+import { useDebounce } from "../lib/hooks";
 import { calcularPrecioVenta } from "../lib/tax";
 
 const initialState = {
@@ -44,6 +46,11 @@ export default function ProductoFormPage() {
   const createMutation = useCreateProducto();
   const updateMutation = useUpdateProducto();
 
+  const debouncedCodigo = useDebounce(data.codigo_producto.trim(), 300);
+  const { data: codigoCheck } = useProductoPorCodigo(debouncedCodigo, { enabled: !id });
+  const existeCodigo = !id && codigoCheck?.encontrado === true;
+  const codigoExistente = existeCodigo ? codigoCheck.producto : null;
+
   const proveedores = proveedoresData?.results ?? [];
 
   const precioVenta = useMemo(
@@ -73,6 +80,7 @@ export default function ProductoFormPage() {
 
   function submit(event) {
     event.preventDefault();
+    if (existeCodigo) return;
     setError("");
     const payload = {
       ...data,
@@ -109,7 +117,22 @@ export default function ProductoFormPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={submit}>
         <div className="row">
-          <div className="col-md-4 form-group"><label>Código Producto</label><input className="form-control" value={data.codigo_producto} onChange={(e) => setData({ ...data, codigo_producto: e.target.value })} required /></div>
+          <div className="col-md-4 form-group">
+            <label>Código Producto</label>
+            <input
+              className={`form-control${existeCodigo ? " is-invalid" : ""}`}
+              value={data.codigo_producto}
+              onChange={(e) => setData({ ...data, codigo_producto: e.target.value })}
+              required
+            />
+            {existeCodigo && codigoExistente && (
+              <div className="alert alert-warning mt-2 mb-0" role="alert">
+                El código "<strong>{codigoExistente.codigo_producto}</strong>" ya existe para
+                el producto "<strong>{codigoExistente.nombre}</strong>"
+                {codigoExistente.marca ? ` (${codigoExistente.marca})` : ""}.
+              </div>
+            )}
+          </div>
           <div className="col-md-4 form-group"><label>Código OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
           <div className="col-md-4 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
           <div className="col-12 form-group"><label>OEM alternativos</label><textarea className="form-control" value={data.oem_alternativo} onChange={(e) => setData({ ...data, oem_alternativo: e.target.value })} rows={2} /></div>
@@ -199,7 +222,7 @@ export default function ProductoFormPage() {
           </span>
         </div>
 
-        <button className="btn btn-primary" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+        <button className="btn btn-primary" type="submit" disabled={existeCodigo || createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar"}
         </button>
       </form>

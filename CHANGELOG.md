@@ -4,6 +4,19 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.21.0] - 2026-08-19
+
+### Agregado
+
+- Seguimiento de cotizaciones convertidas en ventas o pedidos.
+- Devoluciones parciales múltiples en ventas y pedidos, incluyendo reintegro de dinero para pedidos.
+- Guardado de borradores de factura y resaltado de filas con stock sin conciliar.
+
+### Corregido
+
+- Ahora hace check del código de producto antes de rellenar todo el formulario
+- Ahora es obligatorio seleccionar documento y medio de pago antes de confirmar una venta; también se corrigió el control de cantidades al repetir aumentos o disminuciones.
+
 ## [1.20.1] - 2026-08-18
 
 ### Agregado

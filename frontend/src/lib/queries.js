@@ -112,11 +112,11 @@ export function useDeleteProducto() {
   });
 }
 
-export function useProductoPorCodigo(codigo) {
+export function useProductoPorCodigo(codigo, options = {}) {
   return useQuery({
     queryKey: ["productos", "por-codigo", codigo],
     queryFn: () => apiRequest(`/productos/por-codigo/?codigo=${encodeURIComponent(codigo)}`),
-    enabled: !!codigo,
+    enabled: (options.enabled ?? true) && !!codigo,
   });
 }
 
