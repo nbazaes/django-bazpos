@@ -187,6 +187,7 @@ class PagoVenta(models.Model):
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
     producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.SET_NULL, null=True, blank=True, related_name="detalle_ventas")
     cantidad = models.IntegerField()
     precio_unitario = models.IntegerField()
     precio_descontado = models.IntegerField(default=0)

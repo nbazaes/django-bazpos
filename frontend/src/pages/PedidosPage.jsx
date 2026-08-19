@@ -19,6 +19,7 @@ import {
 import { getAccessToken, getUser, isGerente } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
 import { API_BASE } from "../lib/config";
+import { getStoreConfig } from "../lib/store";
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
@@ -68,6 +69,7 @@ export default function PedidosPage() {
   const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
 
   const ubicacionesList = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData]);
+  const defaultUbicacionId = getStoreConfig().ubicacion_por_defecto ?? null;
   const anularMutation = useAnularVenta();
   const devolverMutation = useDevolverProductos();
 
@@ -81,7 +83,7 @@ export default function PedidosPage() {
     const ubiMap = {};
     const cantMap = {};
     for (const d of anularVentaData.detalles) {
-      ubiMap[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
+      ubiMap[d.producto] = String(d.ubicacion_id ?? defaultUbicacionId ?? ubicacionesList[0]?.id ?? "");
       cantMap[d.producto] = d.cantidad;
     }
     let cancelled = false;
@@ -92,7 +94,7 @@ export default function PedidosPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [anularVentaData, ubicacionesList]);
+  }, [anularVentaData, ubicacionesList, defaultUbicacionId]);
 
   useEffect(() => {
     if (!devolverVentaData?.detalles?.length) return;
@@ -110,7 +112,7 @@ export default function PedidosPage() {
       cant[d.producto] = disponible > 0 ? disponible : 1;
       montos[d.producto] = disponible > 0 ? disponible * effPrice : 0;
       rep[d.producto] = true;
-      ubi[d.producto] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
+      ubi[d.producto] = String(d.ubicacion_id ?? defaultUbicacionId ?? ubicacionesList[0]?.id ?? "");
     }
     let cancelled = false;
     Promise.resolve().then(() => {
@@ -123,7 +125,7 @@ export default function PedidosPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [devolverVentaData, ubicacionesList]);
+  }, [devolverVentaData, ubicacionesList, defaultUbicacionId]);
 
   const devolverTotalCalculado = useMemo(() => {
     if (!devolverVentaData?.detalles?.length) return 0;

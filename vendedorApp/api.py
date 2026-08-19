@@ -841,10 +841,8 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     def deducir_stock(self, request, pk=None):
         venta = self.get_object()
 
-        detalles_map = {
-            d.producto_id: d.cantidad
-            for d in venta.detalleventa_set.all()
-        }
+        detalles = venta.detalleventa_set.all()
+        detalles_map = {d.producto_id: d for d in detalles}
 
         deducciones = request.data.get("deducciones", [])
 
@@ -879,8 +877,13 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                     stock.cantidad -= cantidad
                     stock.save()
 
+                    detalle = detalles_map[producto_id]
+                    detalle.ubicacion_id = ubicacion_id
+                    detalle.save(update_fields=["ubicacion"])
+
         with transaction.atomic():
-            for producto_id, cantidad_vendida in detalles_map.items():
+            for producto_id, detalle in detalles_map.items():
+                cantidad_vendida = detalle.cantidad
                 ya_deducido = sum(
                     d["cantidad"] for d in deducciones if d["producto_id"] == producto_id
                 ) if deducciones else 0
@@ -899,6 +902,10 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                         stock.cantidad -= disponible
                         stock.save()
                         restante -= disponible
+
+                        if not detalle.ubicacion_id and stock.ubicacion_id:
+                            detalle.ubicacion_id = stock.ubicacion_id
+                            detalle.save(update_fields=["ubicacion"])
 
         return Response({"status": "ok"})
 
