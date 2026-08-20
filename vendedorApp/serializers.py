@@ -183,21 +183,15 @@ class VentaSerializer(serializers.ModelSerializer):
         return 0
 
     def get_productos_devueltos(self, obj):
-        devueltos = (
-            DetalleDevolucion.objects
-            .filter(devolucion__venta=obj)
-            .values("producto_id")
-            .annotate(total=Sum("cantidad"))
-        )
-        return {d["producto_id"]: d["total"] for d in devueltos}
+        resultado = {}
+        for devolucion in obj.devoluciones.all():
+            for dd in devolucion.detalles.all():
+                if dd.producto_id is not None:
+                    resultado[dd.producto_id] = resultado.get(dd.producto_id, 0) + dd.cantidad
+        return resultado
 
     def _venta_derivada(self, obj):
-        return (
-            obj.ventas_derivadas
-            .exclude(estado=Venta.Estado.CANCELADA)
-            .order_by("id")
-            .first()
-        )
+        return obj.ventas_derivadas.all().first()
 
     def get_convertido(self, obj):
         if obj.tipo_documento != Venta.TipoDocumento.COTIZACION:
@@ -215,26 +209,25 @@ class VentaSerializer(serializers.ModelSerializer):
             dv.producto_id: dv for dv in obj.detalleventa_set.all()
         }
         resultado = {}
-        for dd in DetalleDevolucion.objects.filter(devolucion__venta=obj):
-            pid = dd.producto_id
-            if pid is None:
-                continue
-            if dd.precio_unitario > 0:
-                monto = dd.precio_unitario
-            else:
-                dv = venta_detalles.get(pid)
-                if dv is None:
-                    monto = 0
+        for devolucion in obj.devoluciones.all():
+            for dd in devolucion.detalles.all():
+                pid = dd.producto_id
+                if pid is None:
+                    continue
+                if dd.precio_unitario > 0:
+                    monto = dd.precio_unitario
                 else:
-                    price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
-                    monto = dd.cantidad * price
-            resultado[pid] = resultado.get(pid, 0) + monto
+                    dv = venta_detalles.get(pid)
+                    if dv is None:
+                        monto = 0
+                    else:
+                        price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
+                        monto = dd.cantidad * price
+                resultado[pid] = resultado.get(pid, 0) + monto
         return resultado
 
     def get_monto_devuelto(self, obj):
-        return (
-            obj.devoluciones.aggregate(total=Sum("monto_devuelto"))["total"] or 0
-        )
+        return sum(d.monto_devuelto for d in obj.devoluciones.all())
 
 
 def _round_total(amount):
@@ -468,11 +461,10 @@ class DevolucionSerializer(serializers.ModelSerializer):
         if obj.monto_devuelto > 0:
             return obj.monto_devuelto
 
+        venta_detalles = {dv.producto_id: dv for dv in obj.venta.detalleventa_set.all()}
         total = 0
         for detalle in obj.detalles.all():
-            dv = DetalleVenta.objects.filter(
-                venta=obj.venta, producto_id=detalle.producto_id
-            ).first()
+            dv = venta_detalles.get(detalle.producto_id)
             if dv:
                 price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
                 total += detalle.cantidad * price
