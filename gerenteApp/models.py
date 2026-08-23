@@ -66,6 +66,9 @@ class PrecioHistorico(models.Model):
     class Meta:
         db_table = 'precios_historicos'
         ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['producto', '-fecha'], name='precio_hist_prod_fecha_idx'),
+        ]
 
     def __str__(self):
         return f'{self.producto.nombre} - {self.fecha.strftime("%d/%m/%Y")}'

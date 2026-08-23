@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Case, CharField, Count, F, Max, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models import Case, CharField, Count, F, Max, OuterRef, Prefetch, Q, Subquery, Sum, Value, When
 from django.db import transaction
 from django.conf import settings
 from django.http import HttpResponse
@@ -564,7 +564,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
 
-        if self.action == 'retrieve' or (self.action == 'list' and texto):
+        if self.action == 'retrieve':
             ultima_fecha = DetalleFactura.objects.filter(
                 producto_id=OuterRef("producto_id")
             ).values("factura__fecha").order_by("-factura__fecha")[:1]
@@ -734,7 +734,17 @@ class DeducirStockSerializer(serializers.Serializer):
 
 class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
-    queryset = Venta.objects.select_related("usuario").prefetch_related("pedido").all().order_by("-fecha_venta")
+    queryset = Venta.objects.select_related("usuario").prefetch_related(
+        "pagos",
+        "pedido",
+        "devoluciones",
+        "devoluciones__detalles",
+        "detalleventa_set__producto",
+        Prefetch(
+            "ventas_derivadas",
+            queryset=Venta.objects.exclude(estado=Venta.Estado.CANCELADA).order_by("id"),
+        ),
+    ).all().order_by("-fecha_venta")
     serializer_class = VentaSerializer
     pagination_class = VentaPagination
     role_action_map = {
@@ -1160,7 +1170,7 @@ hr {{ border: none; border-top: 1px dashed #999; margin: 8px 0; }}
 
 class DevolucionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
-    queryset = Devolucion.objects.select_related("venta__usuario", "usuario").prefetch_related("detalles__producto").all().order_by("-fecha_devolucion")
+    queryset = Devolucion.objects.select_related("venta__usuario", "usuario").prefetch_related("detalles__producto", "venta__pedido", "venta__detalleventa_set").all().order_by("-fecha_devolucion")
     serializer_class = DevolucionSerializer
     pagination_class = DevolucionPagination
     role_action_map = {

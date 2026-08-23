@@ -85,6 +85,8 @@ export function useProducto(id) {
     queryKey: queryKeys.productos.detail(id),
     queryFn: () => apiRequest(`/productos/${id}/`),
     enabled: !!id,
+    staleTime: 5 * 60_000,
+    placeholderData: placeholderData(),
   });
 }
 
@@ -127,6 +129,8 @@ export function useUltimaFacturaProducto(productoId) {
     queryKey: ["productos", "ultima-factura", productoId],
     queryFn: () => apiRequest(`/productos/${productoId}/ultima-factura/`),
     enabled: !!productoId,
+    staleTime: 5 * 60_000,
+    placeholderData: placeholderData(),
   });
 }
 
@@ -135,6 +139,8 @@ export function useHistorialPrecios(productoId, params = {}) {
     queryKey: ["productos", "historial-precios", productoId, params],
     queryFn: () => apiRequest(`/productos/${productoId}/historial-precios/${buildQuery(params)}`),
     enabled: !!productoId,
+    staleTime: 5 * 60_000,
+    placeholderData: placeholderData(),
   });
 }
 
@@ -154,6 +160,8 @@ export function useVenta(id) {
     queryKey: queryKeys.ventas.detail(id),
     queryFn: () => apiRequest(`/ventas/${id}/`),
     enabled: !!id,
+    staleTime: 5 * 60_000,
+    placeholderData: placeholderData(),
   });
 }
 
@@ -235,6 +243,8 @@ export function useDevolucion(id) {
     queryKey: queryKeys.devoluciones.detail(id),
     queryFn: () => apiRequest(`/devoluciones/${id}/`),
     enabled: !!id,
+    staleTime: 5 * 60_000,
+    placeholderData: placeholderData(),
   });
 }
 

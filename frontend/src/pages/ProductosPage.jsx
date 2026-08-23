@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import CrudTable from "../components/CrudTable";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
 import AjusteStockModal from "../components/AjusteStockModal";
-import { useDeleteProducto, useFactura, useHistorialPrecios, useProducto, useProductos, useUltimaFacturaProducto } from "../lib/queries";
+import { queryKeys, useDeleteProducto, useFactura, useHistorialPrecios, useProducto, useProductos, useUltimaFacturaProducto } from "../lib/queries";
+import { apiRequest, buildQuery } from "../lib/api";
 import { getUser, isBodeguero, isGerente } from "../lib/auth";
 
 function renderUbicacion(row) {
@@ -46,6 +48,7 @@ function renderUbicacion(row) {
 
 export default function ProductosPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Productos");
 
@@ -75,7 +78,10 @@ export default function ProductosPage() {
   const { data: ultimaFactura } = useUltimaFacturaProducto(detalleProductoId);
   const { data: productoDetalle } = useProducto(detalleProductoId);
   const historialParams = { page: historialPage, page_size: historialPageSize };
-  const { data: historialData } = useHistorialPrecios(detalleProductoId, historialParams);
+  const { data: historialData } = useHistorialPrecios(
+    tabActiva === "historial" ? detalleProductoId : null,
+    historialParams,
+  );
   const { data: facturaDetalle } = useFactura(facturaDetalleId);
 
   const historialRows = historialData?.results ?? [];
@@ -124,6 +130,31 @@ export default function ProductosPage() {
     deleteMutation.mutate(row.producto_id);
   }
 
+  function openDetalle(id) {
+    setDetalleProductoId(id);
+    setFacturaDetalleId(null);
+    setHistorialPage(1);
+    setTabActiva("info");
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.productos.detail(id),
+      queryFn: () => apiRequest(`/productos/${id}/`),
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["productos", "ultima-factura", id],
+      queryFn: () => apiRequest(`/productos/${id}/ultima-factura/`),
+    });
+  }
+
+  function abrirHistorial() {
+    setTabActiva("historial");
+    if (detalleProductoId) {
+      queryClient.prefetchQuery({
+        queryKey: ["productos", "historial-precios", detalleProductoId, historialParams],
+        queryFn: () => apiRequest(`/productos/${detalleProductoId}/historial-precios/${buildQuery(historialParams)}`),
+      });
+    }
+  }
+
   return (
     <>
       <PageCard title="Listado de productos">
@@ -169,7 +200,7 @@ export default function ProductosPage() {
           navigate(`/productos/${row.producto_id}/editar`);
         }}
         onDelete={onDelete}
-        onView={(row) => setDetalleProductoId(row.producto_id)}
+        onView={(row) => openDetalle(row.producto_id)}
       />
       <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
         <PageSizeSelector value={pageSize} onChange={handlePageSizeChange} options={[25, 50, 100]} />
@@ -212,7 +243,7 @@ export default function ProductosPage() {
                   {esGerenteOEncargado && (
                     <button
                       className={`btn btn-sm ${tabActiva === "historial" ? "btn-primary" : "btn-outline"}`}
-                      onClick={() => setTabActiva("historial")}
+                      onClick={abrirHistorial}
                     >
                       Histórico precios
                     </button>
