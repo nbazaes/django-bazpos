@@ -4,6 +4,12 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.22.0] - 2026-08-23
+
+### Rendimiento
+
+- El historial de ventas carga más rápido al mostrar información de pedidos asociados.
+
 ## [1.21.0] - 2026-08-19
 
 ### Agregado
