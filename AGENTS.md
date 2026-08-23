@@ -3,11 +3,14 @@
 ## Repo Map
 - `bazpos/` — Django project config (settings, urls, WSGI, API router at `api_urls.py`, middleware, permissions).
 - `gerenteApp/` — management app: Proveedor, Factura, Usuario, Ubicacion, StoreConfig models + DRF ViewSets.
-- `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion, Devolucion, Pedido, PedidoProveedor models + DRF ViewSets.
-- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`).
+- `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion, Devolucion, Pedido, PedidoProveedor models + DRF ViewSets. Also hosts `CierreCaja*`, `DashboardStats`, `ReportesStats` API views.
+- `chatApp/` — internal team chat (ChatMessage, ChatPresence + two APIView endpoints, no ViewSet/router). Polls `/api/chat/state/`, posts to `/api/chat/messages/`; messages purge after 8h idle (daily reset).
+- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`).
 - `frontend/` — Vite 8 / React 19 SPA with react-router-dom v7. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
 - `static/` — legacy assets (Django admin, vendor).
-- `Dockerfile` / `Dockerfile.nginx` / `docker-entrypoint.sh` / `nginx.conf` / `compose.yaml` — production container definitions.
+- `docs/` — Diátaxis user & technical manuals (`manual-usuario.md`, `guia-tecnica.md` + `.docx`). The technical guide is the API/data-model reference; source of truth is the code.
+- `ops/` — ops/infra tooling: `backup/` (restic → Backblaze B2 backup script) and `staging/` (terraform/libvirt). `ops/staging/` is untracked/ignored.
+- `Dockerfile` / `Dockerfile.nginx` / `docker-entrypoint.sh` / `nginx.conf` / `compose.yaml` / `compose.prod.yaml` — container definitions.
 
 ## Commands
 ```bash
@@ -56,7 +59,8 @@ python manage.py seed_data
 ## Architecture
 - Three services via Docker Compose: MariaDB, Django + Gunicorn, and nginx. Frontend SPA is built into the nginx container (`Dockerfile.nginx` two-stage build) and served from the same origin as the API.
 - Default API base is a relative path (`/api`). CORS is only needed when the frontend dev server runs on a different origin.
-- Frontend is a **SPA** (react-router-dom v7). Old HTML files in `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/`, `frontend/404.html`, `frontend/admin.html`, and `frontend/forgot-password.html` are **dead MPA leftovers** — do not edit them. All routes are in `frontend/src/router.jsx`.
+- Frontend is a **SPA** (react-router-dom v7) with a single `frontend/index.html` entrypoint. All routes live in `frontend/src/router.jsx` — do not add new HTML pages.
+- Both `package-lock.json` (npm) and `pnpm-lock.yaml` are tracked. CI uses `npm ci`; use whichever you actually install with, but keep the corresponding lockfile in sync.
 - Nginx always redirects HTTP→HTTPS. For local Docker testing without certs, this will fail — either provide certs or modify nginx.conf temporarily.
 - `collectstatic` uses `--clear` flag, wiping the staticfiles dir before collecting. The dir is a Docker volume in production.
 - `@tanstack/react-query` is used for server-state caching in the frontend.
@@ -65,13 +69,14 @@ python manage.py seed_data
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `auth/token/`, `auth/token/refresh/`, `auth/me/`
 - `store-name/` (public, no auth): returns `{"name": settings.STORE_NAME}` — runtime store name
-- `dashboard/stats/`
+- `dashboard/stats/`, `reportes/stats/`, `cierre-caja/`, `cierre-caja/historial/`
+- `chat/state/`, `chat/messages/` (team chat — APIViews, not router)
 - CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `devoluciones`, `ubicaciones`, `pedidos`, `configuracion`, `pedidos-proveedor`
 - Health check: `/health/` (used by Docker healthcheck)
 
 ## API Client (`frontend/src/lib/api.js`)
 - `apiRequest()` auto-refreshes the JWT on 401: tries `/auth/token/refresh/` → retries the request → clears tokens and redirects on double failure.
-- `redirectToLogin()` redirects to `/registration/login.html` — this is a leftover MPA URL. It works because the SPA catches `/login` via the router. Prefer navigating to `/login` in new code.
+- `redirectToLogin()` clears tokens and navigates to `/login` (api.js:4).
 
 ## Auth & Roles
 - Four groups via `setup_groups`: Vendedor, Bodeguero, Encargado, Gerente.

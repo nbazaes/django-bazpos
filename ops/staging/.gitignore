@@ -1,0 +1,7 @@
+# Secretos generados por deploy-stack.sh (nunca versionar)
+.env.generated
+
+# Estado de terraform (contiene user_data con la password de la VM)
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
