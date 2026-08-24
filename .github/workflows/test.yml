@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
     branches: [main]
 
@@ -77,15 +77,26 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Tags: siempre <app|nginx>-<sha>; solo en main se agrega <app|nginx>-latest
+      # (los SHAs son únicos, así staging nunca pisa imágenes de main).
+      - name: Compute image tags
+        id: tags
+        run: |
+          echo "app=${REGISTRY}/${IMAGE_BASE}:app-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "nginx=${REGISTRY}/${IMAGE_BASE}:nginx-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "app_latest=${REGISTRY}/${IMAGE_BASE}:app-latest" >> "$GITHUB_OUTPUT"
+            echo "nginx_latest=${REGISTRY}/${IMAGE_BASE}:nginx-latest" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:app-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:app-latest
+            ${{ steps.tags.outputs.app }}
+            ${{ steps.tags.outputs.app_latest }}
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
       - name: Build and push nginx image
@@ -95,9 +106,9 @@ jobs:
           file: ./Dockerfile.nginx
           build-args: |
             VITE_STORE_NAME=${{ vars.VITE_STORE_NAME || 'BAZPOS' }}
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging') }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:nginx-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:nginx-latest
+            ${{ steps.tags.outputs.nginx }}
+            ${{ steps.tags.outputs.nginx_latest }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,mode=max,scope=nginx

@@ -7,21 +7,28 @@ source "$(dirname "$0")/lib.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
-# 1) Resolver el SHA de main → imágenes exactas que CI subió a GHCR
-echo "==> [deploy] Resolviendo SHA de main en ${GITHUB_REPO}..."
-SHA="$(gh api "repos/${GITHUB_REPO}/commits/main" --jq .sha)"
+# 1) Resolver el SHA (DEPLOY_SHA explícito o última de main) → imágenes de CI en GHCR
+if [ -n "${DEPLOY_SHA:-}" ]; then
+  echo "==> [deploy] Usando DEPLOY_SHA=${DEPLOY_SHA}"
+  SHA="${DEPLOY_SHA}"
+else
+  echo "==> [deploy] Resolviendo SHA de main en ${GITHUB_REPO}..."
+  SHA="$(gh api "repos/${GITHUB_REPO}/commits/main" --jq .sha)"
+fi
 APP_IMAGE="${GHCR_REPO}:app-${SHA}"
 NGINX_IMAGE="${GHCR_REPO}:nginx-${SHA}"
 echo "    app   = ${APP_IMAGE}"
 echo "    nginx = ${NGINX_IMAGE}"
 
-# 2) Generar .env del staging (secretos nuevos, nunca se versionan)
-echo "==> [deploy] Generando ${LOCAL_ENV}..."
-DB_PASS="$(openssl rand -hex 16)"
-ROOT_PASS="$(openssl rand -hex 16)"
-ADMIN_PASS="$(openssl rand -hex 16)"
-SECRET="$(openssl rand -base64 50 | tr -d '\n')"
-cat > "${LOCAL_ENV}" <<EOF
+# 2) .env del staging: se genera SOLO la primera vez (los secretos deben persistir
+#    porque el volumen de MariaDB conserva las credenciales iniciales).
+if [ ! -f "${LOCAL_ENV}" ]; then
+  echo "==> [deploy] Generando ${LOCAL_ENV} (primera provisión)..."
+  DB_PASS="$(openssl rand -hex 16)"
+  ROOT_PASS="$(openssl rand -hex 16)"
+  ADMIN_PASS="$(openssl rand -hex 16)"
+  SECRET="$(openssl rand -base64 50 | tr -d '\n')"
+  cat > "${LOCAL_ENV}" <<EOF
 DJANGO_SECRET_KEY=${SECRET}
 DJANGO_DEBUG=False
 DJANGO_ALLOWED_HOSTS=${VM_HOST},localhost,127.0.0.1
@@ -44,7 +51,14 @@ MYSQL_PASSWORD=${DB_PASS}
 APP_IMAGE=${APP_IMAGE}
 NGINX_IMAGE=${NGINX_IMAGE}
 EOF
-chmod 600 "${LOCAL_ENV}"
+  chmod 600 "${LOCAL_ENV}"
+else
+  echo "==> [deploy] Reutilizando ${LOCAL_ENV} existente (no se regeneran secretos)..."
+fi
+# Actualizar siempre las líneas de imágenes con el SHA de esta corrida
+sed -i "s#^APP_IMAGE=.*#APP_IMAGE=${APP_IMAGE}#; s#^NGINX_IMAGE=.*#NGINX_IMAGE=${NGINX_IMAGE}#" "${LOCAL_ENV}"
+grep -q '^APP_IMAGE=' "${LOCAL_ENV}"   || echo "APP_IMAGE=${APP_IMAGE}"   >> "${LOCAL_ENV}"
+grep -q '^NGINX_IMAGE=' "${LOCAL_ENV}" || echo "NGINX_IMAGE=${NGINX_IMAGE}" >> "${LOCAL_ENV}"
 
 # 3) Certificados autofirmados si no existen
 if [ ! -f "${REPO_ROOT}/certs/origin.pem" ]; then
@@ -64,9 +78,9 @@ echo "==> [deploy] Login a GHCR..."
 echo "${GHCR_TOKEN:?Exporta GHCR_TOKEN (PAT con read:packages)}" \
   | ssh_vm "docker login ghcr.io -u ${GHCR_USER} --password-stdin"
 
-# 6) Levantar el stack con las imágenes de producción
+# 6) Levantar el stack con las imágenes (compose las interpola desde /opt/bazpos/.env)
 echo "==> [deploy] Levantando stack (pull + up, puede tardar)..."
-ssh_vm "cd ${COMPOSE_DIR} && APP_IMAGE=${APP_IMAGE} NGINX_IMAGE=${NGINX_IMAGE} docker compose -f compose.prod.yaml up -d"
+ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml up -d"
 echo "==> [deploy] Esperando a que el stack quede healthy (hasta 10 min)..."
 stack_wait_healthy
 

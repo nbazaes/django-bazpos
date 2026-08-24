@@ -24,22 +24,41 @@ Browser (host) ──https──▶ VM enp0s2 ──▶ nginx ──▶ app ─�
 ## Uso
 
 ```bash
-# 1) Bootstrap: Docker + compose + swap + /opt/bazpos dentro de la VM
+# 0) (una vez) Bootstrap: Docker + compose + swap + /opt/bazpos dentro de la VM
 ops/staging/scripts/bootstrap-vm.sh
 
-# 2) Deploy del stack con las imágenes exactas de producción
+# 1) (una vez) Deploy inicial del stack con las imágenes de producción
 export GHCR_TOKEN=ghp_...
 ops/staging/scripts/deploy-stack.sh
 
-# 3) Restaurar los datos de producción (dump + media) — tarda según el volumen
+# 2) (una vez) Restaurar los datos de producción (dump + media) — tarda según el volumen
 ops/staging/scripts/restore-backup.sh
 
-# 4) Inyectar la latencia de 100 ms por dirección (hacer SIEMPRE al final)
+# 3) (una vez) Inyectar la latencia de 100 ms por dirección (hacer SIEMPRE al final)
 ops/staging/scripts/apply-latency.sh
 
-# 5) Verificar
+# 4) Verificar
 ops/staging/scripts/verify.sh
 ```
+
+## Flujo CI/CD (rama staging)
+
+`git push origin staging` → **GitHub Actions** corre tests y construye/subé imágenes
+`app-<sha>` / `nginx-<sha>` a GHCR (los tags `-latest` quedan exclusivos de `main`).
+Producción **nunca** recibe código de staging (`deploy.yml` filtra `head_branch == 'main'`).
+
+Para desplegar esas imágenes en la VM, un solo comando manual desde tu PC:
+
+```bash
+ops/staging/scripts/update-images.sh            # SHA más reciente de origin/staging
+ops/staging/scripts/update-images.sh <sha>      # un commit específico
+FORCE=1 ops/staging/scripts/update-images.sh    # saltar la validación de que CI terminó
+```
+
+`update-images.sh` valida que CI terminó OK para esa SHA, actualiza `APP_IMAGE`/`NGINX_IMAGE`
+en `/opt/bazpos/.env`, y hace `docker compose pull && up -d` en la VM. Los **datos** (volúmenes)
+y la **latencia netem** (vive en las interfaces de la VM, no en los contenedores) se conservan;
+las migraciones nuevas corren solas al arrancar el contenedor.
 
 ## Ciclo de vida diario
 

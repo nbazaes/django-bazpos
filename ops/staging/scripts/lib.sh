@@ -30,22 +30,24 @@ vm_is_running() {
   LC_ALL=C virsh domstate "${VM_DOMAIN}" 2>/dev/null | grep -q running
 }
 
-# Espera hasta que los 3 contenedores estén "healthy" (la VM de 1 vCPU arranca
-# el entrypoint lento: el healthcheck de compose con --wait falla por gracia corta).
+# Espera hasta que los 3 contenedores estén listos (la VM de 1 vCPU arranca el
+# entrypoint lento: el healthcheck de compose con --wait falla por gracia corta).
+# Nota: bazpos_nginx no define healthcheck → se considera listo si está "running".
+# El cuerpo corre como script remoto vía ssh, así que usa exit (no return).
 stack_wait_healthy() {
   local tries="${1:-60}"  # 60 * 10s = 10 min máx
   ssh_vm "
     for i in \$(seq 1 ${tries}); do
       ok=1
       for c in bazpos_db bazpos_app bazpos_nginx; do
-        s=\$(docker inspect -f '{{.State.Health.Status}}' \$c 2>/dev/null || echo n/a)
-        [ \"\$s\" = healthy ] || ok=0
+        s=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' \$c 2>/dev/null || echo n/a)
+        case \"\$s\" in healthy|running) ;; *) ok=0 ;; esac
       done
-      [ \$ok -eq 1 ] && { echo 'Stack healthy'; return 0; }
+      [ \$ok -eq 1 ] && { echo 'Stack listo'; exit 0; }
       sleep 10
     done
-    echo 'Timeout esperando stack healthy' >&2
+    echo 'Timeout esperando el stack' >&2
     docker ps --format 'table {{.Names}}\t{{.Status}}' >&2
-    return 1
+    exit 1
   "
 }
