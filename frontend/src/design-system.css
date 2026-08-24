@@ -788,8 +788,16 @@ textarea.form-control, textarea.input {
   position: sticky;
   top: 0;
   height: 100vh;
+  overflow-x: hidden;
   overflow-y: auto;
   z-index: 100;
+  transition: width var(--transition-slow), border-color var(--transition-slow);
+}
+
+#wrapper.sidebar-collapsed .sidebar {
+  width: 0;
+  border-right-color: transparent;
+  pointer-events: none;
 }
 
 .sidebar::before {
@@ -970,7 +978,7 @@ textarea.form-control, textarea.input {
 }
 
 .hamburger {
-  display: none;
+  display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
@@ -1101,6 +1109,12 @@ textarea.form-control, textarea.input {
     transition: transform var(--transition-slow);
     z-index: 100;
     border-right: 1px solid var(--border-default);
+  }
+
+  #wrapper.sidebar-collapsed .sidebar {
+    width: 250px;
+    border-right-color: var(--border-default);
+    pointer-events: auto;
   }
 
   .sidebar.open {

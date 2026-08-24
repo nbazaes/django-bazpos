@@ -8,6 +8,9 @@ import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
+const desktopMediaQuery = "(min-width: 769px)";
+
 const vendedorLinks = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/ventas", label: "VENTAS", className: "nav-link--ventas", end: true },
@@ -47,10 +50,40 @@ export default function Shell() {
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia(desktopMediaQuery).matches);
   const embed = searchParams.get("embed") === "1";
   const [changelogModal, setChangelogModal] = useState(null);
   const unseenChangelog = getUnseenChangelog();
   const storeName = useStoreName();
+  const sidebarHidden = isDesktop && sidebarCollapsed;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(desktopMediaQuery);
+    const updateViewport = () => setIsDesktop(mediaQuery.matches);
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+    } catch {
+      // The navigation remains usable when browser storage is unavailable.
+    }
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (isDesktop) setSidebarOpen(false);
+  }, [isDesktop]);
 
   useEffect(() => {
     if (embed) return;
@@ -62,7 +95,7 @@ export default function Shell() {
   }, [embed]);
 
   useEffect(() => {
-    if (sidebarOpen) {
+    if (sidebarOpen && !isDesktop) {
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
     } else {
@@ -73,10 +106,18 @@ export default function Shell() {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
     };
-  }, [sidebarOpen]);
+  }, [isDesktop, sidebarOpen]);
 
   function handleNav() {
     setSidebarOpen(false);
+  }
+
+  function handleToggleSidebar() {
+    if (isDesktop) {
+      setSidebarCollapsed((value) => !value);
+      return;
+    }
+    setSidebarOpen((value) => !value);
   }
 
   function handleToggleTheme() {
@@ -109,8 +150,12 @@ export default function Shell() {
 
   return (
     <TitleContext.Provider value={setTitle}>
-      <div id="wrapper" className={sidebarOpen ? "sidebar-open" : ""}>
-        <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
+      <div id="wrapper" className={`${sidebarOpen ? "sidebar-open" : ""}${sidebarHidden ? " sidebar-collapsed" : ""}`}>
+        <aside
+          id="sidebar-navigation"
+          className={`sidebar${sidebarOpen ? " open" : ""}`}
+          inert={sidebarHidden ? "" : undefined}
+        >
           <NavLink className="sidebar-brand" to="/" onClick={handleNav}>{storeName}</NavLink>
 
           <ul className="sidebar-nav">
@@ -185,8 +230,15 @@ export default function Shell() {
               <button
                 type="button"
                 className={`hamburger${sidebarOpen ? " open" : ""}`}
-                onClick={() => setSidebarOpen((v) => !v)}
-                aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
+                onClick={handleToggleSidebar}
+                aria-controls="sidebar-navigation"
+                aria-expanded={isDesktop ? !sidebarHidden : sidebarOpen}
+                aria-label={isDesktop
+                  ? (sidebarHidden ? "Mostrar barra lateral" : "Ocultar barra lateral")
+                  : (sidebarOpen ? "Cerrar menú" : "Abrir menú")}
+                title={isDesktop
+                  ? (sidebarHidden ? "Mostrar barra lateral" : "Ocultar barra lateral")
+                  : undefined}
               >
                 <span />
                 <span />
