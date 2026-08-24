@@ -8,7 +8,7 @@ import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
 import AjusteStockModal from "../components/AjusteStockModal";
 import { queryKeys, useDeleteProducto, useFactura, useHistorialPrecios, useProducto, useProductos, useUltimaFacturaProducto } from "../lib/queries";
-import { apiRequest, buildQuery } from "../lib/api";
+import { apiRequest } from "../lib/api";
 import { getUser, isBodeguero, isGerente } from "../lib/auth";
 
 function renderUbicacion(row) {
@@ -78,10 +78,7 @@ export default function ProductosPage() {
   const { data: ultimaFactura } = useUltimaFacturaProducto(detalleProductoId);
   const { data: productoDetalle } = useProducto(detalleProductoId);
   const historialParams = { page: historialPage, page_size: historialPageSize };
-  const { data: historialData } = useHistorialPrecios(
-    tabActiva === "historial" ? detalleProductoId : null,
-    historialParams,
-  );
+  const { data: historialData } = useHistorialPrecios(detalleProductoId, historialParams);
   const { data: facturaDetalle } = useFactura(facturaDetalleId);
 
   const historialRows = historialData?.results ?? [];
@@ -147,12 +144,6 @@ export default function ProductosPage() {
 
   function abrirHistorial() {
     setTabActiva("historial");
-    if (detalleProductoId) {
-      queryClient.prefetchQuery({
-        queryKey: ["productos", "historial-precios", detalleProductoId, historialParams],
-        queryFn: () => apiRequest(`/productos/${detalleProductoId}/historial-precios/${buildQuery(historialParams)}`),
-      });
-    }
   }
 
   return (
