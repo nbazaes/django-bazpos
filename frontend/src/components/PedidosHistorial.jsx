@@ -77,6 +77,7 @@ export default function PedidosHistorial() {
   const convertirCotizacion = useConvertirCotizacion();
 
   const ubicacionesList = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData]);
+  const defaultUbicacionId = getStoreConfig().ubicacion_por_defecto ?? null;
   const esAdmin = isGerente(getUser());
 
   useEffect(() => {
@@ -138,7 +139,7 @@ export default function PedidosHistorial() {
       sel[d.id] = true;
       montos[d.id] = d.precio_final;
       rep[d.id] = true;
-      ubi[d.id] = ubicacionesList.length > 0 ? String(ubicacionesList[0].id) : "";
+      ubi[d.id] = String(defaultUbicacionId ?? ubicacionesList[0]?.id ?? "");
     }
     let cancelled = false;
     Promise.resolve().then(() => {
@@ -150,7 +151,7 @@ export default function PedidosHistorial() {
       }
     });
     return () => { cancelled = true; };
-  }, [devolverData, ubicacionesList]);
+  }, [devolverData, ubicacionesList, defaultUbicacionId]);
 
   const devolverTotalCalculado = useMemo(() => {
     if (!devolverData?.detalles?.length) return 0;
