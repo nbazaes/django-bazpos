@@ -2008,6 +2008,7 @@ def _report_values_spec(dataset_key, field_keys):
     positional = []
     aliases = {}
     if dataset_key == "productos":
+        positional.append("producto_id")
         sources = PRODUCTOS_VALUES_ALIASES
         for key in field_keys:
             orm_path = sources.get(key, key)
@@ -2016,6 +2017,7 @@ def _report_values_spec(dataset_key, field_keys):
             else:
                 aliases[key] = F(orm_path)
     else:
+        positional.append("id")
         for key in field_keys:
             orm_path = VENTAS_VALUES_ALIASES.get(key)
             if orm_path is None:

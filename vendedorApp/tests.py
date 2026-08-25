@@ -1932,6 +1932,14 @@ class ReportesPersonalizadosApiTest(BaseTest):
         self.assertEqual(fila["stock_actual"], 10)
         self.assertEqual(fila[f"stock_ubic_{self.ubicacion.id}"], 4)
 
+    def test_query_solo_columna_agregada(self):
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=productos&fields=stock_actual"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        self.assertEqual(resp.data["rows"][0], {"stock_actual": 10})
+
     def test_productos_sin_stock_en_fecha(self):
         hace5 = timezone.now() - timedelta(days=5)
         StockHistorico.objects.create(

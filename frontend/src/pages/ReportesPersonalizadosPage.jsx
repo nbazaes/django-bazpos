@@ -100,6 +100,7 @@ export default function ReportesPersonalizadosPage() {
     texto: filters.texto || undefined,
     fecha_desde: filters.fecha_desde || undefined,
     fecha_hasta: filters.fecha_hasta || undefined,
+    stock_fecha: filters.stock_fecha || undefined,
     sin_stock: filters.sin_stock ? "true" : undefined,
     bajo_minimo: filters.bajo_minimo ? "true" : undefined,
     page,
