@@ -574,7 +574,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         texto = self.request.query_params.get("texto", "").strip()
         proveedor = self.request.query_params.get("proveedor", "").strip()
 
-        if self.action == 'retrieve':
+        if self.action == 'retrieve' or (self.action == 'list' and texto):
             ultima_fecha = DetalleFactura.objects.filter(
                 producto_id=OuterRef("producto_id")
             ).values("factura__fecha").order_by("-factura__fecha")[:1]
