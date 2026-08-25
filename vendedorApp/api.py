@@ -1,7 +1,11 @@
-from datetime import date, timedelta
+import csv
+import math
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.db.models import Case, CharField, Count, F, Max, OuterRef, Prefetch, Q, Subquery, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.db import transaction
 from django.conf import settings
 from django.http import HttpResponse
@@ -13,7 +17,7 @@ from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vendedorApp.models import AjusteStock, Anulacion, CierreCaja, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, PagoVenta, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.models import AjusteStock, Anulacion, CierreCaja, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, PagoVenta, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockHistorico, StockProductoUbicacion, Ubicacion, Venta
 from vendedorApp.serializers import (
     AgregarItemPedidoProveedorSerializer,
     AjustarStockInputSerializer,
@@ -39,7 +43,13 @@ from vendedorApp.pagination import (
     ProductoPagination,
     VentaPagination,
 )
-from gerenteApp.models import DetalleFactura, StoreConfig
+from vendedorApp.report_fields import (
+    DYNAMIC_STOCK_FIELD_PREFIX,
+    get_dataset,
+    resolve_field_metas,
+    schema_payload,
+)
+from gerenteApp.models import DetalleFactura, Proveedor, StoreConfig
 from bazpos.permissions import (
     HasKnownRole,
     ROLE_BODEGUERO,
@@ -1736,3 +1746,450 @@ class PedidoProveedorViewSet(viewsets.ModelViewSet):
                 transferidos += 1
 
         return Response({"ok": True, "transferidos": transferidos})
+
+
+REPORT_DEFAULT_PAGE_SIZE = 50
+REPORT_MAX_PAGE_SIZE = 200
+REPORT_EXPORT_MAX_ROWS = 10000
+REPORT_MAX_UBICACION_COLUMNS = 20
+
+
+def _ubicacion_options():
+    return [{"value": u.id, "label": u.nombre} for u in Ubicacion.objects.order_by("nombre")]
+
+
+def _proveedor_options():
+    return [{"value": p.pk, "label": p.nombre} for p in Proveedor.objects.order_by("nombre")]
+
+
+def _marca_options():
+    valores = (
+        Producto.objects.exclude(marca="")
+        .values_list("marca", flat=True)
+        .distinct()
+        .order_by("marca")
+    )
+    return [{"value": marca, "label": marca} for marca in valores]
+
+
+def _vendedor_options():
+    opciones = []
+    for user in User.objects.filter(is_active=True).order_by("first_name", "last_name", "username"):
+        nombre = f"{user.first_name} {user.last_name}".strip()
+        opciones.append({"value": user.id, "label": nombre or user.username})
+    return opciones
+
+
+SCHEMA_OPTIONS_SOURCES = {
+    "ubicaciones": _ubicacion_options,
+    "proveedores": _proveedor_options,
+    "marcas": _marca_options,
+    "vendedores": _vendedor_options,
+}
+
+
+def _parse_int_list(raw):
+    valores = []
+    for token in (raw or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            valores.append(int(token))
+        except ValueError:
+            continue
+    return valores
+
+
+def _parse_str_list(raw):
+    return [token.strip() for token in (raw or "").split(",") if token.strip()]
+
+
+def _parse_date_param(request, key):
+    raw = request.query_params.get(key, "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        raise ValueError(f"Fecha inválida en '{key}'")
+
+
+def _collect_filters(request, fecha_desde, fecha_hasta, stock_fecha):
+    return {
+        "ubicaciones": _parse_int_list(request.query_params.get("ubicaciones")),
+        "proveedores": _parse_int_list(request.query_params.get("proveedores")),
+        "marcas": _parse_str_list(request.query_params.get("marcas")),
+        "vendedores": _parse_int_list(request.query_params.get("vendedores")),
+        "texto": request.query_params.get("texto", "").strip(),
+        "sin_stock": request.query_params.get("sin_stock", "").lower() == "true",
+        "bajo_minimo": request.query_params.get("bajo_minimo", "").lower() == "true",
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "stock_fecha": stock_fecha,
+    }
+
+
+def build_productos_report(filters):
+    queryset = Producto.objects.all().order_by("nombre", "producto_id")
+
+    ubicacion_ids = filters["ubicaciones"]
+    if ubicacion_ids:
+        queryset = queryset.filter(
+            producto_id__in=StockProductoUbicacion.objects.filter(
+                ubicacion_id__in=ubicacion_ids
+            ).values("producto_id")
+        )
+
+    proveedor_ids = filters["proveedores"]
+    if proveedor_ids:
+        queryset = queryset.filter(proveedor_id__in=proveedor_ids)
+
+    marcas = filters["marcas"]
+    if marcas:
+        queryset = queryset.filter(marca__in=marcas)
+
+    texto = filters["texto"]
+    if texto:
+        queryset = queryset.filter(
+            Q(nombre__icontains=texto)
+            | Q(oem__icontains=texto)
+            | Q(codigo_producto__icontains=texto)
+            | Q(oem_alternativo__icontains=texto)
+            | Q(codigo_proveedor__icontains=texto)
+        )
+
+    return queryset
+
+
+def build_ventas_report(filters):
+    queryset = DetalleVenta.objects.filter(
+        venta__estado=Venta.Estado.COMPLETADA,
+        venta__tipo_documento=Venta.TipoDocumento.VENTA,
+    )
+
+    if filters["fecha_desde"]:
+        queryset = queryset.filter(venta__fecha_venta__date__gte=filters["fecha_desde"])
+    if filters["fecha_hasta"]:
+        queryset = queryset.filter(venta__fecha_venta__date__lte=filters["fecha_hasta"])
+
+    vendedores = filters["vendedores"]
+    if vendedores:
+        queryset = queryset.filter(venta__usuario_id__in=vendedores)
+
+    ubicacion_ids = filters["ubicaciones"]
+    if ubicacion_ids:
+        queryset = queryset.filter(ubicacion_id__in=ubicacion_ids)
+
+    texto = filters["texto"]
+    if texto:
+        queryset = queryset.filter(
+            Q(producto__nombre__icontains=texto)
+            | Q(producto__oem__icontains=texto)
+            | Q(producto__codigo_producto__icontains=texto)
+        )
+
+    return queryset.order_by("-venta__fecha_venta", "-id")
+
+
+def _ultimo_stock_historico(ubicacion_id, fecha_limite):
+    return Coalesce(
+        Subquery(
+            StockHistorico.objects.filter(
+                stock__producto_id=OuterRef("producto_id"),
+                stock__ubicacion_id=ubicacion_id,
+                fecha__lt=fecha_limite,
+            )
+            .order_by("-fecha", "-id")
+            .values("cantidad")[:1]
+        ),
+        Value(0),
+    )
+
+
+def _stock_total_historico(fecha_limite):
+    ultimo_por_stock = Subquery(
+        StockHistorico.objects.filter(
+            stock_id=OuterRef("id"),
+            fecha__lt=fecha_limite,
+        )
+        .order_by("-fecha", "-id")
+        .values("cantidad")[:1]
+    )
+    return Coalesce(
+        Subquery(
+            StockProductoUbicacion.objects.filter(producto_id=OuterRef("producto_id"))
+            .annotate(ultimo=ultimo_por_stock)
+            .values("producto_id")
+            .annotate(total=Sum("ultimo"))
+            .values("total")[:1]
+        ),
+        Value(0),
+    )
+
+
+def annotate_productos_report(queryset, field_keys, ubicacion_ids, fecha_limite=None):
+    if any(key.startswith("ultima_factura_") for key in field_keys):
+        def _ultima(values_field):
+            return Subquery(
+                DetalleFactura.objects.filter(producto_id=OuterRef("producto_id"))
+                .values(values_field)
+                .order_by("-factura__fecha", "-factura_id")[:1]
+            )
+
+        queryset = queryset.annotate(
+            ultima_factura_fecha=_ultima("factura__fecha"),
+            ultima_factura_numero=_ultima("factura__numero_factura"),
+            ultima_factura_proveedor=_ultima("factura__proveedor__nombre"),
+        )
+
+    for ubicacion_id in ubicacion_ids[:REPORT_MAX_UBICACION_COLUMNS]:
+        key = f"{DYNAMIC_STOCK_FIELD_PREFIX}{ubicacion_id}"
+        if key not in field_keys:
+            continue
+        if fecha_limite:
+            stock_expr = _ultimo_stock_historico(ubicacion_id, fecha_limite)
+        else:
+            stock_expr = Coalesce(
+                Subquery(
+                    StockProductoUbicacion.objects.filter(
+                        producto_id=OuterRef("producto_id"),
+                        ubicacion_id=ubicacion_id,
+                    ).values("cantidad")[:1]
+                ),
+                Value(0),
+            )
+        queryset = queryset.annotate(**{key: stock_expr})
+
+    if fecha_limite:
+        queryset = queryset.annotate(stock_actual=_stock_total_historico(fecha_limite))
+    return queryset
+
+
+PRODUCTOS_VALUES_ALIASES = {
+    "codigo_producto": "codigo_producto",
+    "nombre": "nombre",
+    "oem": "oem",
+    "marca": "marca",
+    "descripcion": "descripcion",
+    "codigo_proveedor": "codigo_proveedor",
+    "proveedor_nombre": "proveedor__nombre",
+    "precio_costo": "precio_costo",
+    "precio": "precio",
+    "margen_utilidad": "margen_utilidad",
+    "stock_actual": "stock_actual",
+    "stock_minimo": "stock_minimo",
+    "stock_maximo": "stock_maximo",
+}
+
+VENTAS_VALUES_ALIASES = {
+    "fecha_venta": "venta__fecha_venta",
+    "tipo_documento": "venta__tipo_documento",
+    "documento": "venta__documento",
+    "cliente_nombre": "venta__cliente_nombre",
+    "producto_codigo": "producto__codigo_producto",
+    "producto_nombre": "producto__nombre",
+    "producto_oem": "producto__oem",
+    "producto_marca": "producto__marca",
+    "ubicacion_nombre": "ubicacion__nombre",
+    "cantidad": "cantidad",
+    "precio_unitario": "precio_unitario",
+    "subtotal": "subtotal",
+}
+
+VENTAS_HELPER_VALUES = {
+    "vendedor_first": "venta__usuario__first_name",
+    "vendedor_last": "venta__usuario__last_name",
+    "vendedor_username": "venta__usuario__username",
+}
+
+
+def _report_values_spec(dataset_key, field_keys):
+    positional = []
+    aliases = {}
+    if dataset_key == "productos":
+        sources = PRODUCTOS_VALUES_ALIASES
+        for key in field_keys:
+            orm_path = sources.get(key, key)
+            if orm_path == key:
+                positional.append(key)
+            else:
+                aliases[key] = F(orm_path)
+    else:
+        for key in field_keys:
+            orm_path = VENTAS_VALUES_ALIASES.get(key)
+            if orm_path is None:
+                continue
+            if orm_path == key:
+                positional.append(key)
+            else:
+                aliases[key] = F(orm_path)
+        for alias, orm_path in VENTAS_HELPER_VALUES.items():
+            aliases[alias] = F(orm_path)
+    return positional, aliases
+
+
+def serialize_report_rows(dataset_key, field_metas, raw_rows):
+    filas = []
+    for raw in raw_rows:
+        fila = {}
+        for meta in field_metas:
+            fila[meta["key"]] = _resolve_report_value(dataset_key, meta["key"], raw)
+        filas.append(fila)
+    return filas
+
+
+def _resolve_report_value(dataset_key, key, raw):
+    if dataset_key == "ventas":
+        if key == "vendedor":
+            nombre = f"{raw['vendedor_first']} {raw['vendedor_last']}".strip()
+            return nombre or raw["vendedor_username"]
+        if key == "documento":
+            return dict(Venta.Documento.choices).get(raw["documento"], "")
+        if key == "tipo_documento":
+            return dict(Venta.TipoDocumento.choices).get(raw["tipo_documento"], "")
+    return raw.get(key)
+
+
+def _csv_cell(value):
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return timezone.localtime(value).strftime("%d/%m/%Y %H:%M")
+    return str(value)
+
+
+class ReporteAccesoMixin:
+    def _authorize(self, request):
+        if not has_any_role(request.user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            raise PermissionDenied("No tiene permisos para acceder a los reportes personalizados")
+
+    def _prepare(self, request):
+        dataset_key = request.query_params.get("dataset", "").strip()
+        dataset = get_dataset(dataset_key)
+        if not dataset:
+            raise ValueError("Dataset inválido")
+        try:
+            fecha_desde = _parse_date_param(request, "fecha_desde")
+            fecha_hasta = _parse_date_param(request, "fecha_hasta")
+            stock_fecha = _parse_date_param(request, "stock_fecha")
+        except ValueError as exc:
+            raise ValueError(str(exc))
+        filters = _collect_filters(request, fecha_desde, fecha_hasta, stock_fecha)
+        requested_fields = _parse_str_list(request.query_params.get("fields"))
+        ubicacion_labels = {
+            str(u.id): u.nombre
+            for u in Ubicacion.objects.filter(id__in=filters["ubicaciones"])
+        }
+        field_metas = resolve_field_metas(dataset_key, requested_fields, ubicacion_labels)
+        queryset = build_productos_report(filters) if dataset_key == "productos" else build_ventas_report(filters)
+        if dataset_key == "productos":
+            dynamic_ids = {
+                int(meta["key"][len(DYNAMIC_STOCK_FIELD_PREFIX):])
+                for meta in field_metas
+                if meta["key"].startswith(DYNAMIC_STOCK_FIELD_PREFIX)
+            }
+            fecha_limite = None
+            if filters["stock_fecha"]:
+                dia_siguiente = filters["stock_fecha"] + timedelta(days=1)
+                fecha_limite = timezone.make_aware(
+                    datetime.combine(dia_siguiente, datetime.min.time())
+                )
+            queryset = annotate_productos_report(
+                queryset,
+                {meta["key"] for meta in field_metas},
+                sorted(set(filters["ubicaciones"]) | dynamic_ids),
+                fecha_limite,
+            )
+            if filters["sin_stock"]:
+                queryset = queryset.filter(stock_actual__lte=0)
+            if filters["bajo_minimo"]:
+                queryset = queryset.filter(
+                    stock_actual__lt=F("stock_minimo"),
+                    stock_minimo__gt=0,
+                    ignorar_stock_permanente=False,
+                ).filter(Q(recordar_stock_desde__isnull=True) | Q(recordar_stock_desde__lte=timezone.now()))
+        spec = _report_values_spec(dataset_key, {meta["key"] for meta in field_metas})
+        return {
+            "dataset_key": dataset_key,
+            "dataset": dataset,
+            "filters": filters,
+            "field_metas": field_metas,
+            "queryset": queryset.values(*spec[0], **spec[1]),
+        }
+
+
+class ReporteSchemaView(ReporteAccesoMixin, APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        self._authorize(request)
+        return Response(schema_payload(SCHEMA_OPTIONS_SOURCES))
+
+
+class ReporteQueryView(ReporteAccesoMixin, APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        self._authorize(request)
+        try:
+            context = self._prepare(request)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=400)
+
+        total = context["queryset"].count()
+
+        def _int_param(name, default, minimum):
+            try:
+                value = int(request.query_params.get(name, default))
+            except (TypeError, ValueError):
+                return default
+            return max(minimum, value)
+
+        page = _int_param("page", 1, 1)
+        page_size = min(_int_param("page_size", REPORT_DEFAULT_PAGE_SIZE, 1), REPORT_MAX_PAGE_SIZE)
+        offset = (page - 1) * page_size
+
+        raw_rows = list(context["queryset"][offset:offset + page_size])
+        rows = serialize_report_rows(context["dataset_key"], context["field_metas"], raw_rows)
+        columns = [
+            {"key": meta["key"], "label": meta["label"], "type": meta["type"]}
+            for meta in context["field_metas"]
+        ]
+        return Response(
+            {
+                "dataset": context["dataset_key"],
+                "columns": columns,
+                "rows": rows,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "pages": math.ceil(total / page_size) if total else 0,
+            }
+        )
+
+
+class ReporteExportView(ReporteAccesoMixin, APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        self._authorize(request)
+        try:
+            context = self._prepare(request)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=400)
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        filename = f"reporte-{context['dataset_key']}-{timezone.localdate().isoformat()}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.write("\ufeff")
+        writer = csv.writer(response, delimiter=";")
+        writer.writerow([meta["label"] for meta in context["field_metas"]])
+        for raw in context["queryset"][:REPORT_EXPORT_MAX_ROWS].iterator(chunk_size=1000):
+            writer.writerow(
+                [
+                    _csv_cell(_resolve_report_value(context["dataset_key"], meta["key"], raw))
+                    for meta in context["field_metas"]
+                ]
+            )
+        return response

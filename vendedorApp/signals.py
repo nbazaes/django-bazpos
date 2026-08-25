@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from .models import Producto, StockProductoUbicacion
+from .models import Producto, StockHistorico, StockProductoUbicacion
 
 
 @receiver(pre_save, sender=StockProductoUbicacion)
@@ -15,6 +15,17 @@ def capturar_cantidad_anterior(sender, instance, **kwargs):
             instance._cantidad_anterior = 0
     else:
         instance._cantidad_anterior = 0
+
+
+@receiver(post_save, sender=StockProductoUbicacion)
+def registrar_stock_historico(sender, instance, created, **kwargs):
+    """Registra cada cambio real de cantidad en el historial de stock."""
+    cantidad_anterior = getattr(instance, "_cantidad_anterior", 0)
+    if instance.cantidad != cantidad_anterior:
+        StockHistorico.objects.create(
+            stock=instance,
+            cantidad=instance.cantidad,
+        )
 
 
 @receiver(post_save, sender=StockProductoUbicacion)

@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReportesStatsView, VentaViewSet
+from vendedorApp.api import CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
 from .api_views import MeView, StoreNameView
 
 router = DefaultRouter()
@@ -26,6 +26,9 @@ urlpatterns = [
     path("store-name/", StoreNameView.as_view(), name="store_name"),
     path("dashboard/stats/", DashboardStatsView.as_view(), name="dashboard_stats"),
     path("reportes/stats/", ReportesStatsView.as_view(), name="reportes_stats"),
+    path("reportes/custom/schema/", ReporteSchemaView.as_view(), name="reporte_custom_schema"),
+    path("reportes/custom/query/", ReporteQueryView.as_view(), name="reporte_custom_query"),
+    path("reportes/custom/export/", ReporteExportView.as_view(), name="reporte_custom_export"),
     path("cierre-caja/", CierreCajaView.as_view(), name="cierre_caja"),
     path("cierre-caja/historial/", CierreCajaHistorialView.as_view(), name="cierre_caja_historial"),
     path("chat/state/", ChatStateView.as_view(), name="chat_state"),

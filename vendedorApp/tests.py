@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -6,18 +6,20 @@ from django.test import TestCase
 from django.utils import timezone
 
 from docker.test_utils import auth_client, create_business_groups, make_user
-from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig
+from gerenteApp.models import DetalleFactura, Factura, PrecioHistorico, Proveedor, StoreConfig
 from vendedorApp.models import (
     Anulacion,
     AjusteStock,
     CierreCaja,
     DetalleDevolucion,
+    DetalleVenta,
     Devolucion,
     ItemPedidoProveedor,
     Pedido,
     PedidoDetalle,
     PedidoProveedorDia,
     Producto,
+    StockHistorico,
     StockProductoUbicacion,
     Ubicacion,
     Venta,
@@ -1712,3 +1714,301 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(len(pagos), 1)
         self.assertEqual(pagos[0]["metodo_pago_display"], "Tarjeta")
         self.assertEqual(pagos[0]["monto"], 15000)
+
+
+class ReportesPersonalizadosApiTest(BaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.encargado = make_user("Encargado")
+        cls.ubicacion2 = Ubicacion.objects.create(nombre="Bodega Sur")
+        cls.producto = Producto.objects.create(
+            nombre="Filtro Aire",
+            codigo_producto="FA-001",
+            oem="OEM-001",
+            descripcion="Desc",
+            precio_costo=5000,
+            stock_minimo=1,
+            stock_maximo=20,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=cls.proveedor,
+        )
+        cls.stock_ubic1 = StockProductoUbicacion.objects.create(
+            producto=cls.producto, ubicacion=cls.ubicacion, cantidad=4
+        )
+        cls.stock_ubic2 = StockProductoUbicacion.objects.create(
+            producto=cls.producto, ubicacion=cls.ubicacion2, cantidad=6
+        )
+
+        factura_vieja = Factura.objects.create(
+            numero_factura=100, proveedor=cls.proveedor, fecha=date(2026, 1, 10)
+        )
+        DetalleFactura.objects.create(
+            factura=factura_vieja, producto=cls.producto, cantidad=10, costo_compra=4000
+        )
+        factura_reciente = Factura.objects.create(
+            numero_factura=200, proveedor=cls.proveedor, fecha=date(2026, 3, 15)
+        )
+        DetalleFactura.objects.create(
+            factura=factura_reciente, producto=cls.producto, cantidad=8, costo_compra=5000
+        )
+
+    def _venta(self, fecha, subtotal=20000):
+        venta = Venta.objects.create(
+            usuario=self.vendedor,
+            fecha_venta=fecha,
+            monto_total=subtotal,
+            monto_subtotal=subtotal,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.VENTA,
+            documento=Venta.Documento.BOLETA,
+        )
+        DetalleVenta.objects.create(
+            venta=venta,
+            producto=self.producto,
+            ubicacion=self.ubicacion,
+            cantidad=2,
+            precio_unitario=subtotal // 2,
+            subtotal=subtotal,
+        )
+        return venta
+
+    def test_schema_requiere_rol_gestion(self):
+        self.assertEqual(
+            auth_client(self.vendedor).get("/api/reportes/custom/schema/").status_code, 403
+        )
+        self.assertEqual(
+            auth_client(self.bodeguero).get("/api/reportes/custom/schema/").status_code, 403
+        )
+
+    def test_schema_para_gerente(self):
+        resp = auth_client(self.gerente).get("/api/reportes/custom/schema/")
+        self.assertEqual(resp.status_code, 200)
+        datasets = {d["key"] for d in resp.data["datasets"]}
+        self.assertIn("productos", datasets)
+        self.assertIn("ventas", datasets)
+
+    def test_query_acceso_encargado_y_gerente(self):
+        self.assertEqual(
+            auth_client(self.encargado).get("/api/reportes/custom/query/?dataset=productos").status_code,
+            200,
+        )
+        self.assertEqual(
+            auth_client(self.vendedor).get("/api/reportes/custom/query/?dataset=productos").status_code,
+            403,
+        )
+
+    def test_productos_query_stock_por_ubicacion_y_ultima_factura(self):
+        fields = (
+            "codigo_producto,stock_actual,"
+            f"stock_ubic_{self.ubicacion.id},stock_ubic_{self.ubicacion2.id},"
+            "ultima_factura_fecha,ultima_factura_numero"
+        )
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=productos&fields={fields}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.data
+        self.assertEqual(data["total"], 1)
+        fila = data["rows"][0]
+        self.assertEqual(fila["stock_actual"], 10)
+        self.assertEqual(fila[f"stock_ubic_{self.ubicacion.id}"], 4)
+        self.assertEqual(fila[f"stock_ubic_{self.ubicacion2.id}"], 6)
+        self.assertEqual(fila["ultima_factura_numero"], 200)
+        self.assertEqual(str(fila["ultima_factura_fecha"]), "2026-03-15")
+
+    def test_productos_filtro_ubicaciones_no_duplica_stock(self):
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/"
+            f"?dataset=productos&ubicaciones={self.ubicacion2.id}&fields=codigo_producto,stock_actual"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        self.assertEqual(resp.data["rows"][0]["stock_actual"], 10)
+
+    def test_productos_filtro_ubicaciones_sin_coincidencia(self):
+        vacia = Ubicacion.objects.create(nombre="Sin productos")
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=productos&ubicaciones={vacia.id}&fields=codigo_producto"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 0)
+
+    def test_ventas_query_rango_fechas(self):
+        self._venta(datetime(2026, 5, 10, 12, 0), subtotal=20000)
+        self._venta(datetime(2026, 6, 20, 12, 0), subtotal=30000)
+        fields = "fecha_venta,vendedor,producto_nombre,cantidad,subtotal"
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=ventas&fields={fields}"
+            "&fecha_desde=2026-06-01&fecha_hasta=2026-06-30"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        fila = resp.data["rows"][0]
+        self.assertEqual(fila["subtotal"], 30000)
+        self.assertEqual(fila["vendedor"], "Ana Perez")
+
+    def test_ventas_query_excluye_cotizaciones(self):
+        self._venta(datetime(2026, 5, 10, 12, 0))
+        cotizacion = Venta.objects.create(
+            usuario=self.vendedor,
+            fecha_venta=datetime(2026, 5, 11, 12, 0),
+            monto_total=99000,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.COTIZACION,
+        )
+        DetalleVenta.objects.create(
+            venta=cotizacion,
+            producto=self.producto,
+            cantidad=1,
+            precio_unitario=99000,
+            subtotal=99000,
+        )
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=ventas&fields=subtotal"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        self.assertEqual(resp.data["rows"][0]["subtotal"], 20000)
+
+    def test_export_csv_productos(self):
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/export/?dataset=productos&fields=codigo_producto,nombre,precio_costo"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/csv", resp["Content-Type"])
+        self.assertIn("attachment", resp["Content-Disposition"])
+        body = resp.content.decode("utf-8-sig")
+        lines = [line for line in body.strip().splitlines() if line]
+        self.assertEqual(lines[0], "Código;Nombre;Precio costo")
+        self.assertIn("FA-001", lines[1])
+
+    def test_export_denegado_vendedor(self):
+        resp = auth_client(self.vendedor).get("/api/reportes/custom/export/?dataset=productos")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_dataset_invalido(self):
+        resp = auth_client(self.gerente).get("/api/reportes/custom/query/?dataset=nope")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_fecha_invalida(self):
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=ventas&fields=subtotal&fecha_desde=ayer"
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_productos_stock_en_fecha(self):
+        hace5 = timezone.now() - timedelta(days=5)
+        hace2 = timezone.now() - timedelta(days=2)
+        StockHistorico.objects.create(
+            stock=self.stock_ubic1, cantidad=4, fecha=hace5
+        )
+        StockHistorico.objects.create(
+            stock=self.stock_ubic2, cantidad=6, fecha=hace5
+        )
+        StockHistorico.objects.create(
+            stock=self.stock_ubic1, cantidad=9, fecha=hace2
+        )
+
+        fecha = (timezone.now() - timedelta(days=3)).date()
+        fields = f"stock_actual,stock_ubic_{self.ubicacion.id},stock_ubic_{self.ubicacion2.id}"
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=productos&stock_fecha={fecha.isoformat()}&fields={fields}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        fila = resp.data["rows"][0]
+        self.assertEqual(fila["stock_actual"], 10)
+        self.assertEqual(fila[f"stock_ubic_{self.ubicacion.id}"], 4)
+        self.assertEqual(fila[f"stock_ubic_{self.ubicacion2.id}"], 6)
+
+    def test_productos_stock_actual_sin_fecha(self):
+        fields = f"stock_actual,stock_ubic_{self.ubicacion.id}"
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=productos&fields={fields}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        fila = resp.data["rows"][0]
+        self.assertEqual(fila["stock_actual"], 10)
+        self.assertEqual(fila[f"stock_ubic_{self.ubicacion.id}"], 4)
+
+    def test_productos_sin_stock_en_fecha(self):
+        hace5 = timezone.now() - timedelta(days=5)
+        StockHistorico.objects.create(
+            stock=self.stock_ubic1, cantidad=0, fecha=hace5
+        )
+        fecha = (timezone.now() - timedelta(days=3)).date()
+        resp = auth_client(self.gerente).get(
+            f"/api/reportes/custom/query/?dataset=productos&stock_fecha={fecha.isoformat()}"
+            "&sin_stock=true&fields=codigo_producto"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+
+    def test_stock_fecha_invalida(self):
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=productos&stock_fecha=mal"
+        )
+        self.assertEqual(resp.status_code, 400)
+
+
+class StockHistoricoSignalTest(BaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.producto = Producto.objects.create(
+            nombre="Bujia",
+            codigo_producto="BU-001",
+            oem="OEM-BU",
+            descripcion="Desc",
+            precio_costo=3000,
+            stock_minimo=1,
+            stock_maximo=20,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=cls.proveedor,
+        )
+
+    def test_registra_al_crear_y_modificar(self):
+        stock = StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=self.ubicacion, cantidad=3
+        )
+        self.assertEqual(StockHistorico.objects.filter(stock__producto=self.producto).count(), 1)
+        self.assertEqual(
+            StockHistorico.objects.filter(stock__producto=self.producto).first().cantidad, 3
+        )
+
+        stock.cantidad = 5
+        stock.save()
+        self.assertEqual(StockHistorico.objects.filter(stock__producto=self.producto).count(), 2)
+        self.assertEqual(
+            StockHistorico.objects.filter(stock__producto=self.producto).order_by("-id").first().cantidad,
+            5,
+        )
+
+    def test_no_registra_si_cantidad_no_cambia(self):
+        stock = StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=self.ubicacion, cantidad=3
+        )
+        stock.save()
+        stock.save()
+        self.assertEqual(StockHistorico.objects.filter(stock__producto=self.producto).count(), 1)
+
+    def test_factura_registra_historial(self):
+        StockHistorico.objects.all().delete()
+        client = auth_client(self.gerente)
+        resp = client.post(
+            "/api/facturas/",
+            {
+                "numero_factura": 9001,
+                "proveedor_id": self.proveedor.proveedor_id,
+                "fecha": "2026-08-11",
+                "productos": [
+                    {"producto_id": self.producto.producto_id, "precio": 3000, "cantidad": 4}
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        historial = StockHistorico.objects.filter(stock__producto=self.producto)
+        self.assertEqual(historial.count(), 1)
+        self.assertEqual(historial.first().cantidad, 4)

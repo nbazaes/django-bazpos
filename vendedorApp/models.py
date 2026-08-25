@@ -267,6 +267,27 @@ class AjusteStock(models.Model):
         return f"Ajuste {self.producto.nombre} en {ubicacion_nombre}: {self.cantidad_anterior} → {self.cantidad_nueva}"
 
 
+class StockHistorico(models.Model):
+    stock = models.ForeignKey(
+        StockProductoUbicacion,
+        on_delete=models.CASCADE,
+        related_name="historial_stock",
+    )
+    cantidad = models.IntegerField()
+    fecha = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        db_table = "stock_historico"
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(fields=["stock", "fecha"], name="stock_hist_stock_fecha_idx"),
+        ]
+
+    def __str__(self):
+        ubicacion_nombre = self.stock.ubicacion.nombre if self.stock.ubicacion else "Sin ubicación"
+        return f"{self.stock.producto.nombre} en {ubicacion_nombre}: {self.cantidad} @ {self.fecha}"
+
+
 class PedidoProveedorDia(models.Model):
     fecha = models.DateField(unique=True)
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)

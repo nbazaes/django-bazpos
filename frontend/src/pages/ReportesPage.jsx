@@ -12,6 +12,7 @@ import {
   Filler,
 } from "chart.js";
 import PageCard from "../components/PageCard";
+import ReportesPersonalizadosPage from "./ReportesPersonalizadosPage";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useReportesStats } from "../lib/queries";
 
@@ -22,6 +23,7 @@ const TABS = [
   { key: "top-productos", label: "Top Productos" },
   { key: "stock-critico", label: "Stock Crítico" },
   { key: "ventas-vendedor", label: "Ventas por Vendedor" },
+  { key: "personalizados", label: "Reportes personalizados" },
 ];
 
 function formatCLP(value) {
@@ -92,44 +94,46 @@ export default function ReportesPage() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
-          Mes:
-          <select
-            className="form-control"
-            value={mes}
-            onChange={(e) => setMes(Number(e.target.value))}
-            style={{ maxWidth: 150 }}
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {new Date(anio, m - 1, 1).toLocaleString("es-CL", { month: "long" })}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
-          Año:
-          <select
-            className="form-control"
-            value={anio}
-            onChange={(e) => setAnio(Number(e.target.value))}
-            style={{ maxWidth: 110 }}
-          >
-            {Array.from({ length: 5 }, (_, i) => hoy.getFullYear() - i).map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </label>
-        {data && (
-          <div className="stat-card stat-card-success" style={{ marginBottom: 0 }}>
-            <div className="stat-label">Total ventas del mes</div>
-            <div className="stat-value">{formatCLP(data.total_ventas_mes)}</div>
-          </div>
-        )}
-      </div>
+      {tab !== "personalizados" && (
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
+            Mes:
+            <select
+              className="form-control"
+              value={mes}
+              onChange={(e) => setMes(Number(e.target.value))}
+              style={{ maxWidth: 150 }}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  {new Date(anio, m - 1, 1).toLocaleString("es-CL", { month: "long" })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 500 }}>
+            Año:
+            <select
+              className="form-control"
+              value={anio}
+              onChange={(e) => setAnio(Number(e.target.value))}
+              style={{ maxWidth: 110 }}
+            >
+              {Array.from({ length: 5 }, (_, i) => hoy.getFullYear() - i).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          {data && (
+            <div className="stat-card stat-card-success" style={{ marginBottom: 0 }}>
+              <div className="stat-label">Total ventas del mes</div>
+              <div className="stat-value">{formatCLP(data.total_ventas_mes)}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="btn-group mb-4" style={{ flexWrap: "wrap" }}>
         {TABS.map((t) => (
@@ -254,6 +258,8 @@ export default function ReportesPage() {
           )}
         </PageCard>
       )}
+
+      {tab === "personalizados" && <ReportesPersonalizadosPage />}
     </>
   );
 }

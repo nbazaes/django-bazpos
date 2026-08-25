@@ -84,6 +84,25 @@ export function buildQuery(params = {}) {
   return qs ? `?${qs}` : "";
 }
 
+export async function downloadFile(path) {
+  let response = await rawRequest(path);
+  if (response.status === 401 && getRefreshToken()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) response = await rawRequest(path);
+  }
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    try {
+      const data = await response.json();
+      message = data.detail || data.error || JSON.stringify(data);
+    } catch {
+      // noop
+    }
+    throw new Error(message);
+  }
+  return response.blob();
+}
+
 export async function login(username, password) {
   const response = await fetch(`${API_BASE}/auth/token/`, {
     method: "POST",

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, buildQuery } from "./api";
+import { apiRequest, buildQuery, downloadFile } from "./api";
 
 const keepPreviousData = (old, next) => next ?? old;
 
@@ -57,6 +57,10 @@ export const queryKeys = {
   },
   dashboard: ["dashboard", "stats"],
   reportes: (params) => ["reportes", "stats", params],
+  reportesCustom: {
+    schema: ["reportes", "custom", "schema"],
+    query: (params) => ["reportes", "custom", "query", params],
+  },
   cierreCaja: {
     all: ["cierre-caja"],
     detail: (fecha) => ["cierre-caja", "detail", fecha],
@@ -609,6 +613,38 @@ export function useReportesStats(params = {}) {
     placeholderData: placeholderData(),
     staleTime: 60_000,
   });
+}
+
+export function useReportesCustomSchema() {
+  return useQuery({
+    queryKey: queryKeys.reportesCustom.schema,
+    queryFn: () => apiRequest("/reportes/custom/schema/"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useReporteCustom(params = {}) {
+  return useQuery({
+    queryKey: queryKeys.reportesCustom.query(params),
+    queryFn: () => apiRequest(`/reportes/custom/query/${buildQuery(params)}`),
+    enabled: !!params.dataset,
+    placeholderData: placeholderData(),
+    staleTime: 30_000,
+  });
+}
+
+export async function downloadReporteCsv(params = {}) {
+  const blob = await downloadFile(`/reportes/custom/export/${buildQuery(params)}`);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `reporte-${params.dataset || "reporte"}-${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Cierre de caja ──
