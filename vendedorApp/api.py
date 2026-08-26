@@ -1823,6 +1823,7 @@ def _collect_filters(request, fecha_desde, fecha_hasta, stock_fecha):
         "vendedores": _parse_int_list(request.query_params.get("vendedores")),
         "texto": request.query_params.get("texto", "").strip(),
         "sin_stock": request.query_params.get("sin_stock", "").lower() == "true",
+        "con_stock": request.query_params.get("con_stock", "").lower() == "true",
         "bajo_minimo": request.query_params.get("bajo_minimo", "").lower() == "true",
         "fecha_desde": fecha_desde,
         "fecha_hasta": fecha_hasta,
@@ -2105,6 +2106,8 @@ class ReporteAccesoMixin:
             )
             if filters["sin_stock"]:
                 queryset = queryset.filter(stock_actual__lte=0)
+            if filters["con_stock"]:
+                queryset = queryset.filter(stock_actual__gt=0)
             if filters["bajo_minimo"]:
                 queryset = queryset.filter(
                     stock_actual__lt=F("stock_minimo"),

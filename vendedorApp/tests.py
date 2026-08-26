@@ -1940,6 +1940,50 @@ class ReportesPersonalizadosApiTest(BaseTest):
         self.assertEqual(resp.data["total"], 1)
         self.assertEqual(resp.data["rows"][0], {"stock_actual": 10})
 
+    def test_productos_solo_con_stock(self):
+        sin_stock = Producto.objects.create(
+            nombre="Sin Stock",
+            codigo_producto="SS-001",
+            oem="OEM-SS",
+            descripcion="Desc",
+            precio_costo=1000,
+            stock_minimo=1,
+            stock_maximo=10,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=sin_stock, ubicacion=self.ubicacion, cantidad=0
+        )
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=productos&con_stock=true&fields=codigo_producto"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        self.assertEqual(resp.data["rows"][0]["codigo_producto"], "FA-001")
+
+    def test_productos_solo_sin_stock(self):
+        sin_stock = Producto.objects.create(
+            nombre="Sin Stock",
+            codigo_producto="SS-002",
+            oem="OEM-SS",
+            descripcion="Desc",
+            precio_costo=1000,
+            stock_minimo=1,
+            stock_maximo=10,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=sin_stock, ubicacion=self.ubicacion, cantidad=0
+        )
+        resp = auth_client(self.gerente).get(
+            "/api/reportes/custom/query/?dataset=productos&sin_stock=true&fields=codigo_producto"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["total"], 1)
+        self.assertEqual(resp.data["rows"][0]["codigo_producto"], "SS-002")
+
     def test_productos_sin_stock_en_fecha(self):
         hace5 = timezone.now() - timedelta(days=5)
         StockHistorico.objects.create(

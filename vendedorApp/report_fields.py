@@ -44,6 +44,7 @@ PRODUCTOS_FILTERS = [
     {"key": "texto", "label": "Búsqueda", "type": "text", "placeholder": "Nombre, OEM o código"},
     {"key": "stock_fecha", "label": "Stock al día", "type": "date"},
     {"key": "sin_stock", "label": "Solo sin stock", "type": "boolean"},
+    {"key": "con_stock", "label": "Solo con stock", "type": "boolean"},
     {"key": "bajo_minimo", "label": "Solo bajo stock mínimo", "type": "boolean"},
 ]
 

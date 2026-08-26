@@ -21,6 +21,7 @@ const EMPTY_FILTERS = {
   fecha_desde: "",
   fecha_hasta: "",
   sin_stock: false,
+  con_stock: false,
   bajo_minimo: false,
 };
 
@@ -102,6 +103,7 @@ export default function ReportesPersonalizadosPage() {
     fecha_hasta: filters.fecha_hasta || undefined,
     stock_fecha: filters.stock_fecha || undefined,
     sin_stock: filters.sin_stock ? "true" : undefined,
+    con_stock: filters.con_stock ? "true" : undefined,
     bajo_minimo: filters.bajo_minimo ? "true" : undefined,
     page,
     page_size: pageSize,
