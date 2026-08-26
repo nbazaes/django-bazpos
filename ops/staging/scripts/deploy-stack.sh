@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # deploy-stack.sh — Despliega en la VM el stack con las MISMAS imágenes de producción (GHCR).
 #
-# Requiere: GHCR_TOKEN en el entorno (PAT de GitHub con scope read:packages).
+# Requiere un PAT de GitHub con scope read:packages. Se obtiene de:
+#   - la variable de entorno GHCR_TOKEN, o si no está exportada
+#   - pass show ghcr.io/staging-bazpos  (fallback)
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -75,8 +77,16 @@ rsync -a "${REPO_ROOT}/certs/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/certs/"
 rsync -a "${REPO_ROOT}/docker/mariadb/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/docker/mariadb/"
 
 # 5) Login a GHCR (token por stdin, nunca por línea de comandos)
+if [ -z "${GHCR_TOKEN:-}" ]; then
+  echo "==> [deploy] GHCR_TOKEN no exportado; leyendo de pass (ghcr.io/staging-bazpos)..."
+  if ! GHCR_TOKEN="$(pass show ghcr.io/staging-bazpos 2>/dev/null)"; then
+    echo "[ERROR] No hay GHCR_TOKEN en el entorno y 'pass show ghcr.io/staging-bazpos' falló." >&2
+    echo "        Exporta el token o guárdalo una vez: pass insert ghcr.io/staging-bazpos" >&2
+    exit 1
+  fi
+fi
 echo "==> [deploy] Login a GHCR..."
-echo "${GHCR_TOKEN:?Exporta GHCR_TOKEN (PAT con read:packages)}" \
+printf '%s\n' "${GHCR_TOKEN}" \
   | ssh_vm "docker login ghcr.io -u ${GHCR_USER} --password-stdin"
 
 # 6) Levantar el stack con las imágenes (compose las interpola desde /opt/bazpos/.env)

@@ -17,7 +17,7 @@ Browser (host) ──https──▶ VM enp0s2 ──▶ nginx ──▶ app ─�
 
 - `pacman -S restic` (o el equivalente de tu distro).
 - Secretos de restic en `~/.config/restic/bazpos.env` (chmod 600), copiados del VPS (`/etc/restic/bazpos.env`).
-- PAT de GitHub con scope `read:packages` para `docker login ghcr.io`. Exportarlo solo para `deploy-stack.sh`: `export GHCR_TOKEN=ghp_...`
+- PAT de GitHub con scope `read:packages` para `docker login ghcr.io`. `deploy-stack.sh` lo lee de `$GHCR_TOKEN` o, si no está exportado, de `pass show ghcr.io/staging-bazpos`. Guardarlo una vez: `pass insert ghcr.io/staging-bazpos` (o exportar solo para la corrida: `export GHCR_TOKEN=ghp_...`).
 - VM creada con `ops/staging/terraform` (`terraform apply`), accesible por SSH con clave (`staging@192.168.150.160`).
 - `gh` autenticado (para resolver el SHA de `main`).
 
@@ -28,7 +28,7 @@ Browser (host) ──https──▶ VM enp0s2 ──▶ nginx ──▶ app ─�
 ops/staging/scripts/bootstrap-vm.sh
 
 # 1) (una vez) Deploy inicial del stack con las imágenes de producción
-export GHCR_TOKEN=ghp_...
+#    (lee el token de $GHCR_TOKEN o de `pass show ghcr.io/staging-bazpos`)
 ops/staging/scripts/deploy-stack.sh
 
 # 2) (una vez) Restaurar los datos de producción (dump + media) — tarda según el volumen
