@@ -95,6 +95,8 @@ Servicios:
 - **Django + Gunicorn** (`bazpos_app`) — migraciones, grupos, superusuario y `collectstatic --clear` automáticos; healthcheck en `/health/`
 - **nginx** (`bazpos_nginx`) — sirve el SPA y el API en puertos `80`/`443`, redirige HTTP→HTTPS
 
+Los contenedores llevan **límites de memoria** (`mem_limit`) pensados para un VPS de 1 GiB: MariaDB 448m, app 320m, nginx 64m (≈832 MiB máximo, dejando margen al host). La configuración de MariaDB se sobre-escribe en `docker/mariadb/zz-bazpos-tuning.cnf` (buffer pool, conexiones, temp tables). Ver `docs/guia-tecnica.md §5.6`.
+
 Rebuild tras cambios:
 
 ```bash
@@ -208,6 +210,7 @@ bazpos/
 - El frontend es una **SPA**; las rutas antiguas en `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/` y los HTML sueltos (`admin.html`, `forgot-password.html`, `404.html`) son restos del antiguo MPA y no se usan.
 - `DEBUG` se controla con la variable `DJANGO_DEBUG`.
 - Driver MySQL: **PyMySQL** (versión pinnada en `settings.py`). No cambiar sin revisar compatibilidad con MariaDB.
+- Gunicorn corre con **2 workers** (sync) por el presupuesto de memoria del VPS (1 vCPU / 1 GiB). No subir a 4 sin antes medir `docker stats` y latencia.
 - `LANGUAGE_CODE = "es-cl"` — las respuestas de DRF pueden aparecer en español.
 - `collectstatic` usa el flag `--clear`, que vacía el directorio `staticfiles/` antes de recolectar.
 - nginx redirige HTTP→HTTPS por defecto. Para pruebas locales con Docker sin certificados, modificar `nginx.conf` temporalmente.

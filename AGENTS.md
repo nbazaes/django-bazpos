@@ -33,6 +33,12 @@ docker compose up -d --build
 # Rebuild after code changes
 docker compose up -d --build
 
+# Container memory is capped for a 1 vCPU / 1 GiB VPS: db 448m, app 320m, nginx 64m.
+# MariaDB tuning lives in docker/mariadb/zz-bazpos-tuning.cnf (buffer pool 128M, max_connections 30).
+# Gunicorn runs 2 sync workers (--max-requests 500 ± 50). Do not raise workers/mem_limit without
+# measuring `docker stats` and API latency first. See docs/guia-tecnica.md §5.6.
+# Query N+1 audit: python manage.py profile_endpoints (works with DEBUG=False).
+
 # Bootstrap roles & superuser (already run on container start)
 python manage.py migrate
 python manage.py setup_groups
@@ -112,4 +118,5 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - The test DB is `test_bazpos_db` — the local DB user needs `ALL ON test_bazpos_db.*`. CI uses the MariaDB service with root, so it works out of the box.
 - Run tests locally: `python manage.py test --noinput`. Run the full suite via CI: `.github/workflows/test.yml`.
 - MySQL driver is PyMySQL (pinned). Do not swap to mysqlclient or other drivers.
-- Docker entrypoint runs: `wait-for-db → migrate → setup_groups → create_admin → collectstatic --clear → gunicorn`.
+- Docker entrypoint runs: `wait-for-db → migrate → setup_groups → create_admin → collectstatic --clear → gunicorn` (2 sync workers).
+- MariaDB (not SQLite): SQLite was evaluated and rejected — `select_for_update` is a no-op there and multi-worker stock updates would race. Keep MariaDB for scaling; mitigate resource use with the mem_limits and `docker/mariadb/zz-bazpos-tuning.cnf`.

@@ -15,7 +15,7 @@ Bazpos es un sistema de punto de venta (POS) para tiendas de repuestos automotri
 | Frontend | Vite + React + react-router-dom v7 + TanStack Query v5 | Node 20 / Vite 8 / React 19 |
 | Backend | Django + Django REST Framework + SimpleJWT | Django 5.1 / DRF 3.x |
 | Base de datos | MariaDB | 12 |
-| Servidor | Gunicorn (4 workers) + nginx | — |
+| Servidor | Gunicorn (2 workers, sync) + nginx | — |
 | Idioma / formato | `es-cl`, moneda CLP en enteros | — |
 
 ---
@@ -558,11 +558,11 @@ Mapeo de `role_action_map` de cada ViewSet. `V=Vendedor, B=Bodeguero, E=Encargad
 
 | Servicio | Imagen | Puertos | Volúmenes | Notas |
 | :--- | :--- | :--- | :--- | :--- |
-| `db` | `mariadb:12` | — | `mysql_data` | Healthcheck `mariadb-admin ping`; env desde `.env` |
-| `app` | build `Dockerfile` (python:3.12-slim) | — | `static_files`, `media_files` | Healthcheck `GET /health/`; depende de `db` sano |
-| `nginx` | build `Dockerfile.nginx` (node:20 → nginx:alpine) | `80`, `443` | `static_files`, `media_files`, `./certs` | Argumento build `VITE_STORE_NAME`; depende de `app` sano |
+| `db` | `mariadb:12` | — | `mysql_data`, `./docker/mariadb/zz-bazpos-tuning.cnf` (ro) | `mem_limit: 448m`; healthcheck `mariadb-admin ping`; env desde `.env` |
+| `app` | build `Dockerfile` (python:3.12-slim) | — | `static_files`, `media_files` | `mem_limit: 320m`; healthcheck `GET /health/`; depende de `db` sano |
+| `nginx` | build `Dockerfile.nginx` (node:20 → nginx:alpine) | `80`, `443` | `static_files`, `media_files`, `./certs` | `mem_limit: 64m`; argumento build `VITE_STORE_NAME`; depende de `app` sano |
 
-**Entrypoint** (`docker-entrypoint.sh`, secuencia): esperar BD (30 intentos × 2 s) → `migrate --noinput` → `setup_groups` → `create_admin` → `collectstatic --no-input --clear` → `exec gunicorn` (4 workers, `bazpos.wsgi`, puerto 8000).
+**Entrypoint** (`docker-entrypoint.sh`, secuencia): esperar BD (30 intentos × 2 s) → `migrate --noinput` → `setup_groups` → `create_admin` → `collectstatic --no-input --clear` → `exec gunicorn` (2 workers sync, timeout 30, `--max-requests 500` ± 50, `bazpos.wsgi`, puerto 8000).
 
 > `collectstatic` usa `--clear`: el directorio `staticfiles` se limpia antes de recolectar (es volumen de Docker en producción).
 
@@ -614,6 +614,47 @@ flowchart LR
 - `GET /health/` (sin auth) — usado por el healthcheck del contenedor `app`.
 - `/admin/logs/` (superusuarios) — ring buffer de `RequestLogMiddleware` con las últimas peticiones.
 - Logs de Gunicorn por `--access-logfile -` (stdout del contenedor, visible en `docker compose logs app`).
+
+### 5.6 Tuning de recursos (VPS 1 vCPU / 1 GiB)
+
+El stack está dimensionado para un VPS pequeño de **1 vCPU / 1 GiB de RAM**. Los límites de memoria **no reservan** la cantidad, solo acotan el máximo; la suma deja margen para el host (~200 MiB), para no arriesgar un OOM kill.
+
+| Contenedor | `mem_limit` | Justificación |
+| :--- | :--- | :--- |
+| `db` | `448m` | MariaDB: buffer pool 128M + InnoDB + conexiones dentro del tope |
+| `app` | `320m` | 2 workers Gunicorn (~70-100 MiB c/u) + maestro + Django |
+| `nginx` | `64m` | SPA + proxy estáticos; 1 worker es suficiente |
+
+**MariaDB** — `docker/mariadb/zz-bazpos-tuning.cnf` (montado ro sobre `50-server.cnf` del contenedor, se aplica al reiniciar):
+
+```ini
+[mysqld]
+innodb_buffer_pool_size = 128M
+max_connections = 30
+tmp_table_size = 16M
+max_heap_table_size = 16M
+thread_cache_size = 4
+table_open_cache = 400
+```
+
+**Aplicar los cambios:** el archivo debe existir en el host junto a `compose*.yaml` (en staging/prod lo sincroniza `ops/staging/scripts/deploy-stack.sh`, ruta `./docker/mariadb/`); si el bind mount apunta a un archivo inexistente, Docker crea un directorio vacío y la config **no** se aplica. Luego recrear contenedores:
+
+```bash
+docker compose up -d            # recrea db (montaje nuevo) y aplica mem_limit + config
+docker compose up -d --build    # rebuild de la imagen app para los 2 workers de gunicorn
+```
+
+Reglas:
+- `innodb_buffer_pool_size` es la **palanca #1**: ~30% del tope del contenedor. Subirlo exige subir `mem_limit` (o el VPS).
+- **No** tocar `innodb_log_file_size` sin confirmar la versión exacta de `mariadb:12`: el redolog se redimensiona con cuidado y la carga actual no lo justifica.
+- `max_connections = 30` es amplio para 2 workers Django (la app no usa `CONN_MAX_AGE`).
+- Verificar al aplicar: `SHOW VARIABLES LIKE 'innodb_buffer_pool_size'` y `SHOW GLOBAL STATUS LIKE 'Innodb_buffer_pool_read%'` (hit ratio `1 - reads/read_requests` como **tendencia**, no como gate de 99%).
+
+**Gunicorn** — 2 workers *sync* (no ASGI): en 1 vCPU más workers no dan paralelismo real de CPU y duplican memoria. `--max-requests 500 ± 50` reinicia workers para evitar fuga de memoria dentro del tope de 320m. El número de workers se decide por duración/volumen de requests y mediciones, **no** por cantidad de cajeros.
+
+**Escalado futuro (~10 cajeros):** VPS de **2 GiB / 2 vCPU** como mínimo razonable (4 GiB con reportes o crecimiento de datos). MariaDB + WSGI siguen siendo la elección correcta; subir workers solo tras una prueba de carga.
+
+**Auditoría de queries (N+1):** `python manage.py profile_endpoints` (comando en `docker/management/commands/`) cuenta y mide las queries de serialización de los endpoints pesados (ventas, devoluciones, productos, pedidos-proveedor). Usa `CaptureQueriesContext`, así que funciona con `DEBUG=False`. Los querysets de listado ya usan `select_related`/`prefetch_related`; el riesgo latente son los `SerializerMethodField` de los serializers, que pueden disparar una query por fila.
 
 ---
 
@@ -697,6 +738,7 @@ python manage.py setup_groups
 python manage.py create_admin        # requiere ADMIN_USER/EMAIL/PASS
 python manage.py seed_data           # datos demo (opcional)
 python manage.py seed_ventas_diarias # serie de ventas para reportes (opcional)
+python manage.py profile_endpoints   # auditoría de queries (N+1) de endpoints pesados
 ```
 
 > La BD de tests es `test_bazpos_db`; el usuario local necesita permisos `ALL ON test_bazpos_db.*`. En CI se usa el servicio MariaDB con root.
@@ -747,3 +789,4 @@ git commit -m "changelog X.Y.Z"
 | **Comprobante HTML cacheado** | `documento_html` evita regenerar el documento; la impresión es estable incluso si cambia la configuración. |
 | **Blue-Green sin downtime** | Las imágenes se versionan por SHA en GHCR (`app-<sha>` / `nginx-<sha>`) y se referencian por alias; el upstream de nginx puede apuntarse al nuevo contenedor sin cortes. |
 | **PyMySQL 2.2.1 forzado** | Compatibilidad de versión necesaria para MariaDB; no reemplazar por mysqlclient. |
+| **MariaDB sobre SQLite** | SQLite fue evaluada (driver puro ORM, sin SQL crudo, simplifica backup/dev), pero se descartó: `select_for_update` es no-op en SQLite y los 4 workers competirían en read-modify-write de stock. MariaDB escala a múltiples cajeros y la penalización se mitiga con límites de memoria + 2 workers. |

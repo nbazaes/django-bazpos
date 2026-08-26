@@ -58,9 +58,12 @@ class ProductoSerializer(serializers.ModelSerializer):
         ]
 
     def get_ubicaciones_stock(self, obj):
-        stocks = getattr(obj, "_prefetched_stocks", None)
-        if stocks is None:
-            stocks = obj.stocks_ubicacion.select_related("ubicacion").all()
+        prefetched = "stocks_ubicacion" in getattr(obj, "_prefetched_objects_cache", {})
+        stocks = (
+            obj.stocks_ubicacion.all()
+            if prefetched
+            else obj.stocks_ubicacion.select_related("ubicacion").all()
+        )
         return [
             {
                 "ubicacion_id": s.ubicacion.id if s.ubicacion else None,
@@ -922,9 +925,13 @@ class PedidoProveedorDiaHistorialSerializer(serializers.ModelSerializer):
         fields = ["id", "fecha", "finalizado", "created_at", "total_items", "total_pedidos"]
 
     def get_total_items(self, obj):
+        if "items" in getattr(obj, "_prefetched_objects_cache", {}):
+            return len(obj.items.all())
         return obj.items.count()
 
     def get_total_pedidos(self, obj):
+        if "items" in getattr(obj, "_prefetched_objects_cache", {}):
+            return sum(1 for i in obj.items.all() if i.pedido)
         return obj.items.filter(pedido=True).count()
 
 

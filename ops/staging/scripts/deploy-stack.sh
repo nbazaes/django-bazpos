@@ -66,12 +66,13 @@ if [ ! -f "${REPO_ROOT}/certs/origin.pem" ]; then
   "$(dirname "$0")/make-certs.sh"
 fi
 
-# 4) Sincronizar compose/.env/certs a la VM
+# 4) Sincronizar compose/.env/certs/docker-mariadb a la VM
 echo "==> [deploy] Sincronizando stack a ${VM_HOST}:${COMPOSE_DIR}"
-ssh_vm "mkdir -p ${COMPOSE_DIR}/certs"
+ssh_vm "mkdir -p ${COMPOSE_DIR}/certs ${COMPOSE_DIR}/docker/mariadb"
 rsync -a "${REPO_ROOT}/compose.prod.yaml" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/compose.prod.yaml"
 rsync -a "${LOCAL_ENV}" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/.env"
 rsync -a "${REPO_ROOT}/certs/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/certs/"
+rsync -a "${REPO_ROOT}/docker/mariadb/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/docker/mariadb/"
 
 # 5) Login a GHCR (token por stdin, nunca por línea de comandos)
 echo "==> [deploy] Login a GHCR..."

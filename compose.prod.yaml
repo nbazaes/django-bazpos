@@ -3,9 +3,11 @@ services:
     image: mariadb:12
     container_name: bazpos_db
     restart: always
+    mem_limit: 448m
     env_file: .env
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./docker/mariadb/zz-bazpos-tuning.cnf:/etc/mysql/mariadb.conf.d/zz-bazpos-tuning.cnf:ro
     healthcheck:
       test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
       interval: 5s
@@ -19,6 +21,7 @@ services:
     image: ${APP_IMAGE}
     container_name: bazpos_app
     restart: always
+    mem_limit: 320m
     env_file: .env
     volumes:
       - static_files:/app/staticfiles
@@ -39,6 +42,7 @@ services:
     image: ${NGINX_IMAGE}
     container_name: bazpos_nginx
     restart: unless-stopped
+    mem_limit: 64m
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
