@@ -34,6 +34,20 @@ const productoVacio = {
   stellantis: false,
 };
 
+const METODO_PAGO_OPCIONES = [
+  { value: "EF", label: "Efectivo" },
+  { value: "TJ", label: "Tarjeta" },
+  { value: "TR", label: "Transferencia" },
+  { value: "CH", label: "Cheque" },
+];
+
+const DOCUMENTO_OPCIONES = [
+  { value: "SB", label: "Sin boletear" },
+  { value: "BO", label: "Boleteado" },
+  { value: "FA", label: "Facturado" },
+  { value: "OT", label: "Otros" },
+];
+
 export default function PedidosCrearPage() {
   const [tab, setTab] = useState("nuevo");
   usePageTitle(tab === "nuevo" ? "Nuevo pedido" : "Historial de pedidos");
@@ -115,7 +129,24 @@ export default function PedidosCrearPage() {
   }
 
   function handleProductoChange(field, value) {
-    setProducto((prev) => ({ ...prev, [field]: value }));
+    setProducto((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "codigo_proveedor") {
+        const codigo = String(value || "").trim();
+        const match = (productosData?.results ?? []).find(
+          (p) => p.codigo_producto === codigo || p.codigo_proveedor === codigo
+        );
+        next.producto_id = match ? match.producto_id : null;
+        if (match) {
+          next.oem = match.oem || "";
+          next.nombre = match.nombre || "";
+          next.proveedor_id = String(match.proveedor ?? "");
+          next.precio_costo = match.precio_costo ?? "";
+          next.porcentaje_utilidad = match.margen_utilidad ?? "";
+        }
+      }
+      return next;
+    });
   }
 
   function limpiarProducto() {
@@ -217,7 +248,7 @@ export default function PedidosCrearPage() {
     `).join("");
 
     const fecha = formatDateTime(documento.fecha_creacion);
-    const metodo = documento.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
+    const metodo = (METODO_PAGO_OPCIONES.find((m) => m.value === documento.metodo_pago) || {}).label || documento.metodo_pago;
     const estado = documento.estado_display || documento.estado;
     const documentoLabel = documento.estado_documento_display || documento.estado_documento;
 
@@ -544,16 +575,17 @@ export default function PedidosCrearPage() {
               <div className="form-group mb-0">
                 <label>Método de pago</label>
                 <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                  <option value="EF">Efectivo</option>
-                  <option value="TJ">Tarjeta</option>
+                  {METODO_PAGO_OPCIONES.map((op) => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group mb-0">
                 <label>Documento</label>
                 <select className="form-control" value={estadoDocumento} onChange={(e) => setEstadoDocumento(e.target.value)}>
-                  <option value="SB">Sin boletear</option>
-                  <option value="BO">Boleteado</option>
-                  <option value="FA">Facturado</option>
+                  {DOCUMENTO_OPCIONES.map((op) => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
                 </select>
               </div>
             </div>

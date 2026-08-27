@@ -149,6 +149,32 @@ class VentaApiTest(BaseTest):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_create_venta_rechaza_stock_negativo(self):
+        producto = Producto.objects.create(
+            nombre="Producto Negativo", codigo_producto="PNEG1", oem="OEM-NEG",
+            descripcion="Desc", precio_costo=5000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=producto, ubicacion=self.ubicacion, cantidad=-1
+        )
+        payload = {
+            "productos": [
+                {
+                    "producto_id": producto.producto_id,
+                    "cantidad": 1,
+                    "precio": producto.precio,
+                }
+            ],
+            "total": producto.precio,
+            "monto_subtotal": producto.precio,
+        }
+        resp = auth_client(self.vendedor).post(
+            "/api/ventas/", payload, format="json"
+        )
+        self.assertEqual(resp.status_code, 400)
+
     def test_create_venta_discount_mismatch(self):
         payload = self._payload(
             descuento_porcentaje=10,
@@ -691,10 +717,10 @@ class PedidoApiTest(BaseTest):
             "items": [
                 {
                     "producto_id": self.producto.producto_id,
-                    "codigo_proveedor": "CP1",
+                    "codigo_proveedor": self.producto.codigo_producto,
                     "proveedor_id": self.proveedor.proveedor_id,
-                    "oem": "OEM-D",
-                    "nombre": "Producto D",
+                    "oem": self.producto.oem,
+                    "nombre": self.producto.nombre,
                     "precio_costo": 10000,
                     "porcentaje_utilidad": "30.00",
                     "sumar_envio": True,
@@ -705,8 +731,46 @@ class PedidoApiTest(BaseTest):
     def _item_multi(self, n=2):
         payload = self._item()
         item = payload["items"][0]
-        payload["items"] = [dict(item, codigo_proveedor=f"CP{i+1}") for i in range(n)]
+        payload["items"] = [dict(item) for _ in range(n)]
         return payload
+
+    def _item_producto(self, producto, codigo_proveedor=None, oem=None):
+        return {
+            "nombre_cliente": "Cliente Uno",
+            "telefono_cliente": "912345678",
+            "metodo_pago": "EF",
+            "items": [
+                {
+                    "producto_id": producto.producto_id,
+                    "codigo_proveedor": codigo_proveedor or producto.codigo_producto,
+                    "proveedor_id": self.proveedor.proveedor_id,
+                    "oem": oem or producto.oem,
+                    "nombre": producto.nombre,
+                    "precio_costo": 10000,
+                    "porcentaje_utilidad": "30.00",
+                    "sumar_envio": True,
+                }
+            ],
+        }
+
+    def _item_custom(self):
+        return {
+            "nombre_cliente": "Cliente Custom",
+            "telefono_cliente": "912345678",
+            "metodo_pago": "EF",
+            "items": [
+                {
+                    "producto_id": None,
+                    "codigo_proveedor": "CUSTOM-XYZ",
+                    "proveedor_id": self.proveedor.proveedor_id,
+                    "oem": "CUSTOM-OEM",
+                    "nombre": "Repuesto a pedido",
+                    "precio_costo": 10000,
+                    "porcentaje_utilidad": "30.00",
+                    "sumar_envio": True,
+                }
+            ],
+        }
 
     def test_crear_pedido(self):
         resp = auth_client(self.vendedor).post(
@@ -735,6 +799,24 @@ class PedidoApiTest(BaseTest):
         pedido = Pedido.objects.get(id=resp.data["id"])
         self.assertTrue(pedido.es_cotizacion)
         self.assertIsNone(pedido.venta)
+
+    def test_crear_pedido_acepta_todos_los_medios_de_pago_y_documentos(self):
+        for metodo_pago in ["EF", "TJ", "TR", "CH"]:
+            payload = self._item()
+            payload["metodo_pago"] = metodo_pago
+            resp = auth_client(self.vendedor).post(
+                "/api/pedidos/", payload, format="json"
+            )
+            self.assertEqual(resp.status_code, 201, f"metodo_pago={metodo_pago}")
+            pedido = Pedido.objects.get(id=resp.data["id"])
+            self.assertEqual(pedido.metodo_pago, metodo_pago)
+
+        payload = self._item()
+        payload["estado_documento"] = "OT"
+        resp = auth_client(self.vendedor).post("/api/pedidos/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        self.assertEqual(pedido.estado_documento, Pedido.EstadoDocumento.OTROS)
 
     def test_cambiar_estado_retira_descuenta_stock(self):
         resp = auth_client(self.vendedor).post(
@@ -788,6 +870,133 @@ class PedidoApiTest(BaseTest):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
+
+    def test_marcar_retiro_sin_stock_queda_negativo(self):
+        producto = Producto.objects.create(
+            nombre="Sin Stock", codigo_producto="PSS001", oem="OEM-SS",
+            descripcion="Desc", precio_costo=10000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item_producto(producto), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        pedido_id = resp.data["id"]
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {"persona_retiro": "Maria Lopez"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pedido = Pedido.objects.get(id=pedido_id)
+        self.assertTrue(pedido.stock_descontado)
+        total = sum(
+            s.cantidad
+            for s in StockProductoUbicacion.objects.filter(producto=producto)
+        )
+        self.assertEqual(total, -1)
+
+    def test_crear_pedido_resuelve_producto_por_codigo(self):
+        a = Producto.objects.create(
+            nombre="Copiado", codigo_producto="9816338580", oem="OEM-A",
+            descripcion="Desc", precio_costo=10000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        b = Producto.objects.create(
+            nombre="Real", codigo_producto="1806A-05", oem="OEM-B",
+            descripcion="Desc", precio_costo=10000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/",
+            self._item_producto(a, codigo_proveedor="1806A-05"),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        detalle = PedidoDetalle.objects.get(pedido_id=resp.data["id"])
+        self.assertEqual(detalle.producto_id, b.producto_id)
+        dia = PedidoProveedorDia.objects.filter(fecha=date.today()).first()
+        self.assertTrue(
+            ItemPedidoProveedor.objects.filter(dia=dia, producto=b).exists()
+        )
+        self.assertFalse(
+            ItemPedidoProveedor.objects.filter(dia=dia, producto=a).exists()
+        )
+
+    def test_retiro_fk_incoherente_descuenta_producto_correcto(self):
+        a = Producto.objects.create(
+            nombre="Copiado", codigo_producto="9816338580", oem="OEM-A",
+            descripcion="Desc", precio_costo=10000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        b = Producto.objects.create(
+            nombre="Real", codigo_producto="1806A-05", oem="OEM-B",
+            descripcion="Desc", precio_costo=10000, stock_minimo=2,
+            stock_maximo=50, margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=a, ubicacion=self.ubicacion, cantidad=5
+        )
+        StockProductoUbicacion.objects.create(
+            producto=b, ubicacion=self.ubicacion, cantidad=5
+        )
+        venta = Venta.objects.create(
+            usuario=self.vendedor, monto_total=10000, monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA, tipo_documento=Venta.TipoDocumento.PEDIDO,
+        )
+        pedido = Pedido.objects.create(
+            usuario=self.vendedor, nombre_cliente="Cliente X",
+            telefono_cliente="1", monto_subtotal=10000, monto_total=10000,
+            estado=Pedido.Estado.PENDIENTE_RETIRAR, venta=venta,
+        )
+        PedidoDetalle.objects.create(
+            pedido=pedido, producto=a, codigo_proveedor="1806A-05",
+            proveedor=self.proveedor, oem="OEM-B", nombre="Real",
+            precio_costo=10000, porcentaje_utilidad=Decimal("30.00"),
+            precio_final=20000,
+        )
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido.id}/marcar-retiro/",
+            {"persona_retiro": "Maria"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido.id)
+        self.assertEqual(detalle.producto_id, b.producto_id)
+        self.assertEqual(
+            StockProductoUbicacion.objects.get(
+                producto=a, ubicacion=self.ubicacion
+            ).cantidad,
+            5,
+        )
+        self.assertEqual(
+            StockProductoUbicacion.objects.get(
+                producto=b, ubicacion=self.ubicacion
+            ).cantidad,
+            4,
+        )
+
+    def test_retiro_item_custom_no_crea_stock(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", self._item_custom(), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        pedido_id = resp.data["id"]
+        stock_before = StockProductoUbicacion.objects.count()
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {"persona_retiro": "Maria"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pedido = Pedido.objects.get(id=pedido_id)
+        self.assertTrue(pedido.stock_descontado)
+        self.assertEqual(StockProductoUbicacion.objects.count(), stock_before)
 
     def test_cancelar_pedido(self):
         resp = auth_client(self.vendedor).post(
@@ -1629,6 +1838,17 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["documentos"]["boleta"], 15000)
         self.assertFalse(stats["guardado"])
 
+    def test_get_cierre_cuenta_transferencia_cheque_y_otros_de_pedidos(self):
+        self._crear_pedido_venta(metodo_pago="TR", estado_documento="OT")
+        self._crear_pedido_venta(metodo_pago="CH", estado_documento="OT")
+
+        resp = auth_client(self.gerente).get("/api/cierre-caja/")
+        self.assertEqual(resp.status_code, 200)
+        stats = resp.data
+        self.assertEqual(stats["pagos"]["transferencia"], 15000)
+        self.assertEqual(stats["pagos"]["cheque"], 15000)
+        self.assertEqual(stats["documentos"]["otros"], 30000)
+
     def test_get_cierre_resta_devoluciones_y_anulaciones(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
         venta_anulada = Venta.objects.create(
@@ -1714,6 +1934,122 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(len(pagos), 1)
         self.assertEqual(pagos[0]["metodo_pago_display"], "Tarjeta")
         self.assertEqual(pagos[0]["monto"], 15000)
+
+    def _get_detalle(self, fecha, tipo, clave=""):
+        url = "/api/cierre-caja/detalle/"
+        params = [f"fecha={fecha}"]
+        if tipo:
+            params.append(f"tipo={tipo}")
+        if clave:
+            params.append(f"clave={clave}")
+        return auth_client(self.gerente).get(url + "?" + "&".join(params))
+
+    def test_detalle_pago_efectivo_lista_ventas_y_pedidos(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(
+            monto=18000,
+            pagos=[
+                {"metodo_pago": "EF", "monto": 10000},
+                {"metodo_pago": "TJ", "monto": 5000},
+                {"metodo_pago": "CH", "monto": 3000},
+            ],
+            documento="FA",
+        )
+        self._crear_venta(monto=9000, pagos=[{"metodo_pago": "EF", "monto": 9000}], documento="BO")
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="BO")
+
+        resp = self._get_detalle(fecha, "pago", "EF")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 3)
+        montos = {r["monto"] for r in resp.data}
+        self.assertEqual(montos, {10000, 9000, 15000})
+        self.assertIn("pedido", {r["tipo"] for r in resp.data})
+
+    def test_detalle_pago_sin_clasificar(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=12000, pagos=[{"metodo_pago": "TJ", "monto": 12000}])
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=6000,
+            monto_subtotal=6000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+
+        resp = self._get_detalle(fecha, "pago", "SIN")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 6000)
+
+    def test_detalle_documento_boleta(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}], documento="FA")
+        self._crear_venta(monto=9000, pagos=[{"metodo_pago": "EF", "monto": 9000}], documento="BO")
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="BO")
+
+        resp = self._get_detalle(fecha, "documento", "BO")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(sum(r["monto"] for r in resp.data), 24000)
+
+    def test_detalle_documento_sin_clasificar(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=12000, pagos=[{"metodo_pago": "TJ", "monto": 12000}], documento="FA")
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=7000,
+            monto_subtotal=7000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="SB")
+
+        resp = self._get_detalle(fecha, "documento", "SIN")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(sum(r["monto"] for r in resp.data), 22000)
+
+    def test_detalle_devoluciones_y_anulaciones(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
+        venta_anulada = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=9000,
+            monto_subtotal=9000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        Anulacion.objects.create(venta=venta_anulada, usuario=self.vendedor, motivo="Motivo anulación")
+        venta_devuelta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=12000,
+            monto_subtotal=12000,
+            estado=Venta.Estado.COMPLETADA,
+            cliente_nombre="Cliente D",
+        )
+        Devolucion.objects.create(
+            venta=venta_devuelta, usuario=self.vendedor, motivo="Motivo devolución", monto_devuelto=3000
+        )
+
+        resp = self._get_detalle(fecha, "devolucion")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 3000)
+        self.assertEqual(resp.data[0]["cliente"], "Cliente D")
+        self.assertEqual(resp.data[0]["motivo"], "Motivo devolución")
+
+        resp = self._get_detalle(fecha, "anulacion")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 9000)
+        self.assertEqual(resp.data[0]["motivo"], "Motivo anulación")
+
+    def test_detalle_cierre_validaciones_y_permisos(self):
+        resp = self._get_detalle("2026-01-01", "pago", "ZZ")
+        self.assertEqual(resp.status_code, 400)
+        resp = self._get_detalle("2026-01-01", "foo")
+        self.assertEqual(resp.status_code, 400)
+        resp = auth_client(self.vendedor).get("/api/cierre-caja/detalle/?fecha=2026-01-01&tipo=pago&clave=EF")
+        self.assertEqual(resp.status_code, 403)
+        resp = self.client.get("/api/cierre-caja/detalle/?fecha=2026-01-01&tipo=pago&clave=EF")
+        self.assertEqual(resp.status_code, 401)
 
 
 class ReportesPersonalizadosApiTest(BaseTest):

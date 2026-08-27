@@ -349,11 +349,25 @@ class ReportesStatsView(APIView):
         )
 
 
-def calcular_cierre(fecha):
-    ventas_hoy = (
+def _ventas_cierre(fecha):
+    return (
         Venta.objects.filter(fecha_venta__date=fecha, estado=Venta.Estado.COMPLETADA)
         .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
     )
+
+
+def _venta_cliente(venta):
+    if venta.cliente_nombre:
+        return venta.cliente_nombre
+    pedido = venta.pedido.first()
+    return pedido.nombre_cliente if pedido else None
+
+
+_MEDIO_PAGO_LABEL = dict(Venta.MetodoPago.choices)
+
+
+def calcular_cierre(fecha):
+    ventas_hoy = _ventas_cierre(fecha)
 
     devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=fecha)
     anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=fecha)
@@ -391,8 +405,8 @@ def calcular_cierre(fecha):
 
     efectivo = pagos_ve_map.get(Venta.MetodoPago.EFECTIVO, 0) + pagos_pedido_map.get("EF", 0)
     tarjeta = pagos_ve_map.get(Venta.MetodoPago.TARJETA, 0) + pagos_pedido_map.get("TJ", 0)
-    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0)
-    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0)
+    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0) + pagos_pedido_map.get("TR", 0)
+    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0) + pagos_pedido_map.get("CH", 0)
 
     # ── Desglose por documento ──
     docs_ve = (
@@ -408,7 +422,7 @@ def calcular_cierre(fecha):
 
     boleta = docs_ve_map.get(Venta.Documento.BOLETA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.BOLETEADO, 0)
     factura = docs_ve_map.get(Venta.Documento.FACTURA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.FACTURADO, 0)
-    otros = docs_ve_map.get(Venta.Documento.OTROS, 0)
+    otros = docs_ve_map.get(Venta.Documento.OTROS, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.OTROS, 0)
     doc_sin_clasificar = (
         docs_ve_map.get(None, 0)
         + docs_pedido_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
@@ -435,6 +449,147 @@ def calcular_cierre(fecha):
             "sin_clasificar": doc_sin_clasificar,
         },
     }
+
+
+def detalle_cierre(fecha, tipo, clave):
+    """Listado de ventas/devoluciones/anulaciones para un renglón del cierre de caja."""
+    ventas_hoy = _ventas_cierre(fecha)
+    ventas_ve = ventas_hoy.exclude(tipo_documento=Venta.TipoDocumento.PEDIDO)
+    ventas_pedido = ventas_hoy.filter(
+        tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=True
+    )
+
+    if tipo == "pago":
+        if clave == "SIN":
+            ids_con_pagos = set(
+                PagoVenta.objects.filter(venta__in=ventas_ve).values_list("venta_id", flat=True)
+            )
+            records = ventas_ve.exclude(pk__in=ids_con_pagos).select_related("usuario")
+            result = [
+                {
+                    "id": v.id,
+                    "fecha": v.fecha_venta,
+                    "cliente": _venta_cliente(v),
+                    "tipo": "venta",
+                    "documento": v.get_documento_display() if v.documento else "Sin clasificar",
+                    "monto": v.monto_total,
+                    "usuario": v.usuario.username if v.usuario else None,
+                }
+                for v in records
+            ]
+        else:
+            pagos = (
+                PagoVenta.objects.filter(venta__in=ventas_ve, metodo_pago=clave)
+                .values("venta_id")
+                .annotate(monto=Sum("monto"))
+            )
+            pagos_map = {p["venta_id"]: p["monto"] for p in pagos}
+            records = ventas_ve.filter(pk__in=pagos_map).select_related("usuario")
+            result = [
+                {
+                    "id": v.id,
+                    "fecha": v.fecha_venta,
+                    "cliente": _venta_cliente(v),
+                    "tipo": "venta",
+                    "documento": v.get_documento_display() if v.documento else "Sin clasificar",
+                    "monto": pagos_map[v.id],
+                    "usuario": v.usuario.username if v.usuario else None,
+                }
+                for v in records
+            ]
+            pedidos = (
+                Pedido.objects.filter(venta__in=ventas_pedido, activo=True, metodo_pago=clave)
+                .select_related("venta", "venta__usuario")
+            )
+            result.extend(
+                {
+                    "id": p.venta_id,
+                    "fecha": p.venta.fecha_venta,
+                    "cliente": p.venta.cliente_nombre or p.nombre_cliente,
+                    "tipo": "pedido",
+                    "documento": p.get_estado_documento_display(),
+                    "monto": p.monto_total,
+                    "usuario": p.venta.usuario.username if p.venta.usuario else None,
+                }
+                for p in pedidos
+            )
+        return sorted(result, key=lambda r: r["fecha"])
+
+    if tipo == "documento":
+        if clave == "SIN":
+            ve_records = ventas_ve.filter(documento__isnull=True).select_related("usuario").prefetch_related("pagos")
+            estado_pedido = Pedido.EstadoDocumento.SIN_BOLETEAR
+        else:
+            ve_records = ventas_ve.filter(documento=clave).select_related("usuario").prefetch_related("pagos")
+            estado_pedido = clave
+        result = [
+            {
+                "id": v.id,
+                "fecha": v.fecha_venta,
+                "cliente": _venta_cliente(v),
+                "tipo": "venta",
+                "medio_pago": ", ".join(
+                    _MEDIO_PAGO_LABEL.get(p.metodo_pago, p.metodo_pago) for p in v.pagos.all()
+                ) or "Sin clasificar",
+                "monto": v.monto_total,
+                "usuario": v.usuario.username if v.usuario else None,
+            }
+            for v in ve_records
+        ]
+        pedidos = (
+            Pedido.objects.filter(venta__in=ventas_pedido, activo=True, estado_documento=estado_pedido)
+            .select_related("venta", "venta__usuario")
+        )
+        result.extend(
+            {
+                "id": p.venta_id,
+                "fecha": p.venta.fecha_venta,
+                "cliente": p.venta.cliente_nombre or p.nombre_cliente,
+                "tipo": "pedido",
+                "medio_pago": _MEDIO_PAGO_LABEL.get(p.metodo_pago, p.metodo_pago),
+                "monto": p.monto_total,
+                "usuario": p.venta.usuario.username if p.venta.usuario else None,
+            }
+            for p in pedidos
+        )
+        return sorted(result, key=lambda r: r["fecha"])
+
+    if tipo == "devolucion":
+        records = (
+            Devolucion.objects.filter(fecha_devolucion__date=fecha)
+            .select_related("venta", "usuario")
+            .order_by("fecha_devolucion")
+        )
+        return [
+            {
+                "id": d.id,
+                "venta_id": d.venta_id,
+                "fecha": d.fecha_devolucion,
+                "cliente": _venta_cliente(d.venta),
+                "motivo": d.motivo,
+                "monto": d.monto_devuelto,
+                "usuario": d.usuario.username if d.usuario else None,
+            }
+            for d in records
+        ]
+
+    records = (
+        Anulacion.objects.filter(fecha_anulacion__date=fecha)
+        .select_related("venta", "usuario")
+        .order_by("fecha_anulacion")
+    )
+    return [
+        {
+            "id": a.id,
+            "venta_id": a.venta_id,
+            "fecha": a.fecha_anulacion,
+            "cliente": _venta_cliente(a.venta),
+            "motivo": a.motivo,
+            "monto": a.venta.monto_total,
+            "usuario": a.usuario.username if a.usuario else None,
+        }
+        for a in records
+    ]
 
 
 class CierreCajaView(APIView):
@@ -547,6 +702,38 @@ class CierreCajaHistorialView(APIView):
             for c in cierres
         ]
         return Response(data)
+
+
+class CierreCajaDetalleView(APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
+        if not has_any_role(request.user, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            raise PermissionDenied("No tiene permisos para acceder al cierre de caja")
+
+        fecha_str = request.query_params.get("fecha", "").strip()
+        if fecha_str:
+            try:
+                fecha = date.fromisoformat(fecha_str)
+            except ValueError:
+                return Response({"error": "Fecha inválida"}, status=400)
+        else:
+            fecha = timezone.localtime(timezone.now()).date()
+
+        tipo = request.query_params.get("tipo", "").strip().lower()
+        clave = request.query_params.get("clave", "").strip().upper()
+
+        claves_validas = {
+            "pago": {"EF", "TJ", "TR", "CH", "SIN"},
+            "documento": {"BO", "FA", "OT", "SIN"},
+        }
+        if tipo in claves_validas:
+            if clave not in claves_validas[tipo]:
+                return Response({"error": "Clave inválida"}, status=400)
+        elif tipo not in {"devolucion", "anulacion"}:
+            return Response({"error": "Tipo inválido"}, status=400)
+
+        return Response(detalle_cierre(fecha, tipo, clave))
 
 
 class ProductoViewSet(viewsets.ModelViewSet):
@@ -1222,8 +1409,16 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
     )
     nombre_cliente = serializers.CharField(max_length=200, required=False, default="")
     telefono_cliente = serializers.CharField(max_length=50, required=False, default="")
-    metodo_pago = serializers.CharField(max_length=2, required=False, default="EF")
-    estado_documento = serializers.CharField(max_length=2, required=False, default="SB")
+    metodo_pago = serializers.ChoiceField(
+        choices=Pedido._meta.get_field("metodo_pago").choices,
+        required=False,
+        default=Venta.MetodoPago.EFECTIVO,
+    )
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido.EstadoDocumento.choices,
+        required=False,
+        default=Pedido.EstadoDocumento.SIN_BOLETEAR,
+    )
 
 
 class CancelarPedidoSerializer(serializers.Serializer):
@@ -1278,26 +1473,21 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         return Response(output.data, status=status.HTTP_201_CREATED)
 
     def _descontar_stock_pedido(self, pedido):
-        for detalle in pedido.detalles.filter(producto__isnull=False):
-            producto = detalle.producto
-            cantidad = 1
-            stocks = StockProductoUbicacion.objects.select_for_update().filter(
-                producto=producto, cantidad__gt=0
-            ).order_by("-cantidad")
+        from vendedorApp.stock_utils import descontar_stock_producto, resolver_producto_por_identidad
 
-            restante = cantidad
-            for stock in stocks:
-                if restante <= 0:
-                    break
-                disponible = min(stock.cantidad, restante)
-                stock.cantidad -= disponible
-                stock.save()
-                restante -= disponible
-
-            if restante > 0:
-                raise serializers.ValidationError(
-                    {"estado": f"Stock insuficiente para {producto.nombre}"}
-                )
+        for detalle in pedido.detalles.all():
+            producto = resolver_producto_por_identidad(
+                detalle.codigo_proveedor, detalle.oem
+            )
+            if producto is None:
+                if detalle.producto_id is not None:
+                    detalle.producto = None
+                    detalle.save(update_fields=["producto"])
+                continue
+            if detalle.producto_id != producto.producto_id:
+                detalle.producto = producto
+                detalle.save(update_fields=["producto"])
+            descontar_stock_producto(producto)
         pedido.stock_descontado = True
 
     @action(detail=True, methods=["post"], url_path="cambiar-estado")

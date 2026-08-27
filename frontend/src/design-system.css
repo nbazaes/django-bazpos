@@ -1679,14 +1679,40 @@ textarea.form-control, textarea.input {
 
 /* ====== PRINT STYLES ====== */
 
+.only-print {
+  display: none;
+}
+
 @media print {
   .sidebar,
   .topbar,
   .no-print,
   .btn,
   .modal,
+  .chat-widget,
   .pedidos-header-actions {
     display: none !important;
+  }
+
+  .stat-card,
+  .card {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #999 !important;
+    box-shadow: none !important;
+  }
+
+  .stat-card::before {
+    height: 0 !important;
+  }
+
+  .stat-card .stat-label,
+  .stat-card .stat-value,
+  .stat-card .stat-breakdown,
+  .table,
+  .table td,
+  .table th {
+    color: #000 !important;
   }
 
   .only-print {

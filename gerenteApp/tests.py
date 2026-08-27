@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from docker.test_utils import auth_client, create_business_groups, make_user
 from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig, Tax
-from vendedorApp.models import Producto, StockProductoUbicacion, Ubicacion
+from vendedorApp.models import Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion, Venta
 
 
 class TaxTest(TestCase):
@@ -172,6 +172,128 @@ class FacturaUpsertTest(TestCase):
         second = client.post("/api/facturas/", payload, format="json")
         self.assertEqual(second.status_code, 200)
         self.assertTrue(second.data["existing"])
+
+    def _crear_pedido_retirado_custom(self, codigo_proveedor=None, oem=None):
+        venta = Venta.objects.create(
+            usuario=self.gerente,
+            monto_total=10000,
+            monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.PEDIDO,
+        )
+        pedido = Pedido.objects.create(
+            usuario=self.gerente,
+            nombre_cliente="Cliente X",
+            telefono_cliente="912345678",
+            monto_subtotal=10000,
+            monto_total=10000,
+            estado=Pedido.Estado.RETIRADO,
+            stock_descontado=True,
+            venta=venta,
+        )
+        return PedidoDetalle.objects.create(
+            pedido=pedido,
+            producto=None,
+            codigo_proveedor=codigo_proveedor or self.producto.codigo_producto,
+            proveedor=self.proveedor,
+            oem=oem or self.producto.oem,
+            nombre=self.producto.nombre,
+            precio_costo=5000,
+            porcentaje_utilidad=Decimal("30.00"),
+            precio_final=10000,
+        )
+
+    def test_factura_detecta_coincidencia_pedido_retirado(self):
+        detalle = self._crear_pedido_retirado_custom()
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(len(resp.data["coincidencias"]), 1)
+        co = resp.data["coincidencias"][0]
+        self.assertEqual(co["pedido_detalle_id"], detalle.id)
+        self.assertEqual(co["producto_id"], self.producto.producto_id)
+
+    def test_factura_sin_coincidencias(self):
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["coincidencias"], [])
+
+    def test_factura_no_detecta_pedido_pendiente(self):
+        venta = Venta.objects.create(
+            usuario=self.gerente, monto_total=10000, monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA, tipo_documento=Venta.TipoDocumento.PEDIDO,
+        )
+        pedido = Pedido.objects.create(
+            usuario=self.gerente, nombre_cliente="X", telefono_cliente="1",
+            monto_subtotal=10000, monto_total=10000,
+            estado=Pedido.Estado.PENDIENTE_RETIRAR, venta=venta,
+        )
+        PedidoDetalle.objects.create(
+            pedido=pedido, producto=None,
+            codigo_proveedor=self.producto.codigo_producto,
+            proveedor=self.proveedor, oem=self.producto.oem,
+            nombre=self.producto.nombre, precio_costo=5000,
+            porcentaje_utilidad=Decimal("30.00"), precio_final=10000,
+        )
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["coincidencias"], [])
+
+    def test_reconciliar_pedidos_descuenta(self):
+        detalle = self._crear_pedido_retirado_custom()
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        factura_id = resp.data["id"]
+        resp = auth_client(self.gerente).post(
+            f"/api/facturas/{factura_id}/reconciliar-pedidos/",
+            {"descontar": [detalle.id]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["aplicados"], [detalle.id])
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.producto_id, self.producto.producto_id)
+        stock = StockProductoUbicacion.objects.get(producto=self.producto)
+        self.assertEqual(stock.cantidad, 4)
+
+    def test_reconciliar_pedidos_idempotente(self):
+        detalle = self._crear_pedido_retirado_custom()
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        factura_id = resp.data["id"]
+        client = auth_client(self.gerente)
+        first = client.post(
+            f"/api/facturas/{factura_id}/reconciliar-pedidos/",
+            {"descontar": [detalle.id]},
+            format="json",
+        )
+        second = client.post(
+            f"/api/facturas/{factura_id}/reconciliar-pedidos/",
+            {"descontar": [detalle.id]},
+            format="json",
+        )
+        self.assertEqual(first.data["aplicados"], [detalle.id])
+        self.assertEqual(second.data["aplicados"], [])
+
+    def test_reconciliar_pedidos_id_invalido_ignorado(self):
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        factura_id = resp.data["id"]
+        resp = auth_client(self.gerente).post(
+            f"/api/facturas/{factura_id}/reconciliar-pedidos/",
+            {"descontar": [999999]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["aplicados"], [])
 
 
 class StoreConfigApiTest(TestCase):

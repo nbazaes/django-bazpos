@@ -497,6 +497,22 @@ export function useDeleteFactura() {
   });
 }
 
+export function useReconciliarFacturaPedidos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, descontar }) =>
+      apiRequest(`/facturas/${id}/reconciliar-pedidos/`, {
+        method: "POST",
+        body: { descontar },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.facturas.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+    },
+  });
+}
+
 export function useBuscarProductoFactura(codigo) {
   return useQuery({
     queryKey: queryKeys.facturas.buscarProducto(codigo),
@@ -673,6 +689,16 @@ export function useCierreCajaHistorial() {
   return useQuery({
     queryKey: queryKeys.cierreCaja.historial,
     queryFn: () => apiRequest("/cierre-caja/historial/"),
+    staleTime: 30_000,
+  });
+}
+
+export function useCierreDetalle(fecha, tipo, clave, enabled) {
+  return useQuery({
+    queryKey: [...queryKeys.cierreCaja.all, "detalle", fecha, tipo, clave],
+    queryFn: () =>
+      apiRequest(`/cierre-caja/detalle/${buildQuery({ fecha, tipo, clave })}`),
+    enabled,
     staleTime: 30_000,
   });
 }

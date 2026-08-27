@@ -331,6 +331,7 @@ class Pedido(models.Model):
         SIN_BOLETEAR = "SB", "Sin boletear"
         BOLETEADO = "BO", "Boleteado"
         FACTURADO = "FA", "Facturado"
+        OTROS = "OT", "Otros"
 
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     nombre_cliente = models.CharField(max_length=200)
@@ -340,8 +341,8 @@ class Pedido(models.Model):
     costo_envio = models.IntegerField(default=4500)
     metodo_pago = models.CharField(
         max_length=2,
-        choices=[("EF", "Efectivo"), ("TJ", "Tarjeta")],
-        default="EF",
+        choices=Venta.MetodoPago.choices,
+        default=Venta.MetodoPago.EFECTIVO,
     )
     estado = models.CharField(
         max_length=2,
