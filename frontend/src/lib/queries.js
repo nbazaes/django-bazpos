@@ -477,11 +477,7 @@ export function useCreateFactura() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data) => apiRequest("/facturas/", { method: "POST", body: data }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.facturas.all });
-      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
-      qc.invalidateQueries({ queryKey: queryKeys.ubicaciones.all });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.facturas.all }),
   });
 }
 
@@ -489,11 +485,7 @@ export function useUpdateFactura() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }) => apiRequest(`/facturas/${id}/`, { method: "PUT", body: data }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.facturas.all });
-      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
-      qc.invalidateQueries({ queryKey: queryKeys.ubicaciones.all });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.facturas.all }),
   });
 }
 
@@ -501,11 +493,7 @@ export function useDeleteFactura() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id) => apiRequest(`/facturas/${id}/`, { method: "DELETE" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.facturas.all });
-      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
-      qc.invalidateQueries({ queryKey: queryKeys.ubicaciones.all });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.facturas.all }),
   });
 }
 
