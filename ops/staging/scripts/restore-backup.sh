@@ -16,12 +16,16 @@ done
 # 2) Restaurar el snapshot más reciente
 echo "==> [restore] Snapshots recientes:"
 restic snapshots | tail -6
-echo "==> [restore] Restaurando 'latest' en ${RESTORE_DIR}..."
+echo "==> [restore] Limpiando ${RESTORE_DIR} (evita que dumps de restores anteriores se mezclen)..."
+rm -rf "${RESTORE_DIR}"
 mkdir -p "${RESTORE_DIR}"
 restic restore latest --target "${RESTORE_DIR}"
 
-DUMP="$(find "${RESTORE_DIR}" -name bazpos_db.sql.gz | head -n1)"
-MEDIA="$(find "${RESTORE_DIR}" -name media.tar.gz | head -n1)"
+# Seleccionar el dump/media MÁS RECIENTE por mtime: tras limpiar el directorio
+# queda solo el del snapshot 'latest', pero esto evita regresiones si se restauran
+# varios snapshots en el mismo directorio.
+DUMP="$(find "${RESTORE_DIR}" -name bazpos_db.sql.gz -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)"
+MEDIA="$(find "${RESTORE_DIR}" -name media.tar.gz -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2-)"
 [ -n "${DUMP}" ] && [ -n "${MEDIA}" ] || { echo "No se encontraron bazpos_db.sql.gz / media.tar.gz"; exit 1; }
 echo "    Dump:  $(du -h "${DUMP}" | cut -f1)  ${DUMP}"
 echo "    Media: $(du -h "${MEDIA}" | cut -f1)  ${MEDIA}"
