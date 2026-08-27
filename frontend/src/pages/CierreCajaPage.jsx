@@ -3,6 +3,7 @@ import PageCard from "../components/PageCard";
 import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
+import { useStoreName } from "../lib/storeName";
 import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
 
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;
@@ -22,6 +23,7 @@ function fmtFechaHora(iso) {
 export default function CierreCajaPage() {
   usePageTitle("Cierre de caja");
   const showToast = useToast();
+  const storeName = useStoreName();
   const today = new Date();
   const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const [fecha, setFecha] = useState(localToday);
@@ -40,6 +42,10 @@ export default function CierreCajaPage() {
         showToast(err.message || "No se pudo guardar el cierre de caja", "danger");
       },
     });
+  }
+
+  function handleImprimir() {
+    window.print();
   }
 
   const pagos = data?.pagos || {};
@@ -69,7 +75,7 @@ export default function CierreCajaPage() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+      <div className="no-print" style={{ display: "flex", alignItems: "flex-end", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem", fontWeight: 500 }}>
           Fecha
           <input
@@ -87,10 +93,27 @@ export default function CierreCajaPage() {
         >
           {guardarMutation.isPending ? "Guardando..." : "Guardar cierre de caja"}
         </button>
+        <button
+          className="btn btn-secondary"
+          onClick={handleImprimir}
+          disabled={isLoading || !!error}
+        >
+          Imprimir
+        </button>
         {ultimoGuardado && (
           <span className="text-success" style={{ fontWeight: 500 }}>
             ✓ Cierre guardado el {fmtFechaHora(ultimoGuardado.created_at)} por {ultimoGuardado.usuario || "—"}
           </span>
+        )}
+      </div>
+
+      <div className="only-print" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+        <h1 style={{ margin: 0, fontSize: "1.4rem" }}>{storeName}</h1>
+        <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>Cierre de caja — {fmtFecha(fecha)}</div>
+        {ultimoGuardado && (
+          <div style={{ fontSize: "0.85rem" }}>
+            Guardado el {fmtFechaHora(ultimoGuardado.created_at)} por {ultimoGuardado.usuario || "—"}
+          </div>
         )}
       </div>
 
@@ -100,14 +123,13 @@ export default function CierreCajaPage() {
       {data && (
         <>
           <div className="row mb-4">
-            <div className="col-md-3">
+            <div className="col-3">
               <div className="stat-card stat-card-success">
                 <div className="stat-label">Total vendido</div>
                 <div className="stat-value">{fmtMoney(data.total_vendido)}</div>
-                <div className="stat-breakdown">{data.cantidad_ventas} ventas</div>
               </div>
             </div>
-            <div className="col-md-3">
+            <div className="col-3">
               <div
                 className="stat-card stat-card-info"
                 onClick={() => abrirDetalle("devolucion", "", "Devoluciones", data.total_devoluciones)}
@@ -115,12 +137,9 @@ export default function CierreCajaPage() {
               >
                 <div className="stat-label">Devoluciones</div>
                 <div className="stat-value">{fmtMoney(data.total_devoluciones)}</div>
-                {data.total_devoluciones > 0 && (
-                  <div className="stat-breakdown">Ver detalle →</div>
-                )}
               </div>
             </div>
-            <div className="col-md-3">
+            <div className="col-3">
               <div
                 className="stat-card stat-card-danger"
                 onClick={() => abrirDetalle("anulacion", "", "Anulaciones", data.total_anulaciones)}
@@ -128,12 +147,9 @@ export default function CierreCajaPage() {
               >
                 <div className="stat-label">Anulaciones</div>
                 <div className="stat-value">{fmtMoney(data.total_anulaciones)}</div>
-                {data.total_anulaciones > 0 && (
-                  <div className="stat-breakdown">Ver detalle →</div>
-                )}
               </div>
             </div>
-            <div className="col-md-3">
+            <div className="col-3">
               <div className="stat-card stat-card-purple">
                 <div className="stat-label">Total del día</div>
                 <div className="stat-value">{fmtMoney(data.total_final)}</div>
@@ -145,7 +161,7 @@ export default function CierreCajaPage() {
             <div className="col-md-6">
               <PageCard title="Ventas por medio de pago">
                 <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
+                  <table className="table table-sm">
                     <thead>
                       <tr><th>Medio de pago</th><th>Monto</th></tr>
                     </thead>
@@ -156,14 +172,7 @@ export default function CierreCajaPage() {
                           onClick={() => abrirDetalle("pago", clave, titulo, valor)}
                           style={valor > 0 ? { cursor: "pointer" } : undefined}
                         >
-                          <td>
-                            {label}
-                            {valor > 0 && (
-                              <span className="text-muted" style={{ fontSize: "0.7rem", marginLeft: "0.5rem" }}>
-                                Ver detalle →
-                              </span>
-                            )}
-                          </td>
+                          <td>{label}</td>
                           <td>{fmtMoney(valor)}</td>
                         </tr>
                       ))}
@@ -179,7 +188,7 @@ export default function CierreCajaPage() {
             <div className="col-md-6">
               <PageCard title="Ventas por documento">
                 <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
+                  <table className="table table-sm">
                     <thead>
                       <tr><th>Documento</th><th>Monto</th></tr>
                     </thead>
@@ -190,14 +199,7 @@ export default function CierreCajaPage() {
                           onClick={() => abrirDetalle("documento", clave, titulo, valor)}
                           style={valor > 0 ? { cursor: "pointer" } : undefined}
                         >
-                          <td>
-                            {label}
-                            {valor > 0 && (
-                              <span className="text-muted" style={{ fontSize: "0.7rem", marginLeft: "0.5rem" }}>
-                                Ver detalle →
-                              </span>
-                            )}
-                          </td>
+                          <td>{label}</td>
                           <td>{fmtMoney(valor)}</td>
                         </tr>
                       ))}
@@ -214,11 +216,11 @@ export default function CierreCajaPage() {
         </>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 no-print">
         <PageCard title={`Historial de cierres de la fecha ${fmtFecha(fecha)}`}>
           {historialFiltered.length > 0 ? (
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm">
                 <thead>
                   <tr>
                     <th>#</th>

@@ -80,7 +80,7 @@ export default function CierreDetalleModal({ fecha, tipo, clave, titulo, onClose
           </div>
           <div className="modal-body">
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm">
                 <thead>
                   <tr>
                     {columnas.map((c) => (
