@@ -4,6 +4,21 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.23.0] - 2026-08-27
+
+### Agregado
+
+- Nuevo constructor de reportes personalizados de productos y ventas, con columnas y filtros seleccionables, paginación y exportación a CSV.
+- El reporte de productos permite consultar el stock total y por ubicación a una fecha determinada.
+
+### Corregido
+
+- La búsqueda de productos en ventas y facturas vuelve a mostrar la última fecha de llegada.
+
+### Rendimiento
+
+- Mejorado el rendimiento y la estabilidad general.
+
 ## [1.22.1] - 2026-08-24
 
 ### Agregado
