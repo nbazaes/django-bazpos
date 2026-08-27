@@ -4,6 +4,22 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.24.0] - 2026-08-27
+
+### Agregado
+
+- Ahora puedes imprimir el resumen del cierre de caja, con encabezado de tienda y fecha.
+- En el módulo de Cierre de caja, consulta el detalle de ventas por medio de pago, documento y devoluciones haciendo clic en sus tarjetas o filas.
+- Los pedidos admiten efectivo, tarjeta, transferencia, cheque y el documento «Otros».
+
+### Cambiado
+
+- El cierre de caja luce más ordenado, con tarjetas del mismo tamaño en una sola fila y tablas más limpias.
+
+### Corregido
+
+- Puedes retirar pedidos aunque el stock quede negativo; además, se corrigen automáticamente productos mal vinculados y se pueden reconciliar pedidos al ingresar una factura.
+
 ## [1.23.0] - 2026-08-27
 
 ### Agregado
