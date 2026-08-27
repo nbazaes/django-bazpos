@@ -3,12 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../lib/usePageTitle";
+import { formatDateTime } from "../lib/format";
 import {
   useCheckFacturaExiste,
   useCreateFactura,
   useFactura,
   useImpuesto,
   useProveedores,
+  useReconciliarFacturaPedidos,
   useUpdateFactura,
   useUbicaciones,
 } from "../lib/queries";
@@ -67,6 +69,10 @@ export default function FacturaFormPage() {
   const [searching, setSearching] = useState(false);
   const [ubicacionModalIdx, setUbicacionModalIdx] = useState(null);
   const searchRequestRef = useRef(0);
+  const [reconciliarCoincidencias, setReconciliarCoincidencias] = useState([]);
+  const [reconciliarChecks, setReconciliarChecks] = useState({});
+  const [reconciliarFacturaId, setReconciliarFacturaId] = useState(null);
+  const reconciliarPedidos = useReconciliarFacturaPedidos();
 
   const { data: proveedoresData } = useProveedores({ page_size: 200 });
   const { data: facturaData } = useFactura(id);
@@ -299,12 +305,40 @@ export default function FacturaFormPage() {
             setWarning("");
             navigate(`/facturas/${data.id}/editar`);
           }, 1500);
+        } else if (Array.isArray(data?.coincidencias) && data.coincidencias.length > 0) {
+          setReconciliarCoincidencias(data.coincidencias);
+          setReconciliarChecks(
+            Object.fromEntries(data.coincidencias.map((c) => [c.pedido_detalle_id, false]))
+          );
+          setReconciliarFacturaId(data.id);
         } else {
           navigate("/facturas");
         }
       },
       onError: (err) => setError(err.message),
     });
+  }
+
+  function omitirReconciliar() {
+    setReconciliarFacturaId(null);
+    navigate("/facturas");
+  }
+
+  function confirmarReconciliar() {
+    const descontar = Object.entries(reconciliarChecks)
+      .filter(([, checked]) => checked)
+      .map(([detalleId]) => Number(detalleId));
+    if (descontar.length === 0) return;
+    reconciliarPedidos.mutate(
+      { id: reconciliarFacturaId, descontar },
+      {
+        onSuccess: () => {
+          setReconciliarFacturaId(null);
+          navigate("/facturas");
+        },
+        onError: (err) => setError(err.message),
+      },
+    );
   }
 
   function getUbicacionSummary(item) {
@@ -783,6 +817,73 @@ export default function FacturaFormPage() {
               <div className="modal-body text-center py-5">
                 <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>&#10003;</div>
                 <h5 className="mb-0">Producto creado con éxito</h5>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reconciliarFacturaId && reconciliarCoincidencias.length > 0 && (
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && omitirReconciliar()}>
+          <div className="modal-dialog" style={{ maxWidth: 620 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Pedidos ya entregados detectados</h5>
+                <button type="button" className="modal-close" onClick={omitirReconciliar} disabled={reconciliarPedidos.isPending}>&times;</button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">
+                  Uno o más productos ingresados coinciden con pedidos que ya se retiraron con stock pendiente (producto no existía al retirar).
+                  Marca los que corresponda para <strong>descontar 1 unidad del stock</strong>.
+                </p>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered mb-0">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 40 }}>Descontar</th>
+                        <th>Producto</th>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Fecha retiro</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reconciliarCoincidencias.map((c) => (
+                        <tr key={c.pedido_detalle_id}>
+                          <td className="text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!reconciliarChecks[c.pedido_detalle_id]}
+                              onChange={(e) =>
+                                setReconciliarChecks((prev) => ({
+                                  ...prev,
+                                  [c.pedido_detalle_id]: e.target.checked,
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>{c.producto_nombre}</td>
+                          <td>#{c.pedido_id}</td>
+                          <td>{c.cliente}</td>
+                          <td>{formatDateTime(c.fecha_retiro)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={omitirReconciliar} disabled={reconciliarPedidos.isPending}>
+                  Omitir (no descontar)
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarReconciliar}
+                  disabled={reconciliarPedidos.isPending || !Object.values(reconciliarChecks).some(Boolean)}
+                >
+                  {reconciliarPedidos.isPending ? "Guardando..." : "Aceptar"}
+                </button>
               </div>
             </div>
           </div>

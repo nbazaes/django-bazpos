@@ -1,4 +1,5 @@
 from django.contrib.auth.models import Group, User
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -16,8 +17,9 @@ from gerenteApp.serializers import (
     UserSerializer,
 )
 from vendedorApp.pagination import DefaultPagination
-from vendedorApp.models import Producto, Ubicacion
+from vendedorApp.models import Pedido, PedidoDetalle, Producto, Ubicacion
 from vendedorApp.serializers import UbicacionSerializer
+from vendedorApp.stock_utils import descontar_stock_producto, resolver_producto_por_identidad
 from bazpos.permissions import ROLE_BODEGUERO, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_VENDEDOR, RoleActionPermission
 
 
@@ -92,6 +94,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
         "crear_producto_rapido": [ROLE_ENCARGADO, ROLE_GERENTE],
         "impuesto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "check_exists": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "reconciliar_pedidos": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
 
     def get_serializer_class(self):
@@ -123,7 +126,9 @@ class FacturaViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         factura = serializer.save()
         out = FacturaDetalleSerializer(factura, context={"request": request})
-        return Response(out.data, status=status.HTTP_201_CREATED)
+        data = out.data
+        data["coincidencias"] = self._coincidencias_factura(factura)
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         factura = self.get_object()
@@ -131,7 +136,86 @@ class FacturaViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         factura = serializer.save()
         out = FacturaDetalleSerializer(factura, context={"request": request})
-        return Response(out.data)
+        data = out.data
+        data["coincidencias"] = self._coincidencias_factura(factura)
+        return Response(data)
+
+    def _coincidencias_factura(self, factura):
+        """Detecta detalles de pedidos custom ya retirados que corresponden a los
+        productos de esta factura (match por identidad). No descuenta nada."""
+        coincidencias = []
+        for df in factura.detalles.select_related("producto").all():
+            producto = df.producto
+            if producto is None:
+                continue
+            codigos = {c for c in (producto.codigo_producto, producto.codigo_proveedor) if c}
+            query = Q(codigo_proveedor__in=codigos) if codigos else Q()
+            if producto.oem:
+                query = query | (Q(codigo_proveedor="") & Q(oem=producto.oem))
+            if not query:
+                continue
+            candidatos = PedidoDetalle.objects.filter(
+                query,
+                producto__isnull=True,
+                pedido__estado=Pedido.Estado.RETIRADO,
+                pedido__stock_descontado=True,
+                pedido__activo=True,
+                pedido__es_cotizacion=False,
+            ).select_related("pedido")
+            for detalle in candidatos:
+                if resolver_producto_por_identidad(detalle.codigo_proveedor, detalle.oem) != producto:
+                    continue
+                coincidencias.append({
+                    "producto_id": producto.producto_id,
+                    "producto_nombre": producto.nombre,
+                    "pedido_detalle_id": detalle.id,
+                    "pedido_id": detalle.pedido_id,
+                    "cliente": detalle.pedido.nombre_cliente,
+                    "codigo_proveedor": detalle.codigo_proveedor,
+                    "oem": detalle.oem,
+                    "fecha_retiro": detalle.pedido.fecha_retiro,
+                })
+        return coincidencias
+
+    @action(detail=True, methods=["post"], url_path="reconciliar-pedidos")
+    def reconciliar_pedidos(self, request, pk=None):
+        factura = self.get_object()
+        descontar_ids = request.data.get("descontar", [])
+        if not isinstance(descontar_ids, list):
+            return Response({"error": "Formato inválido"}, status=status.HTTP_400_BAD_REQUEST)
+
+        productos_factura = set(factura.detalles.values_list("producto_id", flat=True))
+        aplicados = []
+        with transaction.atomic():
+            for detalle_id in descontar_ids:
+                try:
+                    detalle = (
+                        PedidoDetalle.objects.select_for_update()
+                        .select_related("pedido")
+                        .get(id=detalle_id)
+                    )
+                except PedidoDetalle.DoesNotExist:
+                    continue
+                if detalle.producto_id is not None:
+                    continue
+                pedido = detalle.pedido
+                if (
+                    pedido.estado != Pedido.Estado.RETIRADO
+                    or not pedido.stock_descontado
+                    or not pedido.activo
+                    or pedido.es_cotizacion
+                ):
+                    continue
+                producto = resolver_producto_por_identidad(
+                    detalle.codigo_proveedor, detalle.oem
+                )
+                if producto is None or producto.producto_id not in productos_factura:
+                    continue
+                detalle.producto = producto
+                detalle.save(update_fields=["producto"])
+                descontar_stock_producto(producto)
+                aplicados.append(detalle_id)
+        return Response({"aplicados": aplicados})
 
     @action(detail=False, methods=["get"], url_path="check-exists")
     def check_exists(self, request):

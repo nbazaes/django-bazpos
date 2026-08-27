@@ -5,6 +5,7 @@ from django.db.models import Sum
 from rest_framework import serializers
 
 from gerenteApp.models import PrecioHistorico
+from vendedorApp.stock_utils import resolver_producto_por_identidad
 from vendedorApp.models import (
     AjusteStock,
     Anulacion,
@@ -759,13 +760,9 @@ class CrearPedidoSerializer(serializers.Serializer):
                 sumar_envio=item.get("sumar_envio", True),
                 stellantis=item.get("stellantis", False),
             )
-            producto_id = item.get("producto_id")
-            producto = None
-            if producto_id:
-                try:
-                    producto = Producto.objects.get(producto_id=producto_id)
-                except Producto.DoesNotExist:
-                    producto = None
+            producto = resolver_producto_por_identidad(
+                item["codigo_proveedor"], item["oem"]
+            )
 
             PedidoDetalle.objects.create(
                 pedido=pedido,
@@ -787,13 +784,9 @@ class CrearPedidoSerializer(serializers.Serializer):
             from vendedorApp.models import PedidoProveedorDia, ItemPedidoProveedor
 
             for item in items:
-                producto_id = item.get("producto_id")
-                producto = None
-                if producto_id:
-                    try:
-                        producto = Producto.objects.get(producto_id=producto_id)
-                    except Producto.DoesNotExist:
-                        producto = None
+                producto = resolver_producto_por_identidad(
+                    item["codigo_proveedor"], item["oem"]
+                )
 
                 fecha = date.today()
                 dia_hoy = PedidoProveedorDia.objects.filter(fecha=fecha).first()

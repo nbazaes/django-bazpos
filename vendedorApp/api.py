@@ -1278,26 +1278,21 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         return Response(output.data, status=status.HTTP_201_CREATED)
 
     def _descontar_stock_pedido(self, pedido):
-        for detalle in pedido.detalles.filter(producto__isnull=False):
-            producto = detalle.producto
-            cantidad = 1
-            stocks = StockProductoUbicacion.objects.select_for_update().filter(
-                producto=producto, cantidad__gt=0
-            ).order_by("-cantidad")
+        from vendedorApp.stock_utils import descontar_stock_producto, resolver_producto_por_identidad
 
-            restante = cantidad
-            for stock in stocks:
-                if restante <= 0:
-                    break
-                disponible = min(stock.cantidad, restante)
-                stock.cantidad -= disponible
-                stock.save()
-                restante -= disponible
-
-            if restante > 0:
-                raise serializers.ValidationError(
-                    {"estado": f"Stock insuficiente para {producto.nombre}"}
-                )
+        for detalle in pedido.detalles.all():
+            producto = resolver_producto_por_identidad(
+                detalle.codigo_proveedor, detalle.oem
+            )
+            if producto is None:
+                if detalle.producto_id is not None:
+                    detalle.producto = None
+                    detalle.save(update_fields=["producto"])
+                continue
+            if detalle.producto_id != producto.producto_id:
+                detalle.producto = producto
+                detalle.save(update_fields=["producto"])
+            descontar_stock_producto(producto)
         pedido.stock_descontado = True
 
     @action(detail=True, methods=["post"], url_path="cambiar-estado")

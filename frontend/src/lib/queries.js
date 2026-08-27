@@ -497,6 +497,22 @@ export function useDeleteFactura() {
   });
 }
 
+export function useReconciliarFacturaPedidos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, descontar }) =>
+      apiRequest(`/facturas/${id}/reconciliar-pedidos/`, {
+        method: "POST",
+        body: { descontar },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.facturas.all });
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
+    },
+  });
+}
+
 export function useBuscarProductoFactura(codigo) {
   return useQuery({
     queryKey: queryKeys.facturas.buscarProducto(codigo),

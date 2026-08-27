@@ -115,7 +115,24 @@ export default function PedidosCrearPage() {
   }
 
   function handleProductoChange(field, value) {
-    setProducto((prev) => ({ ...prev, [field]: value }));
+    setProducto((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "codigo_proveedor") {
+        const codigo = String(value || "").trim();
+        const match = (productosData?.results ?? []).find(
+          (p) => p.codigo_producto === codigo || p.codigo_proveedor === codigo
+        );
+        next.producto_id = match ? match.producto_id : null;
+        if (match) {
+          next.oem = match.oem || "";
+          next.nombre = match.nombre || "";
+          next.proveedor_id = String(match.proveedor ?? "");
+          next.precio_costo = match.precio_costo ?? "";
+          next.porcentaje_utilidad = match.margen_utilidad ?? "";
+        }
+      }
+      return next;
+    });
   }
 
   function limpiarProducto() {
