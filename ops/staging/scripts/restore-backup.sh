@@ -41,16 +41,21 @@ fi
 echo "==> [restore] Deteniendo app..."
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml stop app"
 
-# 5) Importar dump en bazpos_db (como root del contenedor para respetar DEFINER de triggers/rutinas)
+# 5) Recrear bazpos_db vacío (evita que tablas obsoletas de un restore anterior
+#    sobrevivan y rompan las migraciones al arrancar el stack).
+echo "==> [restore] Recreando bazpos_db (drop + create)..."
+ssh_vm "docker exec bazpos_db sh -c 'exec mariadb -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e \"DROP DATABASE IF EXISTS bazpos_db; CREATE DATABASE bazpos_db CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;\"'"
+
+# 6) Importar dump en bazpos_db (como root del contenedor para respetar DEFINER de triggers/rutinas)
 echo "==> [restore] Importando dump en bazpos_db (puede tardar minutos)..."
 gunzip -c "${DUMP}" \
   | ssh_vm "docker exec -i bazpos_db sh -c 'exec mariadb -uroot -p\"\$MYSQL_ROOT_PASSWORD\" bazpos_db'"
 
-# 6) Importar media en el volumen (streaming directo, sin doble copia en host)
+# 7) Importar media en el volumen (streaming directo, sin doble copia en host)
 echo "==> [restore] Importando media en bazpos_media_files..."
 ssh_vm "docker run --rm -v bazpos_media_files:/media -i alpine sh -c 'mkdir -p /tmp/m && tar xzf - -C /tmp/m && cp -a /tmp/m/. /media/ && rm -rf /tmp/m'" < "${MEDIA}"
 
-# 7) Reiniciar stack completo
+# 8) Reiniciar stack completo
 echo "==> [restore] Reiniciando stack..."
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml up -d"
 stack_wait_healthy
