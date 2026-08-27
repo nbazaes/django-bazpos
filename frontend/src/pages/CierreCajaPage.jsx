@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PageCard from "../components/PageCard";
+import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
 import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
@@ -28,6 +29,7 @@ export default function CierreCajaPage() {
   const { data, error, isLoading } = useCierreCaja(fecha);
   const { data: historial } = useCierreCajaHistorial();
   const guardarMutation = useGuardarCierre();
+  const [detalle, setDetalle] = useState(null);
 
   function handleGuardar() {
     guardarMutation.mutate(fecha, {
@@ -44,19 +46,23 @@ export default function CierreCajaPage() {
   const documentos = data?.documentos || {};
 
   const filasPago = [
-    ["Efectivo", pagos.efectivo],
-    ["Tarjeta", pagos.tarjeta],
-    ["Transferencia", pagos.transferencia],
-    ["Cheque", pagos.cheque],
-    ["Sin clasificar", pagos.sin_clasificar],
+    ["Efectivo", "EF", "Ventas en efectivo", pagos.efectivo],
+    ["Tarjeta", "TJ", "Ventas con tarjeta", pagos.tarjeta],
+    ["Transferencia", "TR", "Ventas por transferencia", pagos.transferencia],
+    ["Cheque", "CH", "Ventas con cheque", pagos.cheque],
+    ["Sin clasificar", "SIN", "Ventas sin clasificar", pagos.sin_clasificar],
   ];
 
   const filasDoc = [
-    ["Boleta", documentos.boleta],
-    ["Factura", documentos.factura],
-    ["Otros", documentos.otros],
-    ["Sin clasificar", documentos.sin_clasificar],
+    ["Boleta", "BO", "Ventas con boleta", documentos.boleta],
+    ["Factura", "FA", "Ventas con factura", documentos.factura],
+    ["Otros", "OT", "Ventas con otros documentos", documentos.otros],
+    ["Sin clasificar", "SIN", "Ventas sin clasificar", documentos.sin_clasificar],
   ];
+
+  const abrirDetalle = (tipo, clave, titulo, valor) => {
+    if (valor > 0) setDetalle({ tipo, clave, titulo });
+  };
 
   const historialFiltered = (historial || []).filter((c) => c.fecha === fecha);
   const ultimoGuardado = historialFiltered[0] || null;
@@ -102,15 +108,29 @@ export default function CierreCajaPage() {
               </div>
             </div>
             <div className="col-md-3">
-              <div className="stat-card stat-card-info">
+              <div
+                className="stat-card stat-card-info"
+                onClick={() => abrirDetalle("devolucion", "", "Devoluciones", data.total_devoluciones)}
+                style={data.total_devoluciones > 0 ? { cursor: "pointer" } : undefined}
+              >
                 <div className="stat-label">Devoluciones</div>
                 <div className="stat-value">{fmtMoney(data.total_devoluciones)}</div>
+                {data.total_devoluciones > 0 && (
+                  <div className="stat-breakdown">Ver detalle →</div>
+                )}
               </div>
             </div>
             <div className="col-md-3">
-              <div className="stat-card stat-card-danger">
+              <div
+                className="stat-card stat-card-danger"
+                onClick={() => abrirDetalle("anulacion", "", "Anulaciones", data.total_anulaciones)}
+                style={data.total_anulaciones > 0 ? { cursor: "pointer" } : undefined}
+              >
                 <div className="stat-label">Anulaciones</div>
                 <div className="stat-value">{fmtMoney(data.total_anulaciones)}</div>
+                {data.total_anulaciones > 0 && (
+                  <div className="stat-breakdown">Ver detalle →</div>
+                )}
               </div>
             </div>
             <div className="col-md-3">
@@ -130,9 +150,20 @@ export default function CierreCajaPage() {
                       <tr><th>Medio de pago</th><th>Monto</th></tr>
                     </thead>
                     <tbody>
-                      {filasPago.map(([label, valor]) => (
-                        <tr key={label}>
-                          <td>{label}</td>
+                      {filasPago.map(([label, clave, titulo, valor]) => (
+                        <tr
+                          key={label}
+                          onClick={() => abrirDetalle("pago", clave, titulo, valor)}
+                          style={valor > 0 ? { cursor: "pointer" } : undefined}
+                        >
+                          <td>
+                            {label}
+                            {valor > 0 && (
+                              <span className="text-muted" style={{ fontSize: "0.7rem", marginLeft: "0.5rem" }}>
+                                Ver detalle →
+                              </span>
+                            )}
+                          </td>
                           <td>{fmtMoney(valor)}</td>
                         </tr>
                       ))}
@@ -153,9 +184,20 @@ export default function CierreCajaPage() {
                       <tr><th>Documento</th><th>Monto</th></tr>
                     </thead>
                     <tbody>
-                      {filasDoc.map(([label, valor]) => (
-                        <tr key={label}>
-                          <td>{label}</td>
+                      {filasDoc.map(([label, clave, titulo, valor]) => (
+                        <tr
+                          key={label}
+                          onClick={() => abrirDetalle("documento", clave, titulo, valor)}
+                          style={valor > 0 ? { cursor: "pointer" } : undefined}
+                        >
+                          <td>
+                            {label}
+                            {valor > 0 && (
+                              <span className="text-muted" style={{ fontSize: "0.7rem", marginLeft: "0.5rem" }}>
+                                Ver detalle →
+                              </span>
+                            )}
+                          </td>
                           <td>{fmtMoney(valor)}</td>
                         </tr>
                       ))}
@@ -208,6 +250,16 @@ export default function CierreCajaPage() {
           )}
         </PageCard>
       </div>
+
+      {detalle && (
+        <CierreDetalleModal
+          fecha={fecha}
+          tipo={detalle.tipo}
+          clave={detalle.clave}
+          titulo={detalle.titulo}
+          onClose={() => setDetalle(null)}
+        />
+      )}
     </>
   );
 }

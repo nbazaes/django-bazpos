@@ -693,6 +693,16 @@ export function useCierreCajaHistorial() {
   });
 }
 
+export function useCierreDetalle(fecha, tipo, clave, enabled) {
+  return useQuery({
+    queryKey: [...queryKeys.cierreCaja.all, "detalle", fecha, tipo, clave],
+    queryFn: () =>
+      apiRequest(`/cierre-caja/detalle/${buildQuery({ fecha, tipo, clave })}`),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
 // ── Configuración ──
 
 export function useStoreConfig() {

@@ -1935,6 +1935,122 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(pagos[0]["metodo_pago_display"], "Tarjeta")
         self.assertEqual(pagos[0]["monto"], 15000)
 
+    def _get_detalle(self, fecha, tipo, clave=""):
+        url = "/api/cierre-caja/detalle/"
+        params = [f"fecha={fecha}"]
+        if tipo:
+            params.append(f"tipo={tipo}")
+        if clave:
+            params.append(f"clave={clave}")
+        return auth_client(self.gerente).get(url + "?" + "&".join(params))
+
+    def test_detalle_pago_efectivo_lista_ventas_y_pedidos(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(
+            monto=18000,
+            pagos=[
+                {"metodo_pago": "EF", "monto": 10000},
+                {"metodo_pago": "TJ", "monto": 5000},
+                {"metodo_pago": "CH", "monto": 3000},
+            ],
+            documento="FA",
+        )
+        self._crear_venta(monto=9000, pagos=[{"metodo_pago": "EF", "monto": 9000}], documento="BO")
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="BO")
+
+        resp = self._get_detalle(fecha, "pago", "EF")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 3)
+        montos = {r["monto"] for r in resp.data}
+        self.assertEqual(montos, {10000, 9000, 15000})
+        self.assertIn("pedido", {r["tipo"] for r in resp.data})
+
+    def test_detalle_pago_sin_clasificar(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=12000, pagos=[{"metodo_pago": "TJ", "monto": 12000}])
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=6000,
+            monto_subtotal=6000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+
+        resp = self._get_detalle(fecha, "pago", "SIN")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 6000)
+
+    def test_detalle_documento_boleta(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}], documento="FA")
+        self._crear_venta(monto=9000, pagos=[{"metodo_pago": "EF", "monto": 9000}], documento="BO")
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="BO")
+
+        resp = self._get_detalle(fecha, "documento", "BO")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(sum(r["monto"] for r in resp.data), 24000)
+
+    def test_detalle_documento_sin_clasificar(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=12000, pagos=[{"metodo_pago": "TJ", "monto": 12000}], documento="FA")
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=7000,
+            monto_subtotal=7000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        self._crear_pedido_venta(metodo_pago="EF", estado_documento="SB")
+
+        resp = self._get_detalle(fecha, "documento", "SIN")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(sum(r["monto"] for r in resp.data), 22000)
+
+    def test_detalle_devoluciones_y_anulaciones(self):
+        fecha = timezone.localtime().date().isoformat()
+        self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
+        venta_anulada = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=9000,
+            monto_subtotal=9000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        Anulacion.objects.create(venta=venta_anulada, usuario=self.vendedor, motivo="Motivo anulación")
+        venta_devuelta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=12000,
+            monto_subtotal=12000,
+            estado=Venta.Estado.COMPLETADA,
+            cliente_nombre="Cliente D",
+        )
+        Devolucion.objects.create(
+            venta=venta_devuelta, usuario=self.vendedor, motivo="Motivo devolución", monto_devuelto=3000
+        )
+
+        resp = self._get_detalle(fecha, "devolucion")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 3000)
+        self.assertEqual(resp.data[0]["cliente"], "Cliente D")
+        self.assertEqual(resp.data[0]["motivo"], "Motivo devolución")
+
+        resp = self._get_detalle(fecha, "anulacion")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 9000)
+        self.assertEqual(resp.data[0]["motivo"], "Motivo anulación")
+
+    def test_detalle_cierre_validaciones_y_permisos(self):
+        resp = self._get_detalle("2026-01-01", "pago", "ZZ")
+        self.assertEqual(resp.status_code, 400)
+        resp = self._get_detalle("2026-01-01", "foo")
+        self.assertEqual(resp.status_code, 400)
+        resp = auth_client(self.vendedor).get("/api/cierre-caja/detalle/?fecha=2026-01-01&tipo=pago&clave=EF")
+        self.assertEqual(resp.status_code, 403)
+        resp = self.client.get("/api/cierre-caja/detalle/?fecha=2026-01-01&tipo=pago&clave=EF")
+        self.assertEqual(resp.status_code, 401)
+
 
 class ReportesPersonalizadosApiTest(BaseTest):
     @classmethod

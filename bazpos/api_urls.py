@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
+from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
 from .api_views import MeView, StoreNameView
 
 router = DefaultRouter()
@@ -31,6 +31,7 @@ urlpatterns = [
     path("reportes/custom/export/", ReporteExportView.as_view(), name="reporte_custom_export"),
     path("cierre-caja/", CierreCajaView.as_view(), name="cierre_caja"),
     path("cierre-caja/historial/", CierreCajaHistorialView.as_view(), name="cierre_caja_historial"),
+    path("cierre-caja/detalle/", CierreCajaDetalleView.as_view(), name="cierre_caja_detalle"),
     path("chat/state/", ChatStateView.as_view(), name="chat_state"),
     path("chat/messages/", ChatMessageCreateView.as_view(), name="chat_message_create"),
     path("", include(router.urls)),
