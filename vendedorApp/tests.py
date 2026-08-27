@@ -800,6 +800,24 @@ class PedidoApiTest(BaseTest):
         self.assertTrue(pedido.es_cotizacion)
         self.assertIsNone(pedido.venta)
 
+    def test_crear_pedido_acepta_todos_los_medios_de_pago_y_documentos(self):
+        for metodo_pago in ["EF", "TJ", "TR", "CH"]:
+            payload = self._item()
+            payload["metodo_pago"] = metodo_pago
+            resp = auth_client(self.vendedor).post(
+                "/api/pedidos/", payload, format="json"
+            )
+            self.assertEqual(resp.status_code, 201, f"metodo_pago={metodo_pago}")
+            pedido = Pedido.objects.get(id=resp.data["id"])
+            self.assertEqual(pedido.metodo_pago, metodo_pago)
+
+        payload = self._item()
+        payload["estado_documento"] = "OT"
+        resp = auth_client(self.vendedor).post("/api/pedidos/", payload, format="json")
+        self.assertEqual(resp.status_code, 201)
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        self.assertEqual(pedido.estado_documento, Pedido.EstadoDocumento.OTROS)
+
     def test_cambiar_estado_retira_descuenta_stock(self):
         resp = auth_client(self.vendedor).post(
             "/api/pedidos/", self._item(), format="json"
@@ -1819,6 +1837,17 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["documentos"]["factura"], 18000)
         self.assertEqual(stats["documentos"]["boleta"], 15000)
         self.assertFalse(stats["guardado"])
+
+    def test_get_cierre_cuenta_transferencia_cheque_y_otros_de_pedidos(self):
+        self._crear_pedido_venta(metodo_pago="TR", estado_documento="OT")
+        self._crear_pedido_venta(metodo_pago="CH", estado_documento="OT")
+
+        resp = auth_client(self.gerente).get("/api/cierre-caja/")
+        self.assertEqual(resp.status_code, 200)
+        stats = resp.data
+        self.assertEqual(stats["pagos"]["transferencia"], 15000)
+        self.assertEqual(stats["pagos"]["cheque"], 15000)
+        self.assertEqual(stats["documentos"]["otros"], 30000)
 
     def test_get_cierre_resta_devoluciones_y_anulaciones(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])

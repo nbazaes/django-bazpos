@@ -391,8 +391,8 @@ def calcular_cierre(fecha):
 
     efectivo = pagos_ve_map.get(Venta.MetodoPago.EFECTIVO, 0) + pagos_pedido_map.get("EF", 0)
     tarjeta = pagos_ve_map.get(Venta.MetodoPago.TARJETA, 0) + pagos_pedido_map.get("TJ", 0)
-    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0)
-    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0)
+    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0) + pagos_pedido_map.get("TR", 0)
+    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0) + pagos_pedido_map.get("CH", 0)
 
     # ── Desglose por documento ──
     docs_ve = (
@@ -408,7 +408,7 @@ def calcular_cierre(fecha):
 
     boleta = docs_ve_map.get(Venta.Documento.BOLETA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.BOLETEADO, 0)
     factura = docs_ve_map.get(Venta.Documento.FACTURA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.FACTURADO, 0)
-    otros = docs_ve_map.get(Venta.Documento.OTROS, 0)
+    otros = docs_ve_map.get(Venta.Documento.OTROS, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.OTROS, 0)
     doc_sin_clasificar = (
         docs_ve_map.get(None, 0)
         + docs_pedido_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
@@ -1222,8 +1222,16 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
     )
     nombre_cliente = serializers.CharField(max_length=200, required=False, default="")
     telefono_cliente = serializers.CharField(max_length=50, required=False, default="")
-    metodo_pago = serializers.CharField(max_length=2, required=False, default="EF")
-    estado_documento = serializers.CharField(max_length=2, required=False, default="SB")
+    metodo_pago = serializers.ChoiceField(
+        choices=Pedido._meta.get_field("metodo_pago").choices,
+        required=False,
+        default=Venta.MetodoPago.EFECTIVO,
+    )
+    estado_documento = serializers.ChoiceField(
+        choices=Pedido.EstadoDocumento.choices,
+        required=False,
+        default=Pedido.EstadoDocumento.SIN_BOLETEAR,
+    )
 
 
 class CancelarPedidoSerializer(serializers.Serializer):

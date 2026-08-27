@@ -22,6 +22,14 @@ const DOCUMENTO_OPCIONES = [
   { value: "SB", label: "Sin boletear" },
   { value: "BO", label: "Boleteado" },
   { value: "FA", label: "Facturado" },
+  { value: "OT", label: "Otros" },
+];
+
+const METODO_PAGO_OPCIONES = [
+  { value: "EF", label: "Efectivo" },
+  { value: "TJ", label: "Tarjeta" },
+  { value: "TR", label: "Transferencia" },
+  { value: "CH", label: "Cheque" },
 ];
 
 const ESTADO_BADGE = {
@@ -276,7 +284,7 @@ export default function PedidosHistorial() {
 
     const fecha = formatDateTime(pedido.fecha_creacion);
     const fechaRetiro = formatDateTime(pedido.fecha_retiro);
-    const metodo = pedido.metodo_pago === "TJ" ? "Tarjeta" : "Efectivo";
+    const metodo = (METODO_PAGO_OPCIONES.find((m) => m.value === pedido.metodo_pago) || {}).label || pedido.metodo_pago;
     const estadoDoc = pedido.estado_documento_display || pedido.estado_documento;
     const estado = pedido.estado_display || pedido.estado;
 
@@ -601,6 +609,7 @@ export default function PedidosHistorial() {
                     <select className="form-control" value={retiroDocumento} onChange={(e) => setRetiroDocumento(e.target.value)}>
                       <option value="BO">Boleteado</option>
                       <option value="FA">Facturado</option>
+                      <option value="OT">Otros</option>
                     </select>
                   </div>
                 )}
@@ -871,14 +880,15 @@ export default function PedidosHistorial() {
                   <div className="col-md-6">
                     <div className="form-group">
                       <label>Medio de pago</label>
-                      <select
-                        className="form-control"
-                        value={convertirMetodoPago}
-                        onChange={(e) => setConvertirMetodoPago(e.target.value)}
-                      >
-                        <option value="EF">Efectivo</option>
-                        <option value="TJ">Tarjeta</option>
-                      </select>
+<select
+                          className="form-control"
+                          value={convertirMetodoPago}
+                          onChange={(e) => setConvertirMetodoPago(e.target.value)}
+                        >
+                          {METODO_PAGO_OPCIONES.map((op) => (
+                            <option key={op.value} value={op.value}>{op.label}</option>
+                          ))}
+                        </select>
                     </div>
                   </div>
                   <div className="col-md-6">

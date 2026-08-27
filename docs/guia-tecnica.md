@@ -280,9 +280,9 @@ Convenciones: todos los montos se almacenan como **`IntegerField`** en pesos chi
 | | `nombre_cliente` / `telefono_cliente` | Char | NOT NULL | — |
 | | `monto_subtotal` / `monto_total` | Integer | NOT NULL | — |
 | | `costo_envio` | Integer | default=4500 | — |
-| | `metodo_pago` | Char(2) | `EF/TJ` | — |
+| | `metodo_pago` | Char(2) | `EF/TJ/TR/CH` | Efectivo / Tarjeta / Transferencia / Cheque |
 | | `estado` | Char(2) | `PR/RE/DE/CA`, `db_index` | Pendiente retirar / Retirado / Devuelto / Cancelado |
-| | `estado_documento` | Char(2) | `SB/BO/FA` | Sin boletear / Boleteado / Facturado |
+| | `estado_documento` | Char(2) | `SB/BO/FA/OT` | Sin boletear / Boleteado / Facturado / Otros |
 | | `persona_retiro` | Char(200) | default="" | — |
 | | `fecha_retiro` | DateTime | NULL | — |
 | | `stock_descontado` | Boolean | default=False | El stock se descuenta al marcar retiro |
