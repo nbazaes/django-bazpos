@@ -64,16 +64,41 @@ export default function DashboardPage() {
         method: "POST",
         body: { accion },
       }),
+    onMutate: async ({ productoId }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
+      const previousDashboard = queryClient.getQueryData(queryKeys.dashboard);
+
+      if (popoverAbierto === productoId) {
+        setPopoverAbierto(null);
+      }
+
+      queryClient.setQueryData(queryKeys.dashboard, (old) => {
+        if (!old?.stock?.bajo_minimo) return old;
+        return {
+          ...old,
+          stock: {
+            ...old.stock,
+            bajo_minimo: old.stock.bajo_minimo.filter(
+              (p) => p.producto_id !== productoId
+            ),
+          },
+        };
+      });
+
+      return { previousDashboard };
+    },
+    onError: (err, _, context) => {
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(queryKeys.dashboard, context.previousDashboard);
+      }
+      showToast(err.message || "No se pudo actualizar el producto", "danger");
+    },
     onSuccess: (_, variables) => {
       const mensaje =
         variables.accion === "recordar_manana"
           ? "Producto recordado para mañana"
           : "Producto ignorado permanentemente";
       showToast(mensaje, "success");
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-    },
-    onError: (err) => {
-      showToast(err.message || "No se pudo actualizar el producto", "danger");
     },
   });
 
@@ -83,12 +108,34 @@ export default function DashboardPage() {
         method: "POST",
         body: { producto_id: productoId },
       }),
+    onMutate: async (productoId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
+      const previousDashboard = queryClient.getQueryData(queryKeys.dashboard);
+
+      queryClient.setQueryData(queryKeys.dashboard, (old) => {
+        if (!old?.stock) return old;
+        const currentList = old.stock.productos_en_pedido || [];
+        if (currentList.includes(productoId)) return old;
+        return {
+          ...old,
+          stock: {
+            ...old.stock,
+            productos_en_pedido: [...currentList, productoId],
+          },
+        };
+      });
+
+      return { previousDashboard };
+    },
+    onError: (err, _, context) => {
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(queryKeys.dashboard, context.previousDashboard);
+      }
+      showToast(err.message || "No se pudo agregar el producto", "danger");
+    },
     onSuccess: () => {
       showToast("Producto agregado a la lista de pedidos", "success");
       queryClient.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
-    },
-    onError: (err) => {
-      showToast(err.message || "No se pudo agregar el producto", "danger");
     },
   });
 
@@ -201,92 +248,107 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.stock.bajo_minimo.map((p) => (
-                        <tr key={p.producto_id}>
-                          <td className="text-center">
-                            {p.oem_productos && p.oem_productos.length > 0 && (
-                              <button
-                                type="button"
-                                className="stock-hover warning-icon popover-trigger"
-                                onClick={(e) => {
-                                  if (popoverAbierto === p.producto_id) {
-                                    setPopoverAbierto(null);
-                                  } else {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    const approxHeight = 160;
-                                    const popoverWidth = 300;
-                                    const spaceBelow = window.innerHeight - rect.bottom;
-                                    const showAbove =
-                                      spaceBelow < approxHeight && rect.top > approxHeight;
-                                    const top = showAbove ? rect.top - 8 : rect.bottom + 8;
-                                    const left = Math.max(
-                                      8,
-                                      Math.min(
-                                        window.innerWidth - popoverWidth - 8,
-                                        rect.left + rect.width / 2 - popoverWidth / 2
-                                      )
-                                    );
-                                    setPopoverPos({ top, left });
-                                    setPopoverAbierto(p.producto_id);
-                                  }
-                                }}
-                                aria-label="Ver productos con mismo OEM que tienen stock"
-                                aria-expanded={popoverAbierto === p.producto_id}
-                              >
-                                <i className="bi bi-exclamation-triangle-fill"></i>
-                              </button>
-                            )}
-                          </td>
-                          <td>{p.nombre}</td>
-                          <td>{p.codigo_producto}</td>
-                          <td className="hide-mobile">{p.oem}</td>
-                          <td className="hide-mobile">{p.proveedor_nombre}</td>
-                          <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
-                          <td>{p.stock_minimo}</td>
-                          <td>
-                            <div className="btn-group flex-wrap">
-                             <button
-                                className="btn btn-sm btn-outline"
-                                onClick={() =>
-                                  ignorarMutation.mutate({
-                                    productoId: p.producto_id,
-                                    accion: "recordar_manana",
-                                  })
-                                }
-                                disabled={ignorarMutation.isPending}
-                              >
-                                Recordar mañana
-                              </button>
-                              <button
-                                className="btn btn-sm btn-outline"
-                                onClick={() =>
-                                  ignorarMutation.mutate({
-                                    productoId: p.producto_id,
-                                    accion: "ignorar_permanente",
-                                  })
-                                }
-                                disabled={ignorarMutation.isPending}
-                              >
-                                Ignorar permanentemente
-                              </button>
-                              {((productosEnPedido) => {
-                                const yaAgregado = productosEnPedido.includes(p.producto_id);
-                                return (
-                                  <button
-                                    className="btn btn-sm btn-outline"
-                                    onClick={() =>
-                                      agregarPedidoMutation.mutate(p.producto_id)
+                      {data.stock.bajo_minimo.map((p) => {
+                        const isIgnorarPending =
+                          ignorarMutation.isPending &&
+                          ignorarMutation.variables?.productoId === p.producto_id;
+                        const isAgregarPending =
+                          agregarPedidoMutation.isPending &&
+                          agregarPedidoMutation.variables === p.producto_id;
+                        const yaAgregado = (data.stock.productos_en_pedido || []).includes(p.producto_id);
+
+                        return (
+                          <tr key={p.producto_id}>
+                            <td className="text-center">
+                              {p.oem_productos && p.oem_productos.length > 0 && (
+                                <button
+                                  type="button"
+                                  className="stock-hover warning-icon popover-trigger"
+                                  onClick={(e) => {
+                                    if (popoverAbierto === p.producto_id) {
+                                      setPopoverAbierto(null);
+                                    } else {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const approxHeight = 160;
+                                      const popoverWidth = 300;
+                                      const spaceBelow = window.innerHeight - rect.bottom;
+                                      const showAbove =
+                                        spaceBelow < approxHeight && rect.top > approxHeight;
+                                      const top = showAbove ? rect.top - 8 : rect.bottom + 8;
+                                      const left = Math.max(
+                                        8,
+                                        Math.min(
+                                          window.innerWidth - popoverWidth - 8,
+                                          rect.left + rect.width / 2 - popoverWidth / 2
+                                        )
+                                      );
+                                      setPopoverPos({ top, left });
+                                      setPopoverAbierto(p.producto_id);
                                     }
-                                    disabled={agregarPedidoMutation.isPending || yaAgregado}
-                                  >
-                                    {yaAgregado ? "Agregado" : "Agregar a pedido"}
-                                  </button>
-                                );
-                              })(data.stock.productos_en_pedido || [])}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                  }}
+                                  aria-label="Ver productos con mismo OEM que tienen stock"
+                                  aria-expanded={popoverAbierto === p.producto_id}
+                                >
+                                  <i className="bi bi-exclamation-triangle-fill"></i>
+                                </button>
+                              )}
+                            </td>
+                            <td>{p.nombre}</td>
+                            <td>{p.codigo_producto}</td>
+                            <td className="hide-mobile">{p.oem}</td>
+                            <td className="hide-mobile">{p.proveedor_nombre}</td>
+                            <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
+                            <td>{p.stock_minimo}</td>
+                            <td>
+                              <div className="btn-group flex-wrap">
+                                <button
+                                  className="btn btn-sm btn-outline"
+                                  onClick={() =>
+                                    ignorarMutation.mutate({
+                                      productoId: p.producto_id,
+                                      accion: "recordar_manana",
+                                    })
+                                  }
+                                  disabled={isIgnorarPending}
+                                >
+                                  {isIgnorarPending &&
+                                  ignorarMutation.variables?.accion === "recordar_manana"
+                                    ? "Guardando..."
+                                    : "Recordar mañana"}
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline"
+                                  onClick={() =>
+                                    ignorarMutation.mutate({
+                                      productoId: p.producto_id,
+                                      accion: "ignorar_permanente",
+                                    })
+                                  }
+                                  disabled={isIgnorarPending}
+                                >
+                                  {isIgnorarPending &&
+                                  ignorarMutation.variables?.accion === "ignorar_permanente"
+                                    ? "Guardando..."
+                                    : "Ignorar permanentemente"}
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline"
+                                  onClick={() =>
+                                    agregarPedidoMutation.mutate(p.producto_id)
+                                  }
+                                  disabled={isAgregarPending || yaAgregado}
+                                >
+                                  {yaAgregado
+                                    ? "Agregado"
+                                    : isAgregarPending
+                                      ? "Agregando..."
+                                      : "Agregar a pedido"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
