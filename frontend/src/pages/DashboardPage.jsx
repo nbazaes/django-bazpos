@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
+import Pagination from "../components/Pagination";
+import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
 import { getUser } from "../lib/auth";
 import { apiRequest } from "../lib/api";
@@ -38,6 +40,8 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const [popoverAbierto, setPopoverAbierto] = useState(null);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize, setStockPageSize] = useState(10);
   const popoverRef = useRef(null);
 
   useEffect(() => {
@@ -230,131 +234,161 @@ export default function DashboardPage() {
               </PageCard>
             </div>
           )}
-          {data.stock.bajo_minimo && data.stock.bajo_minimo.length > 0 && (
-            <div className="mb-4">
-              <PageCard title="Productos bajo stock mínimo">
-                <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr>
-                        <th style={{ width: "40px" }}></th>
-                        <th>Nombre</th>
-                        <th>Código</th>
-                        <th className="hide-mobile">OEM</th>
-                        <th className="hide-mobile">Proveedor</th>
-                        <th>Stock actual</th>
-                        <th>Stock mínimo</th>
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.stock.bajo_minimo.map((p) => {
-                        const isIgnorarPending =
-                          ignorarMutation.isPending &&
-                          ignorarMutation.variables?.productoId === p.producto_id;
-                        const isAgregarPending =
-                          agregarPedidoMutation.isPending &&
-                          agregarPedidoMutation.variables === p.producto_id;
-                        const yaAgregado = (data.stock.productos_en_pedido || []).includes(p.producto_id);
+          {data.stock.bajo_minimo && data.stock.bajo_minimo.length > 0 && (() => {
+            const bajoMinimoList = data.stock.bajo_minimo;
+            const stockCount = bajoMinimoList.length;
+            const stockTotalPages = Math.max(1, Math.ceil(stockCount / stockPageSize));
+            const activeStockPage = Math.max(1, Math.min(stockPage, stockTotalPages));
+            const paginatedBajoMinimo = bajoMinimoList.slice(
+              (activeStockPage - 1) * stockPageSize,
+              activeStockPage * stockPageSize
+            );
 
-                        return (
-                          <tr key={p.producto_id}>
-                            <td className="text-center">
-                              {p.oem_productos && p.oem_productos.length > 0 && (
-                                <button
-                                  type="button"
-                                  className="stock-hover warning-icon popover-trigger"
-                                  onClick={(e) => {
-                                    if (popoverAbierto === p.producto_id) {
-                                      setPopoverAbierto(null);
-                                    } else {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const approxHeight = 160;
-                                      const popoverWidth = 300;
-                                      const spaceBelow = window.innerHeight - rect.bottom;
-                                      const showAbove =
-                                        spaceBelow < approxHeight && rect.top > approxHeight;
-                                      const top = showAbove ? rect.top - 8 : rect.bottom + 8;
-                                      const left = Math.max(
-                                        8,
-                                        Math.min(
-                                          window.innerWidth - popoverWidth - 8,
-                                          rect.left + rect.width / 2 - popoverWidth / 2
-                                        )
-                                      );
-                                      setPopoverPos({ top, left });
-                                      setPopoverAbierto(p.producto_id);
+            const handleStockPageSizeChange = (newSize) => {
+              setStockPageSize(newSize);
+              setStockPage(1);
+            };
+
+            return (
+              <div className="mb-4">
+                <PageCard title="Productos bajo stock mínimo">
+                  <div className="table-responsive">
+                    <table className="table table-sm table-bordered">
+                      <thead>
+                        <tr>
+                          <th style={{ width: "40px" }}></th>
+                          <th>Nombre</th>
+                          <th>Código</th>
+                          <th className="hide-mobile">OEM</th>
+                          <th className="hide-mobile">Proveedor</th>
+                          <th>Stock actual</th>
+                          <th>Stock mínimo</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedBajoMinimo.map((p) => {
+                          const isIgnorarPending =
+                            ignorarMutation.isPending &&
+                            ignorarMutation.variables?.productoId === p.producto_id;
+                          const isAgregarPending =
+                            agregarPedidoMutation.isPending &&
+                            agregarPedidoMutation.variables === p.producto_id;
+                          const yaAgregado = (data.stock.productos_en_pedido || []).includes(p.producto_id);
+
+                          return (
+                            <tr key={p.producto_id}>
+                              <td className="text-center">
+                                {p.oem_productos && p.oem_productos.length > 0 && (
+                                  <button
+                                    type="button"
+                                    className="stock-hover warning-icon popover-trigger"
+                                    onClick={(e) => {
+                                      if (popoverAbierto === p.producto_id) {
+                                        setPopoverAbierto(null);
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const approxHeight = 160;
+                                        const popoverWidth = 300;
+                                        const spaceBelow = window.innerHeight - rect.bottom;
+                                        const showAbove =
+                                          spaceBelow < approxHeight && rect.top > approxHeight;
+                                        const top = showAbove ? rect.top - 8 : rect.bottom + 8;
+                                        const left = Math.max(
+                                          8,
+                                          Math.min(
+                                            window.innerWidth - popoverWidth - 8,
+                                            rect.left + rect.width / 2 - popoverWidth / 2
+                                          )
+                                        );
+                                        setPopoverPos({ top, left });
+                                        setPopoverAbierto(p.producto_id);
+                                      }
+                                    }}
+                                    aria-label="Ver productos con mismo OEM que tienen stock"
+                                    aria-expanded={popoverAbierto === p.producto_id}
+                                  >
+                                    <i className="bi bi-exclamation-triangle-fill"></i>
+                                  </button>
+                                )}
+                              </td>
+                              <td>{p.nombre}</td>
+                              <td>{p.codigo_producto}</td>
+                              <td className="hide-mobile">{p.oem}</td>
+                              <td className="hide-mobile">{p.proveedor_nombre}</td>
+                              <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
+                              <td>{p.stock_minimo}</td>
+                              <td>
+                                <div className="btn-group flex-wrap">
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() =>
+                                      ignorarMutation.mutate({
+                                        productoId: p.producto_id,
+                                        accion: "recordar_manana",
+                                      })
                                     }
-                                  }}
-                                  aria-label="Ver productos con mismo OEM que tienen stock"
-                                  aria-expanded={popoverAbierto === p.producto_id}
-                                >
-                                  <i className="bi bi-exclamation-triangle-fill"></i>
-                                </button>
-                              )}
-                            </td>
-                            <td>{p.nombre}</td>
-                            <td>{p.codigo_producto}</td>
-                            <td className="hide-mobile">{p.oem}</td>
-                            <td className="hide-mobile">{p.proveedor_nombre}</td>
-                            <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
-                            <td>{p.stock_minimo}</td>
-                            <td>
-                              <div className="btn-group flex-wrap">
-                                <button
-                                  className="btn btn-sm btn-outline"
-                                  onClick={() =>
-                                    ignorarMutation.mutate({
-                                      productoId: p.producto_id,
-                                      accion: "recordar_manana",
-                                    })
-                                  }
-                                  disabled={isIgnorarPending}
-                                >
-                                  {isIgnorarPending &&
-                                  ignorarMutation.variables?.accion === "recordar_manana"
-                                    ? "Guardando..."
-                                    : "Recordar mañana"}
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-outline"
-                                  onClick={() =>
-                                    ignorarMutation.mutate({
-                                      productoId: p.producto_id,
-                                      accion: "ignorar_permanente",
-                                    })
-                                  }
-                                  disabled={isIgnorarPending}
-                                >
-                                  {isIgnorarPending &&
-                                  ignorarMutation.variables?.accion === "ignorar_permanente"
-                                    ? "Guardando..."
-                                    : "Ignorar permanentemente"}
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-outline"
-                                  onClick={() =>
-                                    agregarPedidoMutation.mutate(p.producto_id)
-                                  }
-                                  disabled={isAgregarPending || yaAgregado}
-                                >
-                                  {yaAgregado
-                                    ? "Agregado"
-                                    : isAgregarPending
-                                      ? "Agregando..."
-                                      : "Agregar a pedido"}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </PageCard>
-            </div>
-          )}
+                                    disabled={isIgnorarPending}
+                                  >
+                                    {isIgnorarPending &&
+                                    ignorarMutation.variables?.accion === "recordar_manana"
+                                      ? "Guardando..."
+                                      : "Recordar mañana"}
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() =>
+                                      ignorarMutation.mutate({
+                                        productoId: p.producto_id,
+                                        accion: "ignorar_permanente",
+                                      })
+                                    }
+                                    disabled={isIgnorarPending}
+                                  >
+                                    {isIgnorarPending &&
+                                    ignorarMutation.variables?.accion === "ignorar_permanente"
+                                      ? "Guardando..."
+                                      : "Ignorar permanentemente"}
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-outline"
+                                    onClick={() =>
+                                      agregarPedidoMutation.mutate(p.producto_id)
+                                    }
+                                    disabled={isAgregarPending || yaAgregado}
+                                  >
+                                    {yaAgregado
+                                      ? "Agregado"
+                                      : isAgregarPending
+                                        ? "Agregando..."
+                                        : "Agregar a pedido"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                    <PageSizeSelector
+                      value={stockPageSize}
+                      onChange={handleStockPageSizeChange}
+                      options={[10, 25, 50]}
+                    />
+                    <Pagination
+                      page={activeStockPage}
+                      totalPages={stockTotalPages}
+                      onPageChange={setStockPage}
+                      count={stockCount}
+                      pageSize={stockPageSize}
+                    />
+                  </div>
+                </PageCard>
+              </div>
+            );
+          })()}
           {(() => {
             const productoActivo = data.stock.bajo_minimo?.find(
               (p) => p.producto_id === popoverAbierto

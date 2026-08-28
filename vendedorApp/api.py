@@ -191,7 +191,7 @@ class DashboardStatsView(APIView):
                 "stock_actual",
                 "stock_minimo",
             )
-            .order_by("stock_actual", "nombre", "producto_id")[:10]
+            .order_by("stock_actual", "nombre", "producto_id")
         )
         bajo_minimo = list(bajo_minimo_qs)
 
