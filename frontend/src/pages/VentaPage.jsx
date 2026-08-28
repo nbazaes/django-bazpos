@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
 import { apiRequest } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
@@ -37,8 +36,10 @@ function roundTotal(amount) {
   return Math.floor(amount / 1000) * 1000;
 }
 
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString()}`;
+
 export default function VentaPage() {
-  usePageTitle("Realizar venta");
+  usePageTitle("Punto de Venta");
   const [oem, setOem] = useState(() => readStoredVenta().oem);
   const [codigoBarra, setCodigoBarra] = useState("");
   const [barraFeedback, setBarraFeedback] = useState("");
@@ -61,6 +62,8 @@ export default function VentaPage() {
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
+  const [vistaModo, setVistaModo] = useState("grid");
+  
   const barraRef = useRef(null);
   const processingRef = useRef(false);
   const savingRef = useRef(false);
@@ -78,6 +81,7 @@ export default function VentaPage() {
   useEffect(() => {
     fetchStoreConfig();
   }, []);
+
   const factor = 1 + taxPercent / 100;
   const netoFromBruto = (monto) => Math.round(Number(monto || 0) / factor);
   const subtotalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
@@ -246,7 +250,7 @@ export default function VentaPage() {
     const existing = carro.find((x) => x.producto_id === producto.producto_id);
     if (existing) {
       if (existing.cantidad >= producto.stock_actual) {
-        setError(`No puedes agregar mas de ${producto.stock_actual} unidades para ${producto.nombre}`);
+        setError(`No puedes agregar más de ${producto.stock_actual} unidades para ${producto.nombre}`);
         return;
       }
       setCarro(carro.map((x) => (x.producto_id === producto.producto_id ? { ...x, cantidad: x.cantidad + 1 } : x)));
@@ -489,736 +493,794 @@ export default function VentaPage() {
   }
 
   return (
-    <>
-      {error && (
-        <div className="alert alert-danger" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>{error}</span>
-          <button className="btn btn-sm btn-outline" onClick={() => setError("")} style={{ border: "none", fontSize: "1.2rem", lineHeight: 1, padding: "0 0.25rem" }}>
-            ×
-          </button>
-        </div>
-      )}
+    <div className="space-y-4 max-w-[1600px] mx-auto">
+      {/* Cotización notification banner */}
       {cotizacionOrigenId && (
-        <div className="alert alert-info" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Convirtiendo cotización <strong>#{cotizacionOrigenId}</strong> a venta — los productos se han cargado en el carrito.</span>
-          <button className="btn btn-sm btn-outline" onClick={() => {
-            setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
-            setCarro([]);
-          }}>Cancelar</button>
+        <div className="flex items-center justify-between p-3 rounded-lg bg-info/10 border border-info/30 text-info">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg">receipt_long</span>
+            <span className="text-sm">
+              Convirtiendo cotización <strong>#{cotizacionOrigenId}</strong> a venta — productos cargados al carrito.
+            </span>
+          </div>
+          <button
+            className="px-3 py-1 text-xs rounded border border-info/40 hover:bg-info/20 transition-colors"
+            onClick={() => {
+              setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+              setCarro([]);
+            }}
+          >
+            Cancelar
+          </button>
         </div>
       )}
-      <PageCard title="Buscar producto">
-        <div className="row mb-3">
-          <div className="col-md-5">
-            <input
-              ref={barraRef}
-              className={`form-control ${barraFeedback === "success" ? "is-valid" : barraFeedback === "error" ? "is-invalid" : ""}`}
-              placeholder="Lector código de barra"
-              value={codigoBarra}
-              onChange={(e) => { setCodigoBarra(e.target.value); setBarraFeedback(""); }}
-              onKeyDown={handleBarraKeyDown}
-            />
+
+      {/* Error Banner */}
+      {error && (
+        <div className="flex items-center justify-between p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger animate-pulse">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg">error</span>
+            <span className="text-sm font-medium">{error}</span>
           </div>
+          <button
+            onClick={() => setError("")}
+            className="text-danger hover:text-white text-lg leading-none px-2"
+          >
+            &times;
+          </button>
         </div>
-        <div className="row">
-          <div className="col-md-5">
-            <div style={{ position: "relative" }}>
-              <input
-                className="form-control"
-                placeholder="Ingrese código OEM"
-                value={oem}
-                onChange={(e) => setOem(e.target.value)}
-                style={{ paddingRight: "2rem" }}
-              />
-              {oem && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => { setOem(""); setProductosEncontrados([]); setHayMasProductos(false); setError(""); }}
-                  style={{
-                    position: "absolute",
-                    right: 4,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    fontSize: "1.1rem",
-                    lineHeight: 1,
-                    padding: "0.15rem 0.4rem",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                  }}
-                  title="Limpiar búsqueda"
-                >
-                  &times;
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="col-md-3" style={{ display: "flex", alignItems: "flex-end" }}>
-            <button className="btn btn-primary" onClick={() => buscarProducto(oem)}>Buscar</button>
-          </div>
-        </div>
-        <div className="mt-2">
-          <label className="checkbox-custom">
-            <input
-              type="checkbox"
-              checked={mostrarSinStock}
-              onChange={(e) => setMostrarSinStock(e.target.checked)}
-            />
-            <span className="checkbox-custom__mark" />
-            <span className="checkbox-custom__label">Buscar productos sin stock</span>
-          </label>
-        </div>
-        {productosEncontrados.length > 0 && (
-          <div className="mt-4">
-            {hayMasProductos && (
-              <div className="alert alert-info mb-2">
-                Se encontraron más de 50 productos. Refine la búsqueda para ver el resto.
-              </div>
-            )}
-            <div className="table-responsive">
-              <table className="table table-sm table-bordered">
-                <thead>
-                  <tr>
-                    <th style={{ width: "1px" }}>Código</th>
-                    <th style={{ width: "1px" }}>OEM</th>
-                    <th>Nombre</th>
-                    <th>Marca</th>
-                    <th>Descripción</th>
-                    <th style={{ width: "1px" }}>Stock</th>
-                    <th style={{ width: "1px" }}>Última fecha de llegada</th>
-                    <th style={{ width: "1px" }}>Precio</th>
-                    {esGerente && <th style={{ width: "1px" }}>Precio costo</th>}
-                    <th style={{ width: "1px" }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productosEncontrados.map((p) => (
-                    <tr key={p.producto_id}>
-                      <td className="text-nowrap">{p.codigo_producto}</td>
-                      <td className="text-nowrap">{p.oem}</td>
-                      <td>{p.nombre}</td>
-                      <td>{p.marca}</td>
-                      <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
-                      <td>
-                        {esGerente ? (
-                          <button
-                            className="btn btn-link p-0 stock-clickable"
-                            onClick={() => setQuickStockProducto(p)}
-                            style={{ textDecoration: "none" }}
-                          >
-                            {(p.ubicaciones_stock || []).length > 0 ? (
-                              <span className="stock-hover">
-                                {p.stock_actual}
-                                <span className="stock-popover">
-                                  {(p.ubicaciones_stock || []).map((u) => (
-                                    <div key={u.nombre} className="popover-row">
-                                      <span>{u.nombre}</span>
-                                      <strong>{u.cantidad}</strong>
-                                    </div>
-                                  ))}
-                                </span>
-                              </span>
-                            ) : (
-                              p.stock_actual
-                            )}
-                          </button>
-                        ) : (
-                          <>
-                            {(p.ubicaciones_stock || []).length > 0 ? (
-                              <span className="stock-hover">
-                                {p.stock_actual}
-                                <span className="stock-popover">
-                                  {(p.ubicaciones_stock || []).map((u) => (
-                                    <div key={u.nombre} className="popover-row">
-                                      <span>{u.nombre}</span>
-                                      <strong>{u.cantidad}</strong>
-                                    </div>
-                                  ))}
-                                </span>
-                              </span>
-                            ) : (
-                              p.stock_actual
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="text-nowrap">{p.ultima_fecha_llegada || "—"}</td>
-                      <td>
-                        {preciosModificados[p.producto_id] ? (
-                          <span
-                            style={{ color: "var(--accent)", fontWeight: 700 }}
-                            title="Precio modificado temporalmente"
-                          >
-                            ${preciosModificados[p.producto_id].precio}
-                          </span>
-                        ) : (
-                          <>${p.precio}</>
-                        )}
-                        {preciosModificados[p.producto_id] && (
-                          <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: "0.8rem" }}>*</span>
-                        )}
-                      </td>
-                      {esGerente && (
-                        <td>
-                          <button
-                            className="btn btn-link p-0"
-                            onClick={() => setQuickPrecioCostoProducto(p)}
-                            style={{ textDecoration: "none" }}
-                          >
-                            {preciosModificados[p.producto_id] ? (
-                              <span style={{ color: "var(--accent)", fontWeight: 700 }}>
-                                ${preciosModificados[p.producto_id].precioCosto}
-                              </span>
-                            ) : (
-                              <>${p.precio_costo != null ? p.precio_costo : "—"}</>
-                            )}
-                          </button>
-                        </td>
-                      )}
-                      <td>
-                        <button
-                          className="btn btn-sm btn-success"
-                          onClick={() => agregar(p)}
-                          disabled={(p.stock_actual || 0) <= 0}
-                        >
-                          Agregar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </PageCard>
-      <PageCard title="Carrito">
-        <div className="table-responsive">
-          <table className="table table-sm table-bordered">
-            <thead>
-              <tr>
-                <th style={{ width: "1px" }}>Código</th>
-                <th style={{ width: "1px" }}>OEM</th>
-                <th>Nombre</th>
-                <th style={{ width: "1px" }}>Marca</th>
-                <th style={{ width: "1px" }}>Cantidad</th>
-                <th style={{ width: "1px" }}>Subtotal neto</th>
-                <th style={{ width: "1px" }}>Subtotal</th>
-                <th style={{ width: "1px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {carro.map((i) => (
-                <tr key={i.producto_id}>
-                  <td className="text-nowrap">{i.codigo_producto}</td>
-                  <td className="text-nowrap">{i.oem}</td>
-                  <td>{i.nombre}</td>
-                  <td className="text-nowrap">{i.marca}</td>
-                  <td>
-                    <StepperInput
-                      value={i.cantidad}
-                      onChange={(val) => {
-                        setCarro((prev) => {
-                          const idx = prev.findIndex((x) => x.producto_id === i.producto_id);
-                          if (idx === -1 || prev[idx].cantidad === val) return prev;
-                          const next = [...prev];
-                          next[idx] = { ...next[idx], cantidad: val };
-                          return next;
-                        });
-                        setError("");
-                      }}
-                      min={1}
-                      max={i.stock_actual || 1}
-                      inputStyle={{ width: 64, fontSize: "0.9rem" }}
-                      decrementLabel={`Disminuir cantidad de ${i.nombre}`}
-                      incrementLabel={`Aumentar cantidad de ${i.nombre}`}
-                    />
-                  </td>
-                  <td>${netoFromBruto(i.precio * i.cantidad)}</td>
-                  <td>${i.precio * i.cantidad}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => setCarro(carro.filter((x) => x.producto_id !== i.producto_id))}
-                    >
-                      X
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "stretch",
-            gap: "0.75rem",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-lg)",
-            padding: "1.25rem 1.5rem",
-            width: "100%",
-            maxWidth: 400,
-            boxShadow: "var(--shadow)",
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "0.75rem",
-            }}>
-              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 500 }}>Descuento</span>
-              <div style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.25rem",
-                background: discount > 0 ? "var(--accent-soft)" : "var(--bg-input)",
-                border: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
-                borderRadius: "var(--radius)",
-                padding: "0.25rem 0.5rem",
-                transition: "all var(--transition)",
-                boxShadow: discount > 0 ? "0 0 0 3px var(--accent-glow)" : "none",
-              }}>
-                <StepperInput
-                  value={descuentoPorcentaje || 0}
-                  onChange={(val) => setDescuentoPorcentaje(val)}
-                  min={0}
-                  max={100}
-                  active={discount > 0}
-                  inputStyle={{
-                    width: 52,
-                    border: "none",
-                    background: "transparent",
-                    color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
-                    fontSize: "1.35rem",
-                    fontWeight: 700,
-                    padding: 0,
-                  }}
-                  decrementLabel="Disminuir descuento"
-                  incrementLabel="Aumentar descuento"
+      )}
+
+      {/* 2-Column POS Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: Search & Product Catalog (7 or 8 cols) */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+          {/* Barcode & Search Controls Card */}
+          <div className="stat-card bg-bg-surface border border-border-default rounded-xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Barcode Scanner Input */}
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+                  <span className="material-symbols-outlined text-lg">barcode_scanner</span>
+                </div>
+                <input
+                  ref={barraRef}
+                  className={`w-full pl-10 pr-3 py-2.5 bg-bg-input border rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:ring-2 ${
+                    barraFeedback === "success"
+                      ? "border-success ring-2 ring-success/30"
+                      : barraFeedback === "error"
+                      ? "border-danger ring-2 ring-danger/30"
+                      : "border-border-default focus:border-primary focus:ring-primary/20"
+                  }`}
+                  placeholder="Lector código de barra (Enter)"
+                  value={codigoBarra}
+                  onChange={(e) => { setCodigoBarra(e.target.value); setBarraFeedback(""); }}
+                  onKeyDown={handleBarraKeyDown}
+                  autoFocus
                 />
-                <span style={{
-                  fontSize: "0.95rem",
-                  fontWeight: 600,
-                  color: discount > 0 ? "var(--accent)" : "var(--text-secondary)",
-                  userSelect: "none",
-                  marginLeft: 2,
-                }}>%</span>
+              </div>
+
+              {/* Text / OEM Search Input */}
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+                  <span className="material-symbols-outlined text-lg">search</span>
+                </div>
+                <input
+                  className="w-full pl-10 pr-9 py-2.5 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  placeholder="Buscar por OEM o nombre..."
+                  value={oem}
+                  onChange={(e) => setOem(e.target.value)}
+                />
+                {oem && (
+                  <button
+                    type="button"
+                    onClick={() => { setOem(""); setProductosEncontrados([]); setHayMasProductos(false); setError(""); }}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-primary text-sm"
+                    title="Limpiar búsqueda"
+                  >
+                    &times;
+                  </button>
+                )}
               </div>
             </div>
 
-            <div style={{ width: "100%", height: 1, background: "var(--border-default)" }} />
+            {/* Filter and View Options */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border-default/60">
+              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary select-none">
+                <input
+                  type="checkbox"
+                  className="rounded border-border-default bg-bg-input text-primary focus:ring-primary h-4 w-4"
+                  checked={mostrarSinStock}
+                  onChange={(e) => setMostrarSinStock(e.target.checked)}
+                />
+                <span>Mostrar productos sin stock</span>
+              </label>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", width: "100%" }}>
-              {discount > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "0.85rem",
-                  color: "var(--text-secondary)",
-                }}>
-                  <span>Subtotal</span>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>${subtotalCarro.toLocaleString()}</span>
+              {productosEncontrados.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">
+                    {productosEncontrados.length} encontrados {hayMasProductos && "(+50)"}
+                  </span>
+                  <div className="flex rounded border border-border-default overflow-hidden">
+                    <button
+                      className={`px-2 py-1 text-xs flex items-center ${vistaModo === "grid" ? "bg-primary text-on-primary font-bold" : "bg-bg-input text-text-secondary hover:text-text-primary"}`}
+                      onClick={() => setVistaModo("grid")}
+                      title="Vista en tarjetas"
+                    >
+                      <span className="material-symbols-outlined text-sm">grid_view</span>
+                    </button>
+                    <button
+                      className={`px-2 py-1 text-xs flex items-center ${vistaModo === "table" ? "bg-primary text-on-primary font-bold" : "bg-bg-input text-text-secondary hover:text-text-primary"}`}
+                      onClick={() => setVistaModo("table")}
+                      title="Vista en tabla"
+                    >
+                      <span className="material-symbols-outlined text-sm">table_rows</span>
+                    </button>
+                  </div>
                 </div>
               )}
-              {discount > 0 && (
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "0.85rem",
-                  color: "var(--danger)",
-                }}>
-                  <span>Descuento ({discount}%)</span>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>-${(subtotalCarro - totalConDescuento).toLocaleString()}</span>
-                </div>
-              )}
-              <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: "0.9rem",
-                color: "var(--text-secondary)",
-              }}>
-                <span>Neto</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>${netoFromBruto(totalConDescuento).toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Search Results Display */}
+          {productosEncontrados.length > 0 ? (
+            vistaModo === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {productosEncontrados.map((p) => {
+                  const tieneStock = (p.stock_actual || 0) > 0;
+                  const mod = preciosModificados[p.producto_id];
+                  return (
+                    <div
+                      key={p.producto_id}
+                      className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between ${
+                        tieneStock
+                          ? "bg-bg-surface border-border-default hover:border-primary/50 hover:shadow-md"
+                          : "bg-bg-surface/40 border-border-default/40 opacity-75"
+                      }`}
+                    >
+                      <div>
+                        {/* Top tags */}
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <span className="text-[11px] font-mono text-text-muted bg-surface-container px-1.5 py-0.5 rounded">
+                            {p.codigo_producto}
+                          </span>
+                          <span
+                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                              tieneStock
+                                ? "bg-success/10 text-success border border-success/20"
+                                : "bg-danger/10 text-danger border border-danger/20"
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${tieneStock ? "bg-success" : "bg-danger"}`} />
+                            {p.stock_actual} uds
+                          </span>
+                        </div>
+
+                        {/* Name & OEM */}
+                        <h4 className="text-sm font-bold text-text-primary leading-snug line-clamp-2" title={p.nombre}>
+                          {p.nombre}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-text-secondary">
+                          {p.oem && <span className="font-mono text-text-muted">OEM: {p.oem}</span>}
+                          {p.marca && <span>· {p.marca}</span>}
+                        </div>
+                      </div>
+
+                      {/* Bottom Price & Actions */}
+                      <div className="mt-3 pt-2.5 border-t border-border-default flex items-center justify-between">
+                        <div>
+                          <div className="text-base font-bold font-mono text-primary">
+                            {fmtMoney(mod?.precio ?? p.precio)}
+                            {mod && <span className="text-xs text-accent font-bold ml-1">*</span>}
+                          </div>
+                          {esGerente && p.precio_costo != null && (
+                            <button
+                              onClick={() => setQuickPrecioCostoProducto(p)}
+                              className="text-[11px] text-text-muted hover:text-primary transition-colors block text-left"
+                            >
+                              Costo: {fmtMoney(mod?.precioCosto ?? p.precio_costo)}
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {esGerente && (
+                            <button
+                              onClick={() => setQuickStockProducto(p)}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-variant transition-colors"
+                              title="Ajustar stock rápido"
+                            >
+                              <span className="material-symbols-outlined text-base">edit_note</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => agregar(p)}
+                            disabled={!tieneStock}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                              tieneStock
+                                ? "bg-primary text-on-primary hover:bg-primary-container shadow-sm cursor-pointer"
+                                : "bg-surface-variant text-text-muted cursor-not-allowed"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-sm">add</span>
+                            Agregar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              /* Table View */
+              <div className="bg-bg-surface border border-border-default rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs pos-table">
+                    <thead className="bg-surface-container-high border-b border-border-default text-text-muted">
+                      <tr>
+                        <th className="py-2.5 px-3">Código</th>
+                        <th className="py-2.5 px-3">OEM</th>
+                        <th className="py-2.5 px-3">Nombre</th>
+                        <th className="py-2.5 px-3">Marca</th>
+                        <th className="py-2.5 px-3 text-center">Stock</th>
+                        <th className="py-2.5 px-3 text-right">Precio</th>
+                        {esGerente && <th className="py-2.5 px-3 text-right">Costo</th>}
+                        <th className="py-2.5 px-3 text-right">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-default font-body text-text-secondary">
+                      {productosEncontrados.map((p) => {
+                        const tieneStock = (p.stock_actual || 0) > 0;
+                        const mod = preciosModificados[p.producto_id];
+                        return (
+                          <tr key={p.producto_id} className="hover:bg-surface-container-low transition-colors">
+                            <td className="py-2 px-3 font-mono text-text-primary">{p.codigo_producto}</td>
+                            <td className="py-2 px-3 font-mono">{p.oem || "—"}</td>
+                            <td className="py-2 px-3 font-bold text-text-primary">{p.nombre}</td>
+                            <td className="py-2 px-3">{p.marca || "—"}</td>
+                            <td className="py-2 px-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${tieneStock ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
+                                {p.stock_actual}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 font-mono font-bold text-right text-primary">
+                              {fmtMoney(mod?.precio ?? p.precio)}
+                            </td>
+                            {esGerente && (
+                              <td className="py-2 px-3 font-mono text-right text-text-muted">
+                                {p.precio_costo != null ? fmtMoney(mod?.precioCosto ?? p.precio_costo) : "—"}
+                              </td>
+                            )}
+                            <td className="py-2 px-3 text-right">
+                              <button
+                                onClick={() => agregar(p)}
+                                disabled={!tieneStock}
+                                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                                  tieneStock
+                                    ? "bg-primary text-on-primary hover:bg-primary-container cursor-pointer"
+                                    : "bg-surface-variant text-text-muted cursor-not-allowed"
+                                }`}
+                              >
+                                +
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          ) : (
+            /* Empty Search State */
+            <div className="bg-bg-surface border border-dashed border-border-default rounded-xl p-10 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-secondary-container/20 flex items-center justify-center text-primary">
+                <span className="material-symbols-outlined text-2xl">point_of_sale</span>
+              </div>
+              <h3 className="text-base font-bold text-text-primary">Listo para escanear o buscar</h3>
+              <p className="text-xs text-text-secondary max-w-sm">
+                Use la pistola de código de barras para añadir productos al instante, o escriba en el buscador para ver el catálogo.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN: Live Cart & Checkout Ticket (5 or 4 cols) */}
+        <div className="lg:col-span-5 xl:col-span-4 sticky top-[72px] space-y-4">
+          <div className="bg-bg-surface border border-border-default rounded-xl shadow-lg overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl">shopping_cart</span>
+                <h3 className="font-display font-bold text-text-primary text-base">Carrito de Venta</h3>
+                <span className="text-xs font-mono bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
+                  {carro.reduce((acc, i) => acc + i.cantidad, 0)}
+                </span>
+              </div>
+              {carro.length > 0 && (
+                <button
+                  onClick={limpiarVenta}
+                  className="text-xs text-danger hover:underline transition-colors flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                  Vaciar
+                </button>
+              )}
             </div>
 
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              width: "100%",
-              paddingTop: "0.6rem",
-              borderTop: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
-            }}>
-              <span style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>Total</span>
-              <span style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "2.1rem",
-                fontWeight: 800,
-                color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
-                letterSpacing: "-0.02em",
-              }}>
-                ${totalConDescuento.toLocaleString()}
-              </span>
+            {/* Cart Items List */}
+            <div className="p-3 max-h-[380px] overflow-y-auto space-y-2 divide-y divide-border-default/40">
+              {carro.length === 0 ? (
+                <div className="py-12 text-center text-text-muted space-y-2">
+                  <span className="material-symbols-outlined text-3xl opacity-40">remove_shopping_cart</span>
+                  <p className="text-xs">El carrito está vacío</p>
+                </div>
+              ) : (
+                carro.map((i) => (
+                  <div key={i.producto_id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs text-text-primary truncate" title={i.nombre}>
+                        {i.nombre}
+                      </div>
+                      <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
+                        <span>{i.codigo_producto}</span>
+                        <span>· {fmtMoney(i.precio)} c/u</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <StepperInput
+                        value={i.cantidad}
+                        onChange={(val) => {
+                          setCarro((prev) => {
+                            const idx = prev.findIndex((x) => x.producto_id === i.producto_id);
+                            if (idx === -1 || prev[idx].cantidad === val) return prev;
+                            const next = [...prev];
+                            next[idx] = { ...next[idx], cantidad: val };
+                            return next;
+                          });
+                          setError("");
+                        }}
+                        min={1}
+                        max={i.stock_actual || 1}
+                        inputStyle={{ width: 44, fontSize: "0.85rem", height: 28 }}
+                        decrementLabel={`Disminuir ${i.nombre}`}
+                        incrementLabel={`Aumentar ${i.nombre}`}
+                      />
+
+                      <div className="text-right min-w-[65px] font-mono font-bold text-xs text-text-primary">
+                        {fmtMoney(i.precio * i.cantidad)}
+                      </div>
+
+                      <button
+                        onClick={() => setCarro(carro.filter((x) => x.producto_id !== i.producto_id))}
+                        className="text-text-muted hover:text-danger p-1 rounded transition-colors"
+                        title="Quitar producto"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Financial Summary & Total Box */}
+            <div className="p-4 bg-bg-elevated border-t border-border-default space-y-3">
+              {/* Discount Stepper */}
+              <div className="flex items-center justify-between text-xs text-text-secondary">
+                <span>Descuento global</span>
+                <div className="inline-flex items-center gap-1.5 bg-bg-input px-2 py-1 rounded-lg border border-border-default">
+                  <StepperInput
+                    value={descuentoPorcentaje || 0}
+                    onChange={(val) => setDescuentoPorcentaje(val)}
+                    min={0}
+                    max={100}
+                    active={discount > 0}
+                    inputStyle={{
+                      width: 36,
+                      border: "none",
+                      background: "transparent",
+                      color: discount > 0 ? "var(--color-primary)" : "var(--color-text-primary)",
+                      fontSize: "0.95rem",
+                      fontWeight: 700,
+                      padding: 0,
+                    }}
+                    decrementLabel="Menos descuento"
+                    incrementLabel="Más descuento"
+                  />
+                  <span className="font-bold text-primary">%</span>
+                </div>
+              </div>
+
+              {/* Breakdown */}
+              <div className="space-y-1 text-xs border-t border-border-default/60 pt-2">
+                {discount > 0 && (
+                  <>
+                    <div className="flex justify-between text-text-secondary">
+                      <span>Subtotal bruto</span>
+                      <span className="font-mono">{fmtMoney(subtotalCarro)}</span>
+                    </div>
+                    <div className="flex justify-between text-danger font-medium">
+                      <span>Descuento ({discount}%)</span>
+                      <span className="font-mono">-{fmtMoney(subtotalCarro - totalConDescuento)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between text-text-secondary">
+                  <span>Neto</span>
+                  <span className="font-mono">{fmtMoney(netoFromBruto(totalConDescuento))}</span>
+                </div>
+                <div className="flex justify-between text-text-secondary">
+                  <span>IVA ({taxPercent}%)</span>
+                  <span className="font-mono">{fmtMoney(totalConDescuento - netoFromBruto(totalConDescuento))}</span>
+                </div>
+              </div>
+
+              {/* Giant Total */}
+              <div className="pt-3 border-t-2 border-primary/30 flex items-baseline justify-between">
+                <span className="text-sm font-bold text-text-primary uppercase tracking-wider">Total</span>
+                <div className="text-2xl sm:text-3xl font-extrabold font-mono text-primary tracking-tight">
+                  {fmtMoney(totalConDescuento)}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  disabled={!carro.length}
+                  onClick={() => {
+                    setConfirmMode("CO");
+                    setClienteNombre("");
+                    setShowConfirmVenta(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:bg-surface-variant font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Cotización
+                </button>
+                <button
+                  disabled={!carro.length}
+                  onClick={() => {
+                    setConfirmMode("VE");
+                    setClienteNombre("");
+                    setMedioPago("");
+                    setDocumentoFiscal("");
+                    setEsMixto(false);
+                    setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
+                    setShowConfirmVenta(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">payments</span>
+                  Cobrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
-        <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
-            Confirmar venta
-          </button>
-          <button className="btn btn-outline" disabled={!carro.length} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
-            Generar cotización
-          </button>
-          <button className="btn btn-danger" disabled={!carro.length && !oem} onClick={limpiarVenta}>
-            Limpiar venta
-          </button>
-        </div>
-      </PageCard>
+      </div>
 
+      {/* MODALS */}
+      {/* 1. Confirmar Venta / Cotización Modal */}
       {showConfirmVenta && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{confirmMode === "CO" ? "Generar cotización" : "Confirmar venta"}</h5>
-                <button type="button" className="modal-close" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>
-                  &times;
-                </button>
-              </div>
-              <div className="modal-body">
-                {confirmMode === "CO" && (
-                  <div className="form-group mb-3">
-                    <label className="font-weight-bold">Nombre del cliente:</label>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-border-default flex items-center justify-between bg-surface-container-low">
+              <h3 className="font-display text-lg font-bold text-text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">
+                  {confirmMode === "CO" ? "receipt_long" : "shopping_bag"}
+                </span>
+                {confirmMode === "CO" ? "Generar Cotización" : "Confirmar Venta y Cobro"}
+              </h3>
+              <button
+                onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); }}
+                className="text-text-muted hover:text-text-primary text-2xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {confirmMode === "CO" ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Nombre del cliente (opcional):</label>
                     <input
                       type="text"
-                      className="form-control"
-                      placeholder="Ingrese el nombre del cliente (opcional)"
+                      className="w-full px-3 py-2 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                      placeholder="Ej: Constructora San Martín / Juan Pérez"
                       value={clienteNombre}
                       onChange={(e) => setClienteNombre(e.target.value)}
                     />
-                    <label className="checkbox-custom mt-2" style={{ cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={ocultarTotales}
-                        onChange={(e) => setOcultarTotales(e.target.checked)}
-                      />
-                      <span className="checkbox-custom__mark" />
-                      <span className="checkbox-custom__label">Ocultar totales en la cotización</span>
-                    </label>
                   </div>
-                )}
-                {confirmMode === "VE" && (
-                  <div className="row mb-3">
-                    <div className="col-md-6">
-                      <label className="font-weight-bold">Documento:</label>
+                  <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-border-default bg-bg-input text-primary h-4 w-4"
+                      checked={ocultarTotales}
+                      onChange={(e) => setOcultarTotales(e.target.checked)}
+                    />
+                    <span>Ocultar totales y precios en la cotización impresa</span>
+                  </label>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Selects: Documento & Medio de Pago */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Documento Fiscal:</label>
                       <select
-                        className="form-control"
+                        className="w-full px-3 py-2 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
                         value={documentoFiscal}
                         onChange={(e) => setDocumentoFiscal(e.target.value)}
                       >
                         <option value="">Seleccione documento...</option>
-                        <option value="BO">Boleta</option>
-                        <option value="FA">Factura</option>
-                        <option value="OT">Otros</option>
+                        <option value="BO">Boleta Electrónica</option>
+                        <option value="FA">Factura Electrónica</option>
+                        <option value="OT">Otros / Comprobante</option>
                       </select>
                     </div>
-                    <div className="col-md-6">
-                      <label className="font-weight-bold">Medio de pago:</label>
+
+                    <div>
+                      <label className="block text-xs font-bold text-text-secondary uppercase mb-1">Medio de Pago:</label>
                       <select
-                        className="form-control"
+                        className="w-full px-3 py-2 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary disabled:opacity-50"
                         value={medioPago}
                         onChange={(e) => setMedioPago(e.target.value)}
                         disabled={esMixto}
                       >
-                        <option value="">Seleccione medio de pago...</option>
+                        <option value="">Seleccione medio...</option>
                         <option value="EF">Efectivo</option>
-                        <option value="TJ">Tarjeta</option>
-                        <option value="TR">Transferencia</option>
+                        <option value="TJ">Tarjeta (Débito / Crédito)</option>
+                        <option value="TR">Transferencia Bancaria</option>
                         <option value="CH">Cheque</option>
                       </select>
                     </div>
                   </div>
-                )}
-                {conflictoSeleccion && (
-                  <div className="alert alert-warning">
-                    Debe resolver el conflicto: seleccione el documento y el medio de pago para poder confirmar la venta.
-                  </div>
-                )}
-                {confirmMode === "VE" && (
-                  <div className="form-group mb-3">
-                    <label className="checkbox-custom" style={{ cursor: "pointer" }}>
+
+                  {conflictoSeleccion && (
+                    <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs">
+                      Seleccione el tipo de documento y el medio de pago para continuar.
+                    </div>
+                  )}
+
+                  {/* Mixed Payment Toggle */}
+                  <div>
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
                       <input
                         type="checkbox"
+                        className="rounded border-border-default bg-bg-input text-primary h-4 w-4"
                         checked={esMixto}
                         onChange={(e) => setEsMixto(e.target.checked)}
                       />
-                      <span className="checkbox-custom__mark" />
-                      <span className="checkbox-custom__label">Mixto (pagar con varios medios)</span>
+                      <span className="font-bold">Pago Mixto (Combinar varios medios de pago)</span>
                     </label>
                   </div>
-                )}
-                {confirmMode === "VE" && esMixto && (
-                  <div className="row mb-3">
-                    {[
-                      ["EF", "Efectivo"],
-                      ["TJ", "Tarjeta"],
-                      ["TR", "Transferencia"],
-                      ["CH", "Cheque"],
-                    ].map(([code, label]) => (
-                      <div className="col-md-3" key={code}>
-                        <label className="font-weight-bold">{label}:</label>
-                        <input
-                          type="number"
-                          className="form-control"
-                          min={0}
-                          step={1000}
-                          value={pagosMixtos[code]}
-                          onChange={(e) =>
-                            setPagosMixtos((prev) => ({
-                              ...prev,
-                              [code]: e.target.value === "" ? 0 : Number(e.target.value),
-                            }))
-                          }
-                        />
+
+                  {/* Mixed Payment Inputs */}
+                  {esMixto && (
+                    <div className="p-4 rounded-xl bg-surface-container border border-border-default space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                          ["EF", "Efectivo"],
+                          ["TJ", "Tarjeta"],
+                          ["TR", "Transferencia"],
+                          ["CH", "Cheque"],
+                        ].map(([code, label]) => (
+                          <div key={code}>
+                            <label className="block text-[11px] font-bold text-text-muted mb-1">{label}</label>
+                            <input
+                              type="number"
+                              className="w-full px-2.5 py-1.5 bg-bg-input border border-border-default rounded-lg text-xs font-mono text-text-primary"
+                              min={0}
+                              step={1000}
+                              value={pagosMixtos[code]}
+                              onChange={(e) =>
+                                setPagosMixtos((prev) => ({
+                                  ...prev,
+                                  [code]: e.target.value === "" ? 0 : Number(e.target.value),
+                                }))
+                              }
+                            />
+                          </div>
+                        ))}
                       </div>
+
+                      <div className="text-xs font-mono pt-2 border-t border-border-default flex justify-between">
+                        <span>Suma ingresada: <strong>{fmtMoney(totalPagosMixtos)}</strong></span>
+                        {diferenciaPagos === 0 ? (
+                          <span className="text-success font-bold">Cuadrado exacto</span>
+                        ) : (
+                          <span className="text-danger font-bold">
+                            {diferenciaPagos > 0 ? `Faltan ${fmtMoney(diferenciaPagos)}` : `Sobran ${fmtMoney(Math.abs(diferenciaPagos))}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Items Detail Table */}
+              <div className="border border-border-default rounded-lg overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-container-high text-text-muted border-b border-border-default">
+                    <tr>
+                      <th className="p-2">Item</th>
+                      <th className="p-2 text-center">Cant.</th>
+                      <th className="p-2 text-right">P. Unit</th>
+                      <th className="p-2 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default text-text-secondary">
+                    {carro.map((i) => (
+                      <tr key={`confirm-${i.producto_id}`}>
+                        <td className="p-2 font-medium text-text-primary">{i.nombre}</td>
+                        <td className="p-2 text-center font-mono">{i.cantidad}</td>
+                        <td className="p-2 text-right font-mono">{fmtMoney(i.precio)}</td>
+                        <td className="p-2 text-right font-mono font-bold text-text-primary">{fmtMoney(i.precio * i.cantidad)}</td>
+                      </tr>
                     ))}
-                    <div className="col-12 mt-2">
-                      {diferenciaPagos === 0 ? (
-                        <div className="text-success">
-                          Suma de pagos: ${totalPagosMixtos.toLocaleString()} — coincide con el total.
-                        </div>
-                      ) : (
-                        <div className="text-danger">
-                          Suma de pagos: ${totalPagosMixtos.toLocaleString()} —{" "}
-                          {diferenciaPagos > 0 ? "faltan" : "sobran"} ${Math.abs(diferenciaPagos).toLocaleString()}.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <p className="mb-3 text-secondary">Revise el detalle antes de confirmar:</p>
-                <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
-                    </thead>
-                    <tbody>
-                      {carro.map((i) => (
-                        <tr key={`confirm-${i.producto_id}`}>
-                          <td>{i.codigo_producto}</td>
-                          <td>{i.oem}</td>
-                          <td>{i.nombre}</td>
-                          <td>{i.marca}</td>
-                          <td>{i.cantidad}</td>
-                          <td>${netoFromBruto(i.precio * i.cantidad)}</td>
-                          <td>${i.precio * i.cantidad}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!(confirmMode === "CO" && ocultarTotales) && (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
-                  <div style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                    gap: "0.5rem",
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: "var(--radius-lg)",
-                    padding: "1rem 1.25rem",
-                    width: "100%",
-                    boxShadow: "var(--shadow)",
-                  }}>
-                    {discount > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                        <span>Subtotal</span>
-                        <span style={{ fontFamily: "var(--font-mono)" }}>${subtotalCarro.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {discount > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--danger)" }}>
-                        <span>Descuento ({discount}%)</span>
-                        <span style={{ fontFamily: "var(--font-mono)" }}>-${(subtotalCarro - totalConDescuento).toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                      <span>Neto</span>
-                      <span style={{ fontFamily: "var(--font-mono)" }}>${netoFromBruto(totalConDescuento).toLocaleString()}</span>
-                    </div>
-                    <div style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "baseline",
-                      width: "100%",
-                      paddingTop: "0.5rem",
-                      borderTop: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
-                    }}>
-                      <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text-primary)" }}>Total</span>
-                      <span style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "1.7rem",
-                        fontWeight: 800,
-                        color: discount > 0 ? "var(--accent)" : "var(--text-primary)",
-                        letterSpacing: "-0.02em",
-                      }}>
-                        ${totalConDescuento.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                )}
+                  </tbody>
+                </table>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>Cancelar</button>
-                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}>
-                  {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
-                </button>
-              </div>
+
+              {/* Total Box */}
+              {!(confirmMode === "CO" && ocultarTotales) && (
+                <div className="p-3 rounded-xl bg-surface-container-high flex items-baseline justify-between">
+                  <span className="font-bold text-text-primary text-sm">Total a pagar</span>
+                  <span className="text-2xl font-extrabold font-mono text-primary">{fmtMoney(totalConDescuento)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-border-default bg-surface-container-low flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); }}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-surface-variant transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => guardar(confirmMode)}
+                disabled={isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}
+                className="px-5 py-2 rounded-lg text-xs font-bold bg-primary text-on-primary hover:bg-primary-container transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+              >
+                {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar Cotización" : "Confirmar y Cobrar"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 2. Receipt Preview Modal */}
       {showPreview && lastDocumento && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{lastDocumento.tipo_documento === "CO" ? "Cotización" : "Comprobante de venta"}</h5>
-                <button type="button" className="modal-close" onClick={cerrarComprobante}>
-                  &times;
-                </button>
-              </div>
-              <div className="modal-body">
-                <div className="receipt-preview">
-                  <h6 className="text-center mb-1" style={{ color: "#1a1a1a", fontFamily: "var(--font-mono)" }}>
-                    {lastDocumento.tienda}
-                  </h6>
-                  {lastDocumento.direccion && (
-                    <div className="text-center" style={{ color: "#666", fontSize: "0.7rem" }}>{lastDocumento.direccion}</div>
-                  )}
-                  {lastDocumento.telefono && (
-                    <div className="text-center mb-2" style={{ color: "#666", fontSize: "0.7rem" }}>{lastDocumento.telefono}</div>
-                  )}
-                  <div className="text-center mb-2" style={{ color: "#1a1a1a" }}>
-                    {lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
+              <h4 className="font-bold text-text-primary text-sm">
+                {lastDocumento.tipo_documento === "CO" ? "Cotización" : "Comprobante de Venta"} #{lastDocumento.ventaId}
+              </h4>
+              <button onClick={cerrarComprobante} className="text-text-muted hover:text-text-primary text-2xl leading-none">
+                &times;
+              </button>
+            </div>
+
+            <div className="p-4 max-h-[70vh] overflow-y-auto">
+              <div className="receipt-preview p-4 bg-white text-black rounded-lg text-xs font-mono space-y-2">
+                <div className="text-center font-bold text-sm">{lastDocumento.tienda}</div>
+                {lastDocumento.direccion && <div className="text-center text-[10px] text-gray-600">{lastDocumento.direccion}</div>}
+                {lastDocumento.telefono && <div className="text-center text-[10px] text-gray-600">{lastDocumento.telefono}</div>}
+                <div className="text-center font-bold border-t border-dashed border-gray-400 pt-1 mt-1">
+                  {lastDocumento.tipo_documento === "CO" ? "COTIZACION" : "COMPROBANTE DE VENTA"}
+                </div>
+                <div className="text-center text-[11px] text-gray-600">#{lastDocumento.ventaId} · {lastDocumento.fecha}</div>
+                <div className="border-t border-dashed border-gray-400 my-1"></div>
+
+                {lastDocumento.items.map((item) => (
+                  <div key={`${item.producto_id}-${item.cantidad}`} className="flex justify-between">
+                    <span>{item.cantidad} x {item.nombre}</span>
+                    <span>{fmtMoney(item.subtotal)}</span>
                   </div>
-                  <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>#{lastDocumento.ventaId}</div>
-                  <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>{lastDocumento.fecha}</div>
-                  <hr />
-                  {lastDocumento.items.map((item) => (
-                    <div key={`${item.producto_id}-${item.cantidad}`} className="flex justify-between" style={{ color: "#333" }}>
-                      <span>{item.cantidad} x {item.codigo_producto} - {item.marca ? item.marca + " - " : ""}{item.nombre}</span>
-                      <span>${item.subtotal}</span>
+                ))}
+
+                {!lastDocumento.ocultarTotales && (
+                  <div className="border-t border-dashed border-gray-400 pt-1 space-y-0.5">
+                    <div className="flex justify-between"><span>Subtotal:</span><span>{fmtMoney(lastDocumento.subtotal_original)}</span></div>
+                    {lastDocumento.descuento_porcentaje > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Descuento ({lastDocumento.descuento_porcentaje}%):</span>
+                        <span>-{fmtMoney(lastDocumento.subtotal_original - lastDocumento.total)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between"><span>Neto:</span><span>{fmtMoney(lastDocumento.total_neto)}</span></div>
+                    <div className="flex justify-between"><span>IVA:</span><span>{fmtMoney(lastDocumento.impuesto)}</span></div>
+                    <div className="flex justify-between font-bold text-sm border-t border-gray-400 pt-0.5">
+                      <span>Total:</span>
+                      <span>{fmtMoney(lastDocumento.total)}</span>
                     </div>
-                  ))}
-                  {!lastDocumento.ocultarTotales && (
-                  <>
-                  <hr />
-                  <div className="flex justify-between" style={{ color: "#333" }}><span>Subtotal</span><span>${lastDocumento.subtotal_original}</span></div>
-                  {lastDocumento.descuento_porcentaje > 0 && (
-                    <div className="flex justify-between" style={{ color: "var(--danger)" }}>
-                      <span>Descuento ({lastDocumento.descuento_porcentaje}%)</span>
-                      <span>-${lastDocumento.subtotal_original - lastDocumento.total}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between" style={{ color: "#333" }}><span>Neto</span><span>${lastDocumento.total_neto}</span></div>
-                  <div className="flex justify-between" style={{ color: "#333" }}><span>Impuesto</span><span>${lastDocumento.impuesto}</span></div>
-                  <div className="flex justify-between font-bold" style={{ color: "#1a1a1a" }}><span>Total</span><span>${lastDocumento.total}</span></div>
-                  </>
-                  )}
-                  {lastDocumento.tipo_documento === "CO" && (
-                    <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Cotización válida hasta agotar stock</div>
-                  )}
-                  <div className="text-center mt-2" style={{ color: "#999", fontSize: "0.7rem" }}>Documento carece de validez legal</div>
-                </div>
+                  </div>
+                )}
+                <div className="text-center text-[9px] text-gray-500 pt-2">Documento carece de validez legal</div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={cerrarComprobante}>Cerrar</button>
-                <button type="button" className="btn btn-primary" onClick={() => imprimirDocumento(lastDocumento)}>Imprimir</button>
-              </div>
+            </div>
+
+            <div className="p-4 border-t border-border-default bg-surface-container-low flex justify-end gap-2">
+              <button
+                onClick={cerrarComprobante}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => imprimirDocumento(lastDocumento)}
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-primary text-on-primary hover:bg-primary-container flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-sm">print</span>
+                Imprimir
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 3. Deducción de Stock por Ubicación Modal */}
       {showUbicacionDialog && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Seleccionar ubicación de descuento</h5>
-                <button type="button" className="modal-close" onClick={() => setShowUbicacionDialog(false)}>
-                  &times;
-                </button>
-              </div>
-              <div className="modal-body">
-                <p className="mb-3 text-secondary">Los siguientes productos tienen stock en múltiples ubicaciones. Seleccione de cuál descontar:</p>
-                <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr><th>Producto</th><th>Cantidad vendida</th><th>Ubicación</th></tr>
-                    </thead>
-                    <tbody>
-                      {ubicacionItems.map((item) => (
-                        <tr key={item.producto_id}>
-                          <td>{item.codigo_producto} - {item.nombre}</td>
-                          <td>{item.cantidad_vendida}</td>
-                          <td>
-                            <select
-                              className="form-control form-control-sm"
-                              value={selectedUbicaciones[item.producto_id] || ""}
-                              onChange={(e) => setSelectedUbicaciones({
-                                ...selectedUbicaciones,
-                                [item.producto_id]: Number(e.target.value),
-                              })}
-                            >
-                              {item.ubicaciones.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.nombre} (stock: {u.stock})
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-lg w-full p-5 space-y-4">
+            <h4 className="font-bold text-text-primary text-base">Seleccionar Ubicación para Descontar</h4>
+            <p className="text-xs text-text-secondary">
+              Algunos productos tienen stock en varias ubicaciones. Seleccione de cuál descontar:
+            </p>
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {ubicacionItems.map((item) => (
+                <div key={item.producto_id} className="p-3 rounded-lg bg-surface-container border border-border-default space-y-1">
+                  <div className="text-xs font-bold text-text-primary">{item.nombre} (x{item.cantidad_vendida})</div>
+                  <select
+                    className="w-full p-2 bg-bg-input border border-border-default rounded text-xs text-text-primary"
+                    value={selectedUbicaciones[item.producto_id] || ""}
+                    onChange={(e) => setSelectedUbicaciones({
+                      ...selectedUbicaciones,
+                      [item.producto_id]: Number(e.target.value),
+                    })}
+                  >
+                    {item.ubicaciones.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre} (Stock: {u.stock})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowUbicacionDialog(false)}>Cancelar</button>
-                <button type="button" className="btn btn-success" onClick={handleDeducirStock} disabled={isDeducing}>
-                  {isDeducing ? "Deduciendo..." : "Confirmar"}
-                </button>
-              </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
+              <button onClick={() => setShowUbicacionDialog(false)} className="px-3 py-1.5 text-xs text-text-secondary">Cancelar</button>
+              <button
+                onClick={handleDeducirStock}
+                disabled={isDeducing}
+                className="px-4 py-1.5 text-xs font-bold bg-primary text-on-primary rounded-lg"
+              >
+                {isDeducing ? "Deduciendo..." : "Confirmar"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 4. Success Floating Toast */}
       {showVentaSuccess && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog" style={{ maxWidth: 420 }}>
-            <div className="modal-content">
-              <div className="modal-body text-center py-5">
-                <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>&#10003;</div>
-                <h5 className="mb-0">
-                  {lastDocumento?.tipo_documento === "CO" ? "Cotización generada con éxito" : "Venta registrada con éxito"}
-                </h5>
-              </div>
-            </div>
-          </div>
+        <div className="fixed bottom-8 right-8 z-50 bg-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
+          <span className="material-symbols-outlined text-2xl">check_circle</span>
+          <span className="font-bold text-sm">
+            {lastDocumento?.tipo_documento === "CO" ? "Cotización generada exitosamente" : "Venta registrada exitosamente"}
+          </span>
         </div>
       )}
+
+      {/* Quick Modals */}
       {quickStockProducto && (
         <QuickStockModal
           producto={quickStockProducto}
@@ -1245,6 +1307,6 @@ export default function VentaPage() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }

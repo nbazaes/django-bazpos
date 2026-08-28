@@ -1,3 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #d0bcff;
+  --color-primary-container: #a078ff;
+  --color-on-primary: #3c0091;
+  --color-on-primary-container: #340080;
+  --color-primary-fixed: #e9ddff;
+  --color-primary-fixed-dim: #d0bcff;
+  --color-on-primary-fixed: #23005c;
+  --color-on-primary-fixed-variant: #5516be;
+
+  --color-secondary: #cebdff;
+  --color-secondary-container: #4f319c;
+  --color-on-secondary: #381385;
+  --color-on-secondary-container: #bea8ff;
+  --color-secondary-fixed: #e8ddff;
+  --color-secondary-fixed-dim: #cebdff;
+  --color-on-secondary-fixed: #21005e;
+  --color-on-secondary-fixed-variant: #4f319c;
+
+  --color-tertiary: #ffb869;
+  --color-tertiary-container: #ca801e;
+  --color-on-tertiary: #482900;
+  --color-on-tertiary-container: #3f2300;
+  --color-tertiary-fixed: #ffdcbb;
+  --color-tertiary-fixed-dim: #ffb869;
+  --color-on-tertiary-fixed: #2c1700;
+  --color-on-tertiary-fixed-variant: #673d00;
+
+  --color-bg-base: #09090f;
+  --color-bg-surface: #0e0e1a;
+  --color-bg-elevated: #151528;
+  --color-bg-input: #111128;
+  --color-background: #15121b;
+  --color-surface: #15121b;
+  --color-surface-dim: #15121b;
+  --color-surface-bright: #3b3742;
+  --color-surface-variant: #37333d;
+  --color-surface-container: #211e27;
+  --color-surface-container-low: #1d1a23;
+  --color-surface-container-high: #2c2832;
+  --color-surface-container-highest: #37333d;
+  --color-surface-container-lowest: #0f0d15;
+
+  --color-border-default: #24244a;
+  --color-outline: #958ea0;
+  --color-outline-variant: #494454;
+
+  --color-text-primary: #edecf2;
+  --color-text-secondary: #a8a5c0;
+  --color-text-muted: #656388;
+  --color-on-surface: #e7e0ed;
+  --color-on-surface-variant: #cbc3d7;
+  --color-on-background: #e7e0ed;
+
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+  --color-info: #3b82f6;
+
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-h1: 'DM Sans', sans-serif;
+  --font-h2: 'DM Sans', sans-serif;
+  --font-label-caps: 'DM Sans', sans-serif;
+
+  --spacing-padding-page: 1.5rem;
+  --spacing-sidebar-width: 250px;
+  --spacing-gutter: 1rem;
+  --spacing-container-max: 1400px;
+  --spacing-topbar-height: 56px;
+}
+
 body {
   margin: 0;
+}
+
+/* Gradient strip and stat cards from Stitch */
+.gradient-strip {
+  background: linear-gradient(90deg, #d0bcff 0%, #8b5cf6 100%);
+}
+
+.stat-card {
+  position: relative;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #d0bcff 0%, #a078ff 100%);
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.pos-table th {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
 }
