@@ -12,27 +12,27 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
 const desktopMediaQuery = "(min-width: 769px)";
 
 const vendedorLinks = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/ventas", label: "VENTAS", className: "nav-link--ventas", end: true },
-  { to: "/ventas/pedidos", label: "Pedidos" },
-  { to: "/ventas/historial", label: "Historial" },
-  { to: "/ventas/inventario", label: "Inventario" },
+  { to: "/", label: "Dashboard", icon: "bi-grid-1x2-fill", end: true },
+  { to: "/ventas", label: "VENTAS", icon: "bi-cart-fill", className: "nav-link--ventas", end: true },
+  { to: "/ventas/pedidos", label: "Pedidos", icon: "bi-bag-check" },
+  { to: "/ventas/historial", label: "Historial", icon: "bi-clock-history" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
 ];
 
 const gerenteLinks = [
-  { to: "/productos", label: "Productos" },
-  { to: "/proveedores", label: "Proveedores" },
-  { to: "/pedidos-proveedores", label: "Pedidos Prov." },
-  { to: "/usuarios", label: "Usuarios" },
-  { to: "/facturas", label: "Facturas" },
-  { to: "/reportes", label: "Reportes" },
-  { to: "/cierre-caja", label: "Cierre de caja" },
-  { to: "/configuracion", label: "Configuración" },
+  { to: "/productos", label: "Productos", icon: "bi-box-seam" },
+  { to: "/proveedores", label: "Proveedores", icon: "bi-truck" },
+  { to: "/pedidos-proveedores", label: "Pedidos Prov.", icon: "bi-receipt-cutoff" },
+  { to: "/usuarios", label: "Usuarios", icon: "bi-people" },
+  { to: "/facturas", label: "Facturas", icon: "bi-file-earmark-text" },
+  { to: "/reportes", label: "Reportes", icon: "bi-graph-up" },
+  { to: "/cierre-caja", label: "Cierre de caja", icon: "bi-cash-coin" },
+  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
 ];
 
 const bodegueroLinks = [
-  { to: "/ventas/inventario", label: "Inventario" },
-  { to: "/ubicaciones", label: "Ubicaciones" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
+  { to: "/ubicaciones", label: "Ubicaciones", icon: "bi-geo-alt" },
 ];
 
 export default function Shell() {
@@ -167,7 +167,8 @@ export default function Shell() {
                   end={link.end}
                   onClick={handleNav}
                 >
-                  {link.label}
+                  {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
+                  <span>{link.label}</span>
                 </NavLink>
               </li>
             ))}
@@ -181,7 +182,8 @@ export default function Shell() {
                 {bodegueroLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
                     <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
-                      {link.label}
+                      {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
+                      <span>{link.label}</span>
                     </NavLink>
                   </li>
                 ))}
@@ -197,7 +199,8 @@ export default function Shell() {
                 {gerenteLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
                     <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
-                      {link.label}
+                      {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
+                      <span>{link.label}</span>
                     </NavLink>
                   </li>
                 ))}

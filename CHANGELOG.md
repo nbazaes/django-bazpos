@@ -4,6 +4,17 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.25.0] - 2026-08-28
+
+### Agregado
+
+- Paginación en la tabla de stock crítico y filtro «Solo con stock» en el reporte de productos.
+- Se agregaron iconos y se pulieron las tarjetas y el estilo
+
+### Corregido
+
+- La tabla de stock crítico dejó de parpadear, recargarse y reordenarse innecesariamente.
+
 ## [1.24.0] - 2026-08-27
 
 ### Agregado
