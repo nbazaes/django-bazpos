@@ -2,10 +2,10 @@
 
 ## Repo Map
 - `bazpos/` — Django project config (settings, urls, WSGI, API router at `api_urls.py`, middleware, permissions).
-- `gerenteApp/` — management app: Proveedor, Factura, Usuario, Ubicacion, StoreConfig models + DRF ViewSets.
-- `vendedorApp/` — sales app: Producto, Venta, StockProductoUbicacion, Devolucion, Pedido, PedidoProveedor models + DRF ViewSets. Also hosts `CierreCaja*`, `DashboardStats`, `ReportesStats` API views.
+- `gerenteApp/` — management app: Proveedor, Factura (DetalleFactura), PrecioHistorico, Tax, StoreConfig models + DRF ViewSets (Usuarios via Django's User through UserViewSet).
+- `vendedorApp/` — sales app: Producto, Venta (PagoVenta, DetalleVenta, Anulacion), Devolucion (DetalleDevolucion), StockProductoUbicacion, Ubicacion, AjusteStock, StockHistorico, Pedido, PedidoDetalle, PedidoProveedorDia, ItemPedidoProveedor, CierreCaja models + DRF ViewSets. Also hosts `CierreCaja*`, `DashboardStats`, `ReportesStats`, and the custom report builder (`ReporteSchemaView`, `ReporteQueryView`, `ReporteExportView`) API views.
 - `chatApp/` — internal team chat (ChatMessage, ChatPresence + two APIView endpoints, no ViewSet/router). Polls `/api/chat/state/`, posts to `/api/chat/messages/`; messages purge after 8h idle (daily reset).
-- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`).
+- `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`, `seed_stock_historico`, `profile_endpoints`).
 - `frontend/` — Vite 8 / React 19 SPA with react-router-dom v7. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
 - `static/` — legacy assets (Django admin, vendor).
 - `docs/` — Diátaxis user & technical manuals (`manual-usuario.md`, `guia-tecnica.md` + `.docx`). The technical guide is the API/data-model reference; source of truth is the code.
@@ -75,7 +75,7 @@ python manage.py seed_data
 Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `auth/token/`, `auth/token/refresh/`, `auth/me/`
 - `store-name/` (public, no auth): returns `{"name": settings.STORE_NAME}` — runtime store name
-- `dashboard/stats/`, `reportes/stats/`, `cierre-caja/`, `cierre-caja/historial/`
+- `dashboard/stats/`, `reportes/stats/`, `reportes/custom/schema/`, `reportes/custom/query/`, `reportes/custom/export/`, `cierre-caja/`, `cierre-caja/historial/`, `cierre-caja/detalle/`
 - `chat/state/`, `chat/messages/` (team chat — APIViews, not router)
 - CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `devoluciones`, `ubicaciones`, `pedidos`, `configuracion`, `pedidos-proveedor`
 - Health check: `/health/` (used by Docker healthcheck)
@@ -92,7 +92,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 
 ## Guards (frontend routing)
 - `ProtectedRoute` calls `/auth/me/` on mount to validate JWT on every protected route visit.
-- `GerenteGuard` — allows Gerente and Encargado roles (wraps product/management routes).
+- `GerenteGuard` — allows Gerente and Encargado roles (wraps product/management routes, plus `/reportes` and `/cierre-caja`).
 - `BodegueroGuard` — allows Bodeguero, Encargado, and Gerente roles (wraps `/ubicaciones`).
 - `isGerente()` in auth.js also treats Encargado as Gerente (both have management access).
 - `isBodeguero()` in auth.js also allows Encargado and Gerente (both have warehouse access).

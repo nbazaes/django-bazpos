@@ -4,11 +4,12 @@ Sistema POS con backend Django REST + JWT y frontend React (Vite) SPA.
 
 ## Arquitectura
 
-- **Backend:** Django 5 + Django REST Framework + SimpleJWT + MariaDB 12
+- **Backend:** Django 6 + Django REST Framework + SimpleJWT + MariaDB 12
 - **Apps:**
-  - `gerenteApp` — gestión: proveedores, facturas, usuarios, ubicaciones, configuración de tienda
-  - `vendedorApp` — ventas: productos, ventas, stock por ubicación, devoluciones, pedidos, pedidos a proveedores
-  - `docker` — management commands: `setup_groups`, `create_admin`, `seed_data`
+  - `gerenteApp` — gestión: proveedores, facturas, precios históricos, impuestos, configuración de tienda
+  - `vendedorApp` — ventas: productos, ventas, stock por ubicación, devoluciones, pedidos, pedidos a proveedores, cierre de caja, reportes y constructor de reportes personalizados
+  - `chatApp` — chat interno entre usuarios activos
+  - `docker` — management commands: `setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`, `seed_stock_historico`, `profile_endpoints`
 - **Frontend:** React 19 + Vite 8 SPA con react-router-dom v7. Entrada única: `frontend/index.html` → `src/main.jsx` → `src/router.jsx`
 - **Despliegue:** Docker Compose (MariaDB + Django/Gunicorn + nginx)
 
@@ -19,7 +20,17 @@ Router en `bazpos/api_urls.py`. Endpoints bajo `/api/`:
 - `POST /api/auth/token/` — login JWT
 - `POST /api/auth/token/refresh/` — refresh token
 - `GET /api/auth/me/` — usuario actual
+- `GET /api/store-name/` — nombre de la tienda en runtime (público, sin auth)
 - `GET /api/dashboard/stats/` — estadísticas del dashboard
+- `GET /api/reportes/stats/` — estadísticas del módulo de reportes
+- `POST /api/reportes/custom/schema/` — esquema de columnas del constructor de reportes
+- `POST /api/reportes/custom/query/` — consulta de reporte personalizado
+- `GET /api/reportes/custom/export/` — exportación CSV de reporte personalizado
+- `GET /api/cierre-caja/` — cierre de caja del día
+- `GET /api/cierre-caja/historial/` — historial de cierres
+- `GET /api/cierre-caja/detalle/` — detalle por medio de pago, documento y devoluciones
+- `GET /api/chat/state/` — estado del chat (presencia y mensajes)
+- `POST /api/chat/messages/` — envío de mensajes de chat
 - `GET /api/health/` — health check (usado por Docker)
 - CRUD: `/api/productos/`, `/api/ventas/`, `/api/proveedores/`, `/api/facturas/`, `/api/usuarios/`, `/api/devoluciones/`, `/api/ubicaciones/`, `/api/pedidos/`, `/api/configuracion/`, `/api/pedidos-proveedor/`
 
@@ -27,9 +38,9 @@ El API client (`frontend/src/lib/api.js`) refresca el JWT automáticamente ante 
 
 ## Requisitos
 
-- **Python 3.13+**
+- **Python 3.12+**
 - **MariaDB 12+** (o MySQL 8.0+)
-- **Node.js 20+** (frontend)
+- **Node.js 20.19+** (frontend)
 - **Docker + Docker Compose** (producción)
 
 ## Desarrollo Local
@@ -173,12 +184,16 @@ bazpos/
 ├── bazpos/              # Configuración Django (settings, urls, api_urls, wsgi, permissions, middleware)
 ├── gerenteApp/          # App de gestión (modelos, API, admin)
 ├── vendedorApp/         # App de ventas (modelos, API, admin)
-├── docker/              # Management commands (setup_groups, create_admin, seed_data)
+├── chatApp/             # Chat interno entre usuarios activos
+├── docker/              # Management commands (setup_groups, create_admin, seed_data, seed_ventas_diarias, seed_stock_historico, profile_endpoints) + tuning MariaDB
+├── docs/                # Manuales Diátaxis (manual-usuario, guia-tecnica)
 ├── frontend/            # React SPA (Vite)
 │   ├── src/             # Componentes, páginas, hooks, router, guards, API client
+│   ├── scripts/         # Scripts auxiliares (release/changelog)
 │   ├── public/          # Activos estáticos (CSS, imágenes)
 │   ├── index.html       # Entrada única de la SPA
 │   └── vite.config.js
+├── ops/                 # Herramientas de infraestructura (backup restic/B2, staging terraform)
 ├── static/              # Assets legacy (Django admin, vendor)
 ├── staticfiles/         # Collectstatic output (volumen Docker en producción)
 ├── media/               # Archivos subidos (volumen Docker en producción)
@@ -189,6 +204,7 @@ bazpos/
 ├── docker-entrypoint.sh # Entrypoint del contenedor app
 ├── nginx.conf           # Configuración nginx
 ├── compose.yaml         # MariaDB + App + Nginx
+├── compose.prod.yaml    # Override de producción
 └── requirements.txt     # Dependencias Python
 ```
 
@@ -202,12 +218,12 @@ bazpos/
 ### Guards (frontend)
 
 - `ProtectedRoute` — valida el JWT llamando a `/auth/me/` en cada visita a ruta protegida.
-- `GerenteGuard` — permite Gerente y Encargado (rutas de gestión: productos, proveedores, usuarios, facturas, pedidos-proveedor, configuración).
+- `GerenteGuard` — permite Gerente y Encargado (rutas de gestión: productos, proveedores, usuarios, facturas, pedidos-proveedor, configuración, reportes, cierre de caja).
 - `BodegueroGuard` — permite Bodeguero, Encargado y Gerente (ruta `/ubicaciones`).
 
 ## Notas
 
-- El frontend es una **SPA**; las rutas antiguas en `frontend/gerencia/`, `frontend/ventas/`, `frontend/registration/` y los HTML sueltos (`admin.html`, `forgot-password.html`, `404.html`) son restos del antiguo MPA y no se usan.
+- El frontend es una **SPA** con entrada única en `frontend/index.html`; todas las rutas viven en `frontend/src/router.jsx`.
 - `DEBUG` se controla con la variable `DJANGO_DEBUG`.
 - Driver MySQL: **PyMySQL** (versión pinnada en `settings.py`). No cambiar sin revisar compatibilidad con MariaDB.
 - Gunicorn corre con **2 workers** (sync) por el presupuesto de memoria del VPS (1 vCPU / 1 GiB). No subir a 4 sin antes medir `docker stats` y latencia.
@@ -215,6 +231,15 @@ bazpos/
 - `collectstatic` usa el flag `--clear`, que vacía el directorio `staticfiles/` antes de recolectar.
 - nginx redirige HTTP→HTTPS por defecto. Para pruebas locales con Docker sin certificados, modificar `nginx.conf` temporalmente.
 - `@tanstack/react-query` se usa para caching de estado del servidor en el frontend.
+
+## A futuro
+
+BazPOS se desarrolla **a medida para un comercio local**, atendiendo sus flujos reales de venta, inventario, cierre de caja y reportes. Está en vías de **generalizarse** para poder ofrecerse a otros comercios, lo que implica:
+
+- **Multi-tenant**: soportar varias tiendas en una misma instalación (múltiples configuraciones por tienda en lugar de un único `StoreConfig` global).
+- **Parametrización**: hacer configurables impuestos (IVA/tax), moneda, formatos de documento fiscal y reglas de redondeo por comercio.
+- **Rediseño UI**: reactivar y culminar la rama `feat/redesign` (rediseño integral con Tailwind CSS v4 y tokens Material 3) como base visual para la próxima versión mayor.
+- **Empaquetado**: documentar instalación, respaldo y actualización para terceros (backups offsite, staging replicable, despliegue con Docker).
 
 ## Licencias
 
