@@ -1,49 +1,49 @@
-# BazPOS — Sistema de Punto de Venta
+# BazPOS — Point of Sale System
 
-Sistema POS con backend Django REST + JWT y frontend React (Vite) SPA.
+POS system with a Django REST + JWT backend and a React (Vite) SPA frontend.
 
-## Arquitectura
+## Architecture
 
 - **Backend:** Django 6 + Django REST Framework + SimpleJWT + MariaDB 12
 - **Apps:**
-  - `gerenteApp` — gestión: proveedores, facturas, precios históricos, impuestos, configuración de tienda
-  - `vendedorApp` — ventas: productos, ventas, stock por ubicación, devoluciones, pedidos, pedidos a proveedores, cierre de caja, reportes y constructor de reportes personalizados
-  - `chatApp` — chat interno entre usuarios activos
+  - `gerenteApp` — management: suppliers, invoices, price history, taxes, store configuration
+  - `vendedorApp` — sales: products, sales, stock by location, returns, orders, supplier orders, cash register closing, reports and custom report builder
+  - `chatApp` — internal chat between active users
   - `docker` — management commands: `setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`, `seed_stock_historico`, `profile_endpoints`
-- **Frontend:** React 19 + Vite 8 SPA con react-router-dom v7. Entrada única: `frontend/index.html` → `src/main.jsx` → `src/router.jsx`
-- **Despliegue:** Docker Compose (MariaDB + Django/Gunicorn + nginx)
+- **Frontend:** React 19 + Vite 8 SPA with react-router-dom v7. Single entrypoint: `frontend/index.html` → `src/main.jsx` → `src/router.jsx`
+- **Deployment:** Docker Compose (MariaDB + Django/Gunicorn + nginx)
 
 ## API
 
-Router en `bazpos/api_urls.py`. Endpoints bajo `/api/`:
+Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 
-- `POST /api/auth/token/` — login JWT
+- `POST /api/auth/token/` — JWT login
 - `POST /api/auth/token/refresh/` — refresh token
-- `GET /api/auth/me/` — usuario actual
-- `GET /api/store-name/` — nombre de la tienda en runtime (público, sin auth)
-- `GET /api/dashboard/stats/` — estadísticas del dashboard
-- `GET /api/reportes/stats/` — estadísticas del módulo de reportes
-- `POST /api/reportes/custom/schema/` — esquema de columnas del constructor de reportes
-- `POST /api/reportes/custom/query/` — consulta de reporte personalizado
-- `GET /api/reportes/custom/export/` — exportación CSV de reporte personalizado
-- `GET /api/cierre-caja/` — cierre de caja del día
-- `GET /api/cierre-caja/historial/` — historial de cierres
-- `GET /api/cierre-caja/detalle/` — detalle por medio de pago, documento y devoluciones
-- `GET /api/chat/state/` — estado del chat (presencia y mensajes)
-- `POST /api/chat/messages/` — envío de mensajes de chat
-- `GET /api/health/` — health check (usado por Docker)
+- `GET /api/auth/me/` — current user
+- `GET /api/store-name/` — runtime store name (public, no auth)
+- `GET /api/dashboard/stats/` — dashboard statistics
+- `GET /api/reportes/stats/` — reports module statistics
+- `POST /api/reportes/custom/schema/` — column schema for the custom report builder
+- `POST /api/reportes/custom/query/` — custom report query
+- `GET /api/reportes/custom/export/` — custom report CSV export
+- `GET /api/cierre-caja/` — cash register closing for the day
+- `GET /api/cierre-caja/historial/` — closing history
+- `GET /api/cierre-caja/detalle/` — breakdown by payment method, document and returns
+- `GET /api/chat/state/` — chat state (presence and messages)
+- `POST /api/chat/messages/` — send chat messages
+- `GET /api/health/` — health check (used by Docker)
 - CRUD: `/api/productos/`, `/api/ventas/`, `/api/proveedores/`, `/api/facturas/`, `/api/usuarios/`, `/api/devoluciones/`, `/api/ubicaciones/`, `/api/pedidos/`, `/api/configuracion/`, `/api/pedidos-proveedor/`
 
-El API client (`frontend/src/lib/api.js`) refresca el JWT automáticamente ante 401.
+The API client (`frontend/src/lib/api.js`) automatically refreshes the JWT on 401.
 
-## Requisitos
+## Requirements
 
 - **Python 3.12+**
-- **MariaDB 12+** (o MySQL 8.0+)
+- **MariaDB 12+** (or MySQL 8.0+)
 - **Node.js 20.19+** (frontend)
-- **Docker + Docker Compose** (producción)
+- **Docker + Docker Compose** (production)
 
-## Desarrollo Local
+## Local Development
 
 ### Backend
 
@@ -51,14 +51,14 @@ El API client (`frontend/src/lib/api.js`) refresca el JWT automáticamente ante 
 git clone <repo> && cd bazpos
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # editar credenciales
+cp .env.example .env   # edit credentials
 python manage.py migrate
 python manage.py setup_groups
 python manage.py create_admin
 python manage.py runserver
 ```
 
-Para acceder desde otras PCs en LAN:
+To access from other PCs on the LAN:
 
 ```bash
 python manage.py runserver 0.0.0.0:8000
@@ -69,180 +69,173 @@ python manage.py runserver 0.0.0.0:8000
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # por defecto VITE_API_BASE_URL=/api
+cp .env.example .env   # VITE_API_BASE_URL defaults to /api
 npm run dev            # http://127.0.0.1:5173
 ```
 
-Para acceder desde otras PCs en LAN:
+To access from other PCs on the LAN:
 
 ```bash
 npm run dev -- --host 0.0.0.0
 ```
 
-Verificar lint y build:
+Verify lint and build:
 
 ```bash
 cd frontend && npm run lint && npm run build
 ```
 
-## Docker (Producción / LAN)
+## Docker (Production / LAN)
 
-1. Copiar y editar el archivo de entorno de producción:
+1. Copy and edit the production environment file:
 
 ```bash
 cp .env.production.example .env
-# Editar secretos: DJANGO_SECRET_KEY, DJANGO_ALLOWED_HOSTS, contraseñas, etc.
+# Edit secrets: DJANGO_SECRET_KEY, DJANGO_ALLOWED_HOSTS, passwords, etc.
 ```
 
-2. Levantar el stack:
+2. Bring up the stack:
 
 ```bash
 docker compose up -d --build
 ```
 
-Servicios:
+Services:
 
-- **MariaDB** (`bazpos_db`) — healthcheck con `mariadb-admin ping`
-- **Django + Gunicorn** (`bazpos_app`) — migraciones, grupos, superusuario y `collectstatic --clear` automáticos; healthcheck en `/health/`
-- **nginx** (`bazpos_nginx`) — sirve el SPA y el API en puertos `80`/`443`, redirige HTTP→HTTPS
+- **MariaDB** (`bazpos_db`) — healthcheck with `mariadb-admin ping`
+- **Django + Gunicorn** (`bazpos_app`) — automatic migrations, groups, superuser and `collectstatic --clear`; healthcheck at `/health/`
+- **nginx** (`bazpos_nginx`) — serves the SPA and the API on ports `80`/`443`, redirects HTTP→HTTPS
 
-Los contenedores llevan **límites de memoria** (`mem_limit`) pensados para un VPS de 1 GiB: MariaDB 448m, app 320m, nginx 64m (≈832 MiB máximo, dejando margen al host). La configuración de MariaDB se sobre-escribe en `docker/mariadb/zz-bazpos-tuning.cnf` (buffer pool, conexiones, temp tables). Ver `docs/guia-tecnica.md §5.6`.
+The containers have **memory limits** (`mem_limit`) sized for a 1 GiB VPS: MariaDB 448m, app 320m, nginx 64m (≈832 MiB max, leaving headroom for the host). MariaDB configuration is overridden in `docker/mariadb/zz-bazpos-tuning.cnf` (buffer pool, connections, temp tables). See `docs/guia-tecnica.md §5.6`.
 
-Rebuild tras cambios:
+Rebuild after changes:
 
 ```bash
 docker compose up -d --build
 ```
 
-### Despliegue LAN/VPN con Tailscale
+### Useful management commands
 
-1. Instalar Tailscale en el servidor y habilitar Magic DNS.
-2. Incluir el hostname Tailscale en `DJANGO_ALLOWED_HOSTS` (ej. `bazpos-server.tailnet-name.ts.net`).
-3. Ejecutar `docker compose up -d --build`.
-4. Desde cada cliente, abrir `http://<tailscale-hostname>`.
+- `python manage.py setup_groups` — creates groups and permissions (Vendedor, Bodeguero, Encargado, Gerente)
+- `python manage.py create_admin` — creates a superuser from environment variables
+- `python manage.py seed_data` — loads demo data (optional)
+- `python manage.py collectstatic` — collects static files
 
-### Management commands útiles
-
-- `python manage.py setup_groups` — crea grupos y permisos (Vendedor, Bodeguero, Encargado, Gerente)
-- `python manage.py create_admin` — crea superusuario desde variables de entorno
-- `python manage.py seed_data` — carga datos demo (opcional)
-- `python manage.py collectstatic` — recolecta estáticos
-
-## Base de Datos
+## Database
 
 ```sql
 CREATE DATABASE bazpos_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'bazpos'@'localhost' IDENTIFIED BY 'tu_password';
+CREATE USER 'bazpos'@'localhost' IDENTIFIED BY 'your_password';
 GRANT ALL PRIVILEGES ON bazpos_db.* TO 'bazpos'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-## Variables de Entorno
+## Environment Variables
 
-Nunca commitear `.env`.
+Never commit `.env`.
 
 ### Backend
 
-Para desarrollo local copiar `.env.example` → `.env`.  
-Para producción con Docker copiar `.env.production.example` → `.env`.
+For local development copy `.env.example` → `.env`.  
+For production with Docker copy `.env.production.example` → `.env`.
 
-| Variable | Descripción |
+| Variable | Description |
 |---|---|
-| `DJANGO_SECRET_KEY` | Clave secreta de Django |
-| `DJANGO_DEBUG` | `True`/`False` (debe ser `False` en producción) |
-| `DJANGO_ALLOWED_HOSTS` | Hosts separados por coma |
-| `DB_PASSWORD` | Contraseña MariaDB |
-| `DB_HOST` | Host MariaDB (`db` en Docker, `127.0.0.1` en local) |
-| `DB_USER` | Usuario MariaDB |
-| `DB_NAME` | Nombre de la BD |
-| `DB_PORT` | Puerto MariaDB (default `3306`) |
-| `CORS_ALLOWED_ORIGINS` | Orígenes CORS adicionales (puede quedar vacío en mismo origen) |
-| `CSRF_TRUSTED_ORIGINS` | Orígenes CSRF de confianza |
-| `MYSQL_ROOT_PASSWORD` | Password root del contenedor MariaDB |
-| `MYSQL_DATABASE` | BD inicial del contenedor MariaDB |
-| `MYSQL_USER` | Usuario inicial del contenedor MariaDB |
-| `MYSQL_PASSWORD` | Password inicial del contenedor MariaDB |
-| `ADMIN_USER` | Superusuario creado por `create_admin` (Docker) |
-| `ADMIN_EMAIL` | Email del superusuario (Docker) |
-| `ADMIN_PASS` | Password del superusuario (Docker) |
-| `STORE_NAME` | Nombre de la tienda servido en runtime por `/api/store-name/` (default: `BAZPOS`) |
+| `DJANGO_SECRET_KEY` | Django secret key |
+| `DJANGO_DEBUG` | `True`/`False` (must be `False` in production) |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated hosts |
+| `DB_PASSWORD` | MariaDB password |
+| `DB_HOST` | MariaDB host (`db` in Docker, `127.0.0.1` locally) |
+| `DB_USER` | MariaDB user |
+| `DB_NAME` | Database name |
+| `DB_PORT` | MariaDB port (default `3306`) |
+| `CORS_ALLOWED_ORIGINS` | Additional CORS origins (can be empty on same origin) |
+| `CSRF_TRUSTED_ORIGINS` | Trusted CSRF origins |
+| `MYSQL_ROOT_PASSWORD` | Root password for the MariaDB container |
+| `MYSQL_DATABASE` | Initial DB for the MariaDB container |
+| `MYSQL_USER` | Initial user for the MariaDB container |
+| `MYSQL_PASSWORD` | Initial password for the MariaDB container |
+| `ADMIN_USER` | Superuser created by `create_admin` (Docker) |
+| `ADMIN_EMAIL` | Superuser email (Docker) |
+| `ADMIN_PASS` | Superuser password (Docker) |
+| `STORE_NAME` | Store name served at runtime by `/api/store-name/` (default: `BAZPOS`) |
 
 ### Frontend
 
-Copiar `frontend/.env.example` → `frontend/.env`.
+Copy `frontend/.env.example` → `frontend/.env`.
 
-| Variable | Descripción |
+| Variable | Description |
 |---|---|
-| `VITE_API_BASE_URL` | Ruta del API. Default `/api` (mismo origen en producción). Para dev separado: `http://localhost:8000/api` |
-| `VITE_BACKEND_URL` | URL base del backend para redirecciones/media. Default vacío (mismo origen) |
-| `VITE_STORE_NAME` | Nombre mostrado en la UI (default: `BAZPOS`). Fallback compilado; en producción el nombre real lo sirve el backend en runtime desde `STORE_NAME` |
+| `VITE_API_BASE_URL` | API path. Default `/api` (same origin in production). For separated dev: `http://localhost:8000/api` |
+| `VITE_BACKEND_URL` | Backend base URL for redirects/media. Default empty (same origin) |
+| `VITE_STORE_NAME` | Name shown in the UI (default: `BAZPOS`). Build-time fallback; in production the real name is served by the backend at runtime from `STORE_NAME` |
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 bazpos/
-├── bazpos/              # Configuración Django (settings, urls, api_urls, wsgi, permissions, middleware)
-├── gerenteApp/          # App de gestión (modelos, API, admin)
-├── vendedorApp/         # App de ventas (modelos, API, admin)
-├── chatApp/             # Chat interno entre usuarios activos
-├── docker/              # Management commands (setup_groups, create_admin, seed_data, seed_ventas_diarias, seed_stock_historico, profile_endpoints) + tuning MariaDB
-├── docs/                # Manuales Diátaxis (manual-usuario, guia-tecnica)
+├── bazpos/              # Django configuration (settings, urls, api_urls, wsgi, permissions, middleware)
+├── gerenteApp/          # Management app (models, API, admin)
+├── vendedorApp/         # Sales app (models, API, admin)
+├── chatApp/             # Internal chat between active users
+├── docker/              # Management commands (setup_groups, create_admin, seed_data, seed_ventas_diarias, seed_stock_historico, profile_endpoints) + MariaDB tuning
+├── docs/                # Diátaxis manuals (manual-usuario, guia-tecnica)
 ├── frontend/            # React SPA (Vite)
-│   ├── src/             # Componentes, páginas, hooks, router, guards, API client
-│   ├── scripts/         # Scripts auxiliares (release/changelog)
-│   ├── public/          # Activos estáticos (CSS, imágenes)
-│   ├── index.html       # Entrada única de la SPA
+│   ├── src/             # Components, pages, hooks, router, guards, API client
+│   ├── scripts/         # Helper scripts (release/changelog)
+│   ├── public/          # Static assets (CSS, images)
+│   ├── index.html       # Single SPA entrypoint
 │   └── vite.config.js
-├── ops/                 # Herramientas de infraestructura (backup restic/B2, staging terraform)
-├── static/              # Assets legacy (Django admin, vendor)
-├── staticfiles/         # Collectstatic output (volumen Docker en producción)
-├── media/               # Archivos subidos (volumen Docker en producción)
-├── certs/               # Certificados TLS para nginx
-├── templates/           # Plantillas Django (admin)
-├── Dockerfile           # Imagen Python/Django
-├── Dockerfile.nginx     # Imagen nginx con el SPA (build en dos etapas)
-├── docker-entrypoint.sh # Entrypoint del contenedor app
-├── nginx.conf           # Configuración nginx
+├── ops/                 # Infrastructure tooling (restic/B2 backup, staging terraform)
+├── static/              # Legacy assets (Django admin, vendor)
+├── staticfiles/         # Collectstatic output (Docker volume in production)
+├── media/               # Uploaded files (Docker volume in production)
+├── certs/               # TLS certificates for nginx
+├── templates/           # Django templates (admin)
+├── Dockerfile           # Python/Django image
+├── Dockerfile.nginx     # nginx image with the SPA (two-stage build)
+├── docker-entrypoint.sh # App container entrypoint
+├── nginx.conf           # nginx configuration
 ├── compose.yaml         # MariaDB + App + Nginx
-├── compose.prod.yaml    # Override de producción
-└── requirements.txt     # Dependencias Python
+├── compose.prod.yaml    # Production override
+└── requirements.txt     # Python dependencies
 ```
 
-## Auth y Roles
+## Auth and Roles
 
-- Cuatro grupos: **Vendedor**, **Bodeguero**, **Encargado**, **Gerente**.
-- `RoleActionPermission` mapea acciones DRF a roles por ViewSet. Los superusuarios bypassan todo.
-- `HasKnownRole` requiere pertenecer a uno de los cuatro roles para cualquier endpoint protegido.
-- Autenticación JWT vía `rest_framework_simplejwt`. Session auth también habilitada para Django admin.
+- Four groups: **Vendedor**, **Bodeguero**, **Encargado**, **Gerente**.
+- `RoleActionPermission` maps DRF actions to roles per ViewSet. Superusers bypass everything.
+- `HasKnownRole` requires membership in one of the four roles for any protected endpoint.
+- JWT authentication via `rest_framework_simplejwt`. Session auth is also enabled for Django admin.
 
 ### Guards (frontend)
 
-- `ProtectedRoute` — valida el JWT llamando a `/auth/me/` en cada visita a ruta protegida.
-- `GerenteGuard` — permite Gerente y Encargado (rutas de gestión: productos, proveedores, usuarios, facturas, pedidos-proveedor, configuración, reportes, cierre de caja).
-- `BodegueroGuard` — permite Bodeguero, Encargado y Gerente (ruta `/ubicaciones`).
+- `ProtectedRoute` — validates the JWT by calling `/auth/me/` on every protected route visit.
+- `GerenteGuard` — allows Gerente and Encargado (management routes: products, suppliers, users, invoices, supplier orders, configuration, reports, cash register closing).
+- `BodegueroGuard` — allows Bodeguero, Encargado and Gerente (`/ubicaciones` route).
 
-## Notas
+## Notes
 
-- El frontend es una **SPA** con entrada única en `frontend/index.html`; todas las rutas viven en `frontend/src/router.jsx`.
-- `DEBUG` se controla con la variable `DJANGO_DEBUG`.
-- Driver MySQL: **PyMySQL** (versión pinnada en `settings.py`). No cambiar sin revisar compatibilidad con MariaDB.
-- Gunicorn corre con **2 workers** (sync) por el presupuesto de memoria del VPS (1 vCPU / 1 GiB). No subir a 4 sin antes medir `docker stats` y latencia.
-- `LANGUAGE_CODE = "es-cl"` — las respuestas de DRF pueden aparecer en español.
-- `collectstatic` usa el flag `--clear`, que vacía el directorio `staticfiles/` antes de recolectar.
-- nginx redirige HTTP→HTTPS por defecto. Para pruebas locales con Docker sin certificados, modificar `nginx.conf` temporalmente.
-- `@tanstack/react-query` se usa para caching de estado del servidor en el frontend.
+- The frontend is a **SPA** with a single entrypoint at `frontend/index.html`; all routes live in `frontend/src/router.jsx`.
+- `DEBUG` is controlled by the `DJANGO_DEBUG` variable.
+- MySQL driver: **PyMySQL** (version pinned in `settings.py`). Do not change without reviewing MariaDB compatibility.
+- Gunicorn runs with **2 workers** (sync) due to the VPS memory budget (1 vCPU / 1 GiB). Do not raise to 4 without first measuring `docker stats` and latency.
+- `LANGUAGE_CODE = "es-cl"` — DRF responses may appear in Spanish.
+- `collectstatic` uses the `--clear` flag, which wipes the `staticfiles/` directory before collecting.
+- nginx redirects HTTP→HTTPS by default. For local Docker testing without certificates, temporarily modify `nginx.conf`.
+- `@tanstack/react-query` is used for server-state caching in the frontend.
 
-## A futuro
+## Roadmap
 
-BazPOS se desarrolla **a medida para un comercio local**, atendiendo sus flujos reales de venta, inventario, cierre de caja y reportes. Está en vías de **generalizarse** para poder ofrecerse a otros comercios, lo que implica:
+BazPOS is developed **custom-built for a local store**, addressing its real sales, inventory, cash register closing and reporting workflows. It is on its way to being **generalized** so it can be offered to other businesses, which involves:
 
-- **Multi-tenant**: soportar varias tiendas en una misma instalación (múltiples configuraciones por tienda en lugar de un único `StoreConfig` global).
-- **Parametrización**: hacer configurables impuestos (IVA/tax), moneda, formatos de documento fiscal y reglas de redondeo por comercio.
-- **Rediseño UI**: reactivar y culminar la rama `feat/redesign` (rediseño integral con Tailwind CSS v4 y tokens Material 3) como base visual para la próxima versión mayor.
-- **Empaquetado**: documentar instalación, respaldo y actualización para terceros (backups offsite, staging replicable, despliegue con Docker).
+- **Multi-tenant**: supporting multiple stores in a single installation (per-store configurations instead of a single global `StoreConfig`).
+- **Parameterization**: making taxes (IVA/tax), currency, fiscal document formats and rounding rules configurable per business.
+- **UI redesign**: reactivating and completing the `feat/redesign` branch (full redesign with Tailwind CSS v4 and Material 3 tokens) as the visual foundation for the next major version.
+- **Packaging**: documenting installation, backup and updates for third parties (offsite backups, replicable staging, Docker deployment).
 
-## Licencias
+## Licenses
 
-BazPOS se distribuye bajo **GNU General Public License v2** (ver `LICENSE` en la raíz del repositorio).
+BazPOS is distributed under the **GNU General Public License v2** (see `LICENSE` in the repository root).
 
-Las dependencias de terceros se distribuyen bajo sus respectivas licencias. Ver `THIRD_PARTY_NOTICES.md` y `licenses/`.
+Third-party dependencies are distributed under their respective licenses. See `THIRD_PARTY_NOTICES.md` and `licenses/`.
