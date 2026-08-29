@@ -2400,3 +2400,91 @@ class StockHistoricoSignalTest(BaseTest):
         historial = StockHistorico.objects.filter(stock__producto=self.producto)
         self.assertEqual(historial.count(), 1)
         self.assertEqual(historial.first().cantidad, 4)
+
+
+class CatalogoPublicoApiTest(BaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.freno = Producto.objects.create(
+            nombre="Pastilla de freno",
+            codigo_producto="PF-001",
+            oem="OEM-FRENO",
+            oem_alternativo="ALT-FRENO",
+            marca="Bosch",
+            descripcion="Pastilla de freno delantero",
+            precio_costo=5000,
+            stock_minimo=2,
+            stock_maximo=50,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=cls.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=cls.freno, ubicacion=cls.ubicacion, cantidad=4
+        )
+        cls.filtro = Producto.objects.create(
+            nombre="Filtro de aceite",
+            codigo_producto="FA-002",
+            oem="OEM-FILTRO",
+            marca="Mann",
+            descripcion="Filtro de aceite motor",
+            precio_costo=3000,
+            stock_minimo=1,
+            stock_maximo=40,
+            margen_utilidad=Decimal("25.00"),
+            proveedor=cls.proveedor,
+        )
+
+    def test_list_sin_auth(self):
+        resp = self.client.get("/api/publico/catalogo/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["count"], 2)
+        nombres = {p["nombre"] for p in resp.data["results"]}
+        self.assertEqual(nombres, {"Pastilla de freno", "Filtro de aceite"})
+
+    def test_no_expone_datos_internos(self):
+        resp = self.client.get("/api/publico/catalogo/")
+        item = resp.data["results"][0]
+        for campo in ["precio_costo", "margen_utilidad", "proveedor", "proveedor_nombre", "codigo_proveedor", "stock_minimo", "stock_maximo"]:
+            self.assertNotIn(campo, item)
+        self.assertIn("stock_actual", item)
+        self.assertIn("precio", item)
+
+    def test_detalle_sin_auth_con_ubicaciones(self):
+        resp = self.client.get(f"/api/publico/catalogo/{self.freno.producto_id}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["producto_id"], self.freno.producto_id)
+        self.assertEqual(resp.data["stock_actual"], 4)
+        self.assertEqual(resp.data["ubicaciones_stock"], [
+            {"ubicacion_id": self.ubicacion.id, "nombre": "Bodega Central", "cantidad": 4}
+        ])
+
+    def test_busqueda_texto(self):
+        resp = self.client.get("/api/publico/catalogo/?texto=freno")
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["nombre"], "Pastilla de freno")
+
+    def test_filtro_marca(self):
+        resp = self.client.get("/api/publico/catalogo/?marca=mann")
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["marca"], "Mann")
+
+    def test_filtro_oem(self):
+        resp = self.client.get("/api/publico/catalogo/?oem=OEM-FRENO")
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["codigo_producto"], "PF-001")
+
+    def test_con_stock(self):
+        resp = self.client.get("/api/publico/catalogo/?con_stock=true")
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["stock_actual"], 4)
+
+    def test_marcas(self):
+        resp = self.client.get("/api/publico/catalogo/marcas/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["marcas"], ["Bosch", "Mann"])
+
+    def test_oems(self):
+        resp = self.client.get("/api/publico/catalogo/oems/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["oems"], ["OEM-FILTRO", "OEM-FRENO"])

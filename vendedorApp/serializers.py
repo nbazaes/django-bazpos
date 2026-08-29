@@ -76,6 +76,43 @@ class ProductoSerializer(serializers.ModelSerializer):
         ]
 
 
+class CatalogoProductoSerializer(serializers.ModelSerializer):
+    stock_actual = serializers.IntegerField(read_only=True)
+    ubicaciones_stock = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Producto
+        fields = [
+            "producto_id",
+            "nombre",
+            "marca",
+            "descripcion",
+            "codigo_producto",
+            "oem",
+            "oem_alternativo",
+            "precio",
+            "stock_actual",
+            "ubicaciones_stock",
+        ]
+
+    def get_ubicaciones_stock(self, obj):
+        prefetched = "stocks_ubicacion" in getattr(obj, "_prefetched_objects_cache", {})
+        stocks = (
+            obj.stocks_ubicacion.all()
+            if prefetched
+            else obj.stocks_ubicacion.select_related("ubicacion").all()
+        )
+        return [
+            {
+                "ubicacion_id": s.ubicacion.id if s.ubicacion else None,
+                "nombre": s.ubicacion.nombre if s.ubicacion else "Sin ubicación",
+                "cantidad": s.cantidad,
+            }
+            for s in stocks
+            if s.cantidad > 0
+        ]
+
+
 class VentaDetalleInputSerializer(serializers.Serializer):
     producto_id = serializers.IntegerField()
     cantidad = serializers.IntegerField(min_value=1)

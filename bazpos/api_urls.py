@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
 from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
+from vendedorApp.publico_api import CatalogoPublicoViewSet
 from .api_views import MeView, StoreNameView
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register("ubicaciones", UbicacionViewSet, basename="ubicacion")
 router.register("pedidos", PedidoViewSet, basename="pedido")
 router.register("configuracion", StoreConfigViewSet, basename="configuracion")
 router.register("pedidos-proveedor", PedidoProveedorViewSet, basename="pedido-proveedor")
+router.register("publico/catalogo", CatalogoPublicoViewSet, basename="publico-catalogo")
 
 urlpatterns = [
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),

@@ -218,6 +218,9 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.JSONParser",
     ),
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "DEFAULT_THROTTLE_RATES": {
+        "publico": "120/min",
+    },
 }
 
 SIMPLE_JWT = {
