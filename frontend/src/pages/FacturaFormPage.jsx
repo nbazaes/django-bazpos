@@ -61,9 +61,8 @@ export default function FacturaFormPage() {
   const [showDraftBanner, setShowDraftBanner] = useState(Boolean(initialDraft));
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCreatedSuccess, setShowCreatedSuccess] = useState(false);
-  const [createUrl, setCreateUrl] = useState("");
+  const [productoModal, setProductoModal] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -206,40 +205,68 @@ export default function FacturaFormPage() {
     return p ? p.nombre : "";
   }, [header.proveedor_id, proveedores]);
 
-  const handleProductCreated = useCallback((event) => {
-    const payload = event.data;
-    if (!payload || payload.type !== "PRODUCT_CREATED" || !payload.producto) return;
-    const p = payload.producto;
-    setItems((prev) => {
-      const exists = prev.find((it) => it.producto_id === p.producto_id);
-      if (exists) return prev;
-      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
-      return [...prev, {
-        producto_id: p.producto_id,
-        codigo_producto: p.codigo_producto,
-        codigo_proveedor: p.codigo_proveedor || "",
-        nombre: p.nombre,
-        proveedor_nombre: p.proveedor_nombre || "",
-        precio: p.precio_costo,
-        cantidad: 1,
-        margen_utilidad: Number(p.margen_utilidad) || 0,
-        ubicaciones: defaultUbicacion
-          ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
-          : [],
-      }];
-    });
-    setError("");
-    setShowCreatedSuccess(true);
+  const showSuccessModal = useCallback((message) => {
+    setSuccessMessage(message);
     setTimeout(() => {
-      setShowCreatedSuccess(false);
-      setShowCreateModal(false);
+      setSuccessMessage("");
+      setProductoModal(null);
     }, 1200);
   }, []);
 
+  const handleProductMessage = useCallback((event) => {
+    const payload = event.data;
+    if (!payload || !payload.producto) return;
+    const p = payload.producto;
+
+    if (payload.type === "PRODUCT_CREATED") {
+      setItems((prev) => {
+        const exists = prev.find((it) => it.producto_id === p.producto_id);
+        if (exists) return prev;
+        const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+        return [...prev, {
+          producto_id: p.producto_id,
+          codigo_producto: p.codigo_producto,
+          codigo_proveedor: p.codigo_proveedor || "",
+          nombre: p.nombre,
+          proveedor_nombre: p.proveedor_nombre || "",
+          precio: p.precio_costo,
+          cantidad: 1,
+          margen_utilidad: Number(p.margen_utilidad) || 0,
+          ubicaciones: defaultUbicacion
+            ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
+            : [],
+        }];
+      });
+      setError("");
+      showSuccessModal("Producto creado con éxito");
+      return;
+    }
+
+    if (payload.type === "PRODUCT_UPDATED") {
+      setItems((prev) =>
+        prev.map((it) =>
+          it.producto_id === p.producto_id
+            ? {
+                ...it,
+                codigo_producto: p.codigo_producto,
+                codigo_proveedor: p.codigo_proveedor || "",
+                nombre: p.nombre,
+                proveedor_nombre: p.proveedor_nombre || "",
+                precio: p.precio_costo,
+                margen_utilidad: Number(p.margen_utilidad) || 0,
+              }
+            : it
+        )
+      );
+      setError("");
+      showSuccessModal("Producto actualizado con éxito");
+    }
+  }, [showSuccessModal]);
+
   useEffect(() => {
-    window.addEventListener("message", handleProductCreated);
-    return () => window.removeEventListener("message", handleProductCreated);
-  }, [handleProductCreated]);
+    window.addEventListener("message", handleProductMessage);
+    return () => window.removeEventListener("message", handleProductMessage);
+  }, [handleProductMessage]);
 
   function abrirCrearProducto() {
     const params = new URLSearchParams();
@@ -247,8 +274,16 @@ export default function FacturaFormPage() {
     if (header.proveedor_id) params.set("proveedor", String(header.proveedor_id));
     params.set("from_factura", "1");
     params.set("embed", "1");
-    setCreateUrl(`/productos/crear?${params.toString()}`);
-    setShowCreateModal(true);
+    setProductoModal({ modo: "crear", url: `/productos/crear?${params.toString()}` });
+  }
+
+  function abrirEditarProducto(idx) {
+    const it = items[idx];
+    if (!it) return;
+    const params = new URLSearchParams();
+    params.set("from_factura", "1");
+    params.set("embed", "1");
+    setProductoModal({ modo: "editar", url: `/productos/${it.producto_id}/editar?${params.toString()}` });
   }
 
   function continuar() {
@@ -550,7 +585,16 @@ export default function FacturaFormPage() {
                   const rowInvalida = esUbicacionInvalida(it);
                   return (
                   <tr key={`${it.producto_id}-${idx}`} style={rowInvalida ? { background: "var(--danger-soft)" } : undefined}>
-                    <td style={{ whiteSpace: "nowrap" }}>{it.codigo_producto}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {it.codigo_producto}
+                      <i
+                        className="bi bi-pencil"
+                        title={`Editar producto ${it.nombre}`}
+                        aria-label={`Editar producto ${it.nombre}`}
+                        style={{ cursor: "pointer", color: "var(--text-secondary)", fontSize: "1rem", marginLeft: 8 }}
+                        onClick={() => abrirEditarProducto(idx)}
+                      ></i>
+                    </td>
                     <td style={{ whiteSpace: "nowrap" }}>{it.codigo_proveedor || "—"}</td>
                     <td>{it.proveedor_nombre || "—"}</td>
                     <td>{it.nombre}</td>
@@ -794,29 +838,29 @@ export default function FacturaFormPage() {
       {step === "items" && renderStepItems()}
       {renderUbicacionModal()}
 
-      {showCreateModal && (
+      {productoModal && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="modal-dialog modal-xl" style={{ maxWidth: 1100 }}>
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Crear producto</h5>
-                <button type="button" className="modal-close" onClick={() => setShowCreateModal(false)}>&times;</button>
+                <h5 className="modal-title">{productoModal.modo === "editar" ? "Editar producto" : "Crear producto"}</h5>
+                <button type="button" className="modal-close" onClick={() => setProductoModal(null)}>&times;</button>
               </div>
               <div className="modal-body p-0" style={{ height: "75vh" }}>
-                <iframe title="Crear producto" src={createUrl} style={{ width: "100%", height: "100%", border: 0 }} />
+                <iframe title={productoModal.modo === "editar" ? "Editar producto" : "Crear producto"} src={productoModal.url} style={{ width: "100%", height: "100%", border: 0 }} />
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {showCreatedSuccess && (
+      {successMessage && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="modal-dialog" style={{ maxWidth: 420 }}>
             <div className="modal-content">
               <div className="modal-body text-center py-5">
                 <div className="text-success mb-3" style={{ fontSize: 36, lineHeight: 1 }}>&#10003;</div>
-                <h5 className="mb-0">Producto creado con éxito</h5>
+                <h5 className="mb-0">{successMessage}</h5>
               </div>
             </div>
           </div>

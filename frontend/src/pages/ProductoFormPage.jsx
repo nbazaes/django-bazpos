@@ -93,8 +93,11 @@ export default function ProductoFormPage() {
     const mutation = id ? updateMutation : createMutation;
     mutation.mutate(id ? { id, data: payload } : payload, {
       onSuccess: (saved) => {
-        if (fromFactura && !id) {
-          const message = { type: "PRODUCT_CREATED", producto: saved };
+        if (fromFactura) {
+          const message = {
+            type: id ? "PRODUCT_UPDATED" : "PRODUCT_CREATED",
+            producto: saved,
+          };
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage(message, window.location.origin);
             window.close();
