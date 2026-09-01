@@ -60,6 +60,7 @@ export default function VentaPage() {
   const [showUbicacionDialog, setShowUbicacionDialog] = useState(false);
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
+  const [ubicacionError, setUbicacionError] = useState("");
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
@@ -375,6 +376,7 @@ export default function VentaPage() {
           defaults[item.producto_id] = item.ubicaciones[0]?.id || null;
         });
         setSelectedUbicaciones(defaults);
+        setUbicacionError("");
         setShowUbicacionDialog(true);
       } else {
         await apiRequest(`/ventas/${ventaId}/deducir-stock/`, {
@@ -403,7 +405,7 @@ export default function VentaPage() {
       });
       setShowUbicacionDialog(false);
     } catch (err) {
-      setError(err.message);
+      setUbicacionError(err.message);
     } finally {
       deducirRef.current = false;
       setIsDeducing(false);
@@ -1162,6 +1164,7 @@ export default function VentaPage() {
               </div>
               <div className="modal-body">
                 <p className="mb-3 text-secondary">Los siguientes productos tienen stock en múltiples ubicaciones. Seleccione de cuál descontar:</p>
+                {ubicacionError && <div className="alert alert-danger">{ubicacionError}</div>}
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
@@ -1176,10 +1179,13 @@ export default function VentaPage() {
                             <select
                               className="form-control form-control-sm"
                               value={selectedUbicaciones[item.producto_id] || ""}
-                              onChange={(e) => setSelectedUbicaciones({
+                              onChange={(e) => {
+                              setSelectedUbicaciones({
                                 ...selectedUbicaciones,
                                 [item.producto_id]: Number(e.target.value),
-                              })}
+                              });
+                              setUbicacionError("");
+                            }}
                             >
                               {item.ubicaciones.map((u) => (
                                 <option key={u.id} value={u.id}>

@@ -1048,7 +1048,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     def deducir_stock(self, request, pk=None):
         venta = self.get_object()
 
-        detalles = venta.detalleventa_set.all()
+        detalles = venta.detalleventa_set.select_related("producto").all()
         detalles_map = {d.producto_id: d for d in detalles}
 
         deducciones = request.data.get("deducciones", [])
@@ -1077,7 +1077,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
                     if not stock or stock.cantidad < cantidad:
                         return Response(
-                            {"error": f"Stock insuficiente en la ubicación seleccionada"},
+                            {"error": f"Stock insuficiente del producto {detalles_map[producto_id].producto.codigo_producto} en la ubicación seleccionada"},
                             status=400,
                         )
 
