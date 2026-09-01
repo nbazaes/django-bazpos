@@ -2,25 +2,27 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import Shell from "./components/Shell";
 import { ProtectedRoute, GerenteGuard, BodegueroGuard, RedirectIfLoggedIn } from "./guards";
 import LoginPage from "./pages/LoginPage";
-import DashboardPage from "./pages/DashboardPage";
-import VentaPage from "./pages/VentaPage";
-import PedidosPage from "./pages/PedidosPage";
-import PedidosCrearPage from "./pages/PedidosCrearPage";
-import InventarioPage from "./pages/InventarioPage";
-import ProductosPage from "./pages/ProductosPage";
-import ProductoFormPage from "./pages/ProductoFormPage";
-import ProveedoresPage from "./pages/ProveedoresPage";
-import ProveedorFormPage from "./pages/ProveedorFormPage";
-import UsuariosPage from "./pages/UsuariosPage";
-import UsuarioFormPage from "./pages/UsuarioFormPage";
-import FacturasPage from "./pages/FacturasPage";
-import FacturaFormPage from "./pages/FacturaFormPage";
-import PedidosProveedoresPage from "./pages/PedidosProveedoresPage";
-import UbicacionPage from "./pages/UbicacionPage";
-import ConfiguracionPage from "./pages/ConfiguracionPage";
-import ReportesPage from "./pages/ReportesPage";
-import CierreCajaPage from "./pages/CierreCajaPage";
 import StaticPage from "./pages/StaticPage";
+import {
+  DashboardPage,
+  VentaPage,
+  PedidosPage,
+  PedidosCrearPage,
+  InventarioPage,
+  ProductosPage,
+  ProductoFormPage,
+  ProveedoresPage,
+  ProveedorFormPage,
+  UsuariosPage,
+  UsuarioFormPage,
+  FacturasPage,
+  FacturaFormPage,
+  PedidosProveedoresPage,
+  UbicacionPage,
+  ConfiguracionPage,
+  ReportesPage,
+  CierreCajaPage,
+} from "./lazyRoutes";
 
 export const router = createBrowserRouter([
   {

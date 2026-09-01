@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
@@ -6,6 +6,7 @@ import { useStoreName } from "../lib/storeName";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";
+import PageLoader from "./PageLoader";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
@@ -143,7 +144,9 @@ export default function Shell() {
   if (embed) {
     return (
       <TitleContext.Provider value={setTitle}>
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </TitleContext.Provider>
     );
   }
@@ -271,7 +274,9 @@ export default function Shell() {
           <main className="content-area">
             <div className="container-fluid" key={location.pathname}>
               <div className="page-transition">
-                <Outlet />
+                <Suspense fallback={<PageLoader />}>
+                  <Outlet />
+                </Suspense>
               </div>
             </div>
           </main>

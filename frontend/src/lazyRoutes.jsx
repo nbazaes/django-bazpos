@@ -1,0 +1,20 @@
+import { lazy } from "react";
+
+export const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+export const VentaPage = lazy(() => import("./pages/VentaPage"));
+export const PedidosPage = lazy(() => import("./pages/PedidosPage"));
+export const PedidosCrearPage = lazy(() => import("./pages/PedidosCrearPage"));
+export const InventarioPage = lazy(() => import("./pages/InventarioPage"));
+export const ProductosPage = lazy(() => import("./pages/ProductosPage"));
+export const ProductoFormPage = lazy(() => import("./pages/ProductoFormPage"));
+export const ProveedoresPage = lazy(() => import("./pages/ProveedoresPage"));
+export const ProveedorFormPage = lazy(() => import("./pages/ProveedorFormPage"));
+export const UsuariosPage = lazy(() => import("./pages/UsuariosPage"));
+export const UsuarioFormPage = lazy(() => import("./pages/UsuarioFormPage"));
+export const FacturasPage = lazy(() => import("./pages/FacturasPage"));
+export const FacturaFormPage = lazy(() => import("./pages/FacturaFormPage"));
+export const PedidosProveedoresPage = lazy(() => import("./pages/PedidosProveedoresPage"));
+export const UbicacionPage = lazy(() => import("./pages/UbicacionPage"));
+export const ConfiguracionPage = lazy(() => import("./pages/ConfiguracionPage"));
+export const ReportesPage = lazy(() => import("./pages/ReportesPage"));
+export const CierreCajaPage = lazy(() => import("./pages/CierreCajaPage"));

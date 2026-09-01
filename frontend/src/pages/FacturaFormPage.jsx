@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import StepperInput from "../components/StepperInput";
+import ProductoForm from "../components/ProductoForm";
 import { usePageTitle } from "../lib/usePageTitle";
 import { formatDateTime } from "../lib/format";
 import {
@@ -213,38 +214,12 @@ export default function FacturaFormPage() {
     }, 1200);
   }, []);
 
-  const handleProductMessage = useCallback((event) => {
-    const payload = event.data;
-    if (!payload || !payload.producto) return;
-    const p = payload.producto;
-
-    if (payload.type === "PRODUCT_CREATED") {
-      setItems((prev) => {
-        const exists = prev.find((it) => it.producto_id === p.producto_id);
-        if (exists) return prev;
-        const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
-        return [...prev, {
-          producto_id: p.producto_id,
-          codigo_producto: p.codigo_producto,
-          codigo_proveedor: p.codigo_proveedor || "",
-          nombre: p.nombre,
-          proveedor_nombre: p.proveedor_nombre || "",
-          precio: p.precio_costo,
-          cantidad: 1,
-          margen_utilidad: Number(p.margen_utilidad) || 0,
-          ubicaciones: defaultUbicacion
-            ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
-            : [],
-        }];
-      });
-      setError("");
-      showSuccessModal("Producto creado con éxito");
-      return;
-    }
-
-    if (payload.type === "PRODUCT_UPDATED") {
-      setItems((prev) =>
-        prev.map((it) =>
+  const handleProductSaved = useCallback((p) => {
+    const modo = productoModal?.modo;
+    setItems((prev) => {
+      const exists = prev.find((it) => it.producto_id === p.producto_id);
+      if (exists) {
+        return prev.map((it) =>
           it.producto_id === p.producto_id
             ? {
                 ...it,
@@ -256,34 +231,40 @@ export default function FacturaFormPage() {
                 margen_utilidad: Number(p.margen_utilidad) || 0,
               }
             : it
-        )
-      );
-      setError("");
-      showSuccessModal("Producto actualizado con éxito");
-    }
-  }, [showSuccessModal]);
-
-  useEffect(() => {
-    window.addEventListener("message", handleProductMessage);
-    return () => window.removeEventListener("message", handleProductMessage);
-  }, [handleProductMessage]);
+        );
+      }
+      if (modo === "editar") return prev;
+      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+      return [...prev, {
+        producto_id: p.producto_id,
+        codigo_producto: p.codigo_producto,
+        codigo_proveedor: p.codigo_proveedor || "",
+        nombre: p.nombre,
+        proveedor_nombre: p.proveedor_nombre || "",
+        precio: p.precio_costo,
+        cantidad: 1,
+        margen_utilidad: Number(p.margen_utilidad) || 0,
+        ubicaciones: defaultUbicacion
+          ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: 1 }]
+          : [],
+      }];
+    });
+    setError("");
+    showSuccessModal(modo === "editar" ? "Producto actualizado con éxito" : "Producto creado con éxito");
+  }, [productoModal?.modo, showSuccessModal]);
 
   function abrirCrearProducto() {
-    const params = new URLSearchParams();
-    if (searchText) params.set("codigo_producto", searchText);
-    if (header.proveedor_id) params.set("proveedor", String(header.proveedor_id));
-    params.set("from_factura", "1");
-    params.set("embed", "1");
-    setProductoModal({ modo: "crear", url: `/productos/crear?${params.toString()}` });
+    setProductoModal({
+      modo: "crear",
+      codigoProducto: searchText.trim(),
+      proveedor: header.proveedor_id ? String(header.proveedor_id) : "",
+    });
   }
 
   function abrirEditarProducto(idx) {
     const it = items[idx];
     if (!it) return;
-    const params = new URLSearchParams();
-    params.set("from_factura", "1");
-    params.set("embed", "1");
-    setProductoModal({ modo: "editar", url: `/productos/${it.producto_id}/editar?${params.toString()}` });
+    setProductoModal({ modo: "editar", productoId: it.producto_id });
   }
 
   function continuar() {
@@ -846,8 +827,13 @@ export default function FacturaFormPage() {
                 <h5 className="modal-title">{productoModal.modo === "editar" ? "Editar producto" : "Crear producto"}</h5>
                 <button type="button" className="modal-close" onClick={() => setProductoModal(null)}>&times;</button>
               </div>
-              <div className="modal-body p-0" style={{ height: "75vh" }}>
-                <iframe title={productoModal.modo === "editar" ? "Editar producto" : "Crear producto"} src={productoModal.url} style={{ width: "100%", height: "100%", border: 0 }} />
+              <div className="modal-body" style={{ maxHeight: "75vh", overflowY: "auto" }}>
+                <ProductoForm
+                  productoId={productoModal.modo === "editar" ? productoModal.productoId : null}
+                  initialCodigoProducto={productoModal.codigoProducto || ""}
+                  initialProveedor={productoModal.proveedor || ""}
+                  onSaved={handleProductSaved}
+                />
               </div>
             </div>
           </div>
