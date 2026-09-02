@@ -463,6 +463,65 @@ class VentaStockActionsTest(BaseTest):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_venta_creacion_descarta_stock(self):
+        resp = auth_client(self.vendedor).post(
+            "/api/ventas/",
+            {
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 2,
+                        "precio": self.producto.precio,
+                    }
+                ],
+                "total": self.producto.precio * 2,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        venta = Venta.objects.get(id=resp.data["id"])
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 8)
+        self.assertEqual(
+            venta.deduccion_original,
+            {str(self.producto.producto_id): {str(self.ubicacion.id): 2}},
+        )
+
+    def test_venta_creacion_descarta_stock_multi_ubicacion(self):
+        u2 = Ubicacion.objects.create(nombre="Bodega Norte")
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=u2, cantidad=5
+        )
+        venta_id = self._crear_venta()
+        venta = Venta.objects.get(id=venta_id)
+        stock1 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        stock2 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=u2
+        )
+        self.assertEqual(stock1.cantidad, 8)
+        self.assertEqual(stock2.cantidad, 5)
+        self.assertEqual(
+            venta.deduccion_original,
+            {str(self.producto.producto_id): {str(self.ubicacion.id): 2}},
+        )
+        detalle = DetalleVenta.objects.get(
+            venta_id=venta_id, producto=self.producto
+        )
+        self.assertEqual(detalle.ubicacion_id, self.ubicacion.id)
+
+    def test_venta_sin_deducir_stock_queda_descontada(self):
+        venta_id = self._crear_venta()
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 8)
+        venta = Venta.objects.get(id=venta_id)
+        self.assertIn(str(self.producto.producto_id), venta.deduccion_original)
+
     def test_ubicaciones_para_deducir(self):
         u2 = Ubicacion.objects.create(nombre="Bodega Norte")
         StockProductoUbicacion.objects.create(
@@ -475,6 +534,9 @@ class VentaStockActionsTest(BaseTest):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(len(resp.data[0]["ubicaciones"]), 2)
+        stocks = {u["id"]: u["stock"] for u in resp.data[0]["ubicaciones"]}
+        self.assertEqual(stocks[self.ubicacion.id], 10)
+        self.assertEqual(stocks[u2.id], 4)
 
     def test_ubicaciones_para_deducir_ignora_stock_sin_ubicacion(self):
         u2 = Ubicacion.objects.create(nombre="Bodega Norte")

@@ -158,6 +158,7 @@ class Venta(models.Model):
         blank=True,
         db_index=True,
     )
+    deduccion_original = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = 'ventas'

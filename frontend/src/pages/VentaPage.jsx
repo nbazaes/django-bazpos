@@ -391,11 +391,6 @@ export default function VentaPage() {
         setUbicacionMixto(false);
         setCantidadesUbicacion({});
         setShowUbicacionDialog(true);
-      } else {
-        await apiRequest(`/ventas/${ventaId}/deducir-stock/`, {
-          method: "POST",
-          body: { deducciones: [] },
-        });
       }
     } catch (err) {
       console.error("Error checking ubicaciones:", err);

@@ -1017,29 +1017,34 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     def ubicaciones_para_deducir(self, request, pk=None):
         venta = self.get_object()
         detalles = venta.detalleventa_set.select_related("producto").all()
+        deduccion_original = venta.deduccion_original or {}
 
         resultado = []
         for detalle in detalles:
             producto = detalle.producto
+            registradas = deduccion_original.get(str(producto.producto_id), {})
+
             stocks = StockProductoUbicacion.objects.filter(
-                producto=producto, cantidad__gt=0, ubicacion__isnull=False
+                producto=producto, ubicacion__isnull=False
             ).select_related("ubicacion")
 
-            ubicaciones_con_stock = list(stocks)
-            if len(ubicaciones_con_stock) < 2:
-                continue
+            ubicaciones_pre_venta = []
+            for s in stocks:
+                stock_pre = s.cantidad + int(registradas.get(str(s.ubicacion_id), 0))
+                if stock_pre > 0:
+                    ubicaciones_pre_venta.append(
+                        {"id": s.ubicacion.id, "nombre": s.ubicacion.nombre, "stock": stock_pre}
+                    )
 
-            ubicaciones_info = [
-                {"id": s.ubicacion.id, "nombre": s.ubicacion.nombre, "stock": s.cantidad}
-                for s in ubicaciones_con_stock
-            ]
+            if len(ubicaciones_pre_venta) < 2:
+                continue
 
             resultado.append({
                 "producto_id": producto.producto_id,
                 "nombre": producto.nombre,
                 "codigo_producto": producto.codigo_producto,
                 "cantidad_vendida": detalle.cantidad,
-                "ubicaciones": ubicaciones_info,
+                "ubicaciones": ubicaciones_pre_venta,
             })
 
         return Response(resultado)
@@ -1047,84 +1052,104 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     @action(detail=True, methods=["post"], url_path="deducir-stock")
     def deducir_stock(self, request, pk=None):
         venta = self.get_object()
-
         detalles = venta.detalleventa_set.select_related("producto").all()
         detalles_map = {d.producto_id: d for d in detalles}
 
+        deduccion_original = venta.deduccion_original or {}
+
+        if not deduccion_original:
+            return Response({"status": "ok"})
+
         deducciones = request.data.get("deducciones", [])
 
-        if deducciones:
-            serializer = DeducirStockSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            deducciones = serializer.validated_data["deducciones"]
+        if not deducciones:
+            return Response({"status": "ok"})
 
-            sumas = {}
-            for ded in deducciones:
-                sumas[ded["producto_id"]] = sumas.get(ded["producto_id"], 0) + ded["cantidad"]
+        serializer = DeducirStockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        deducciones = serializer.validated_data["deducciones"]
 
-            for producto_id, total in sumas.items():
-                detalle = detalles_map.get(producto_id)
-                if detalle and total > detalle.cantidad:
-                    return Response(
-                        {"error": f"Las cantidades a descontar superan la cantidad vendida del producto {detalle.producto.codigo_producto}"},
-                        status=400,
-                    )
+        elegidas = {}
+        for ded in deducciones:
+            elegidas.setdefault(ded["producto_id"], []).append(ded)
 
-            with transaction.atomic():
-                for ded in deducciones:
-                    producto_id = ded["producto_id"]
+        for producto_id, ded_list in elegidas.items():
+            if producto_id not in detalles_map:
+                return Response(
+                    {"error": f"Producto {producto_id} no está en esta venta"},
+                    status=400,
+                )
+            suma = sum(d["cantidad"] for d in ded_list)
+            if suma != detalles_map[producto_id].cantidad:
+                return Response(
+                    {"error": f"Las cantidades a descontar del producto {detalles_map[producto_id].producto.codigo_producto} deben sumar la cantidad vendida ({detalles_map[producto_id].cantidad})"},
+                    status=400,
+                )
+
+        with transaction.atomic():
+            for producto_id, ded_list in elegidas.items():
+                detalle = detalles_map[producto_id]
+                registradas = deduccion_original.get(str(producto_id), {})
+                for ded in ded_list:
                     ubicacion_id = ded["ubicacion_id"]
-                    cantidad = ded["cantidad"]
-
-                    if producto_id not in detalles_map:
-                        return Response(
-                            {"error": f"Producto {producto_id} no está en esta venta"},
-                            status=400,
-                        )
-
                     stock = StockProductoUbicacion.objects.select_for_update().filter(
                         producto_id=producto_id,
                         ubicacion_id=ubicacion_id,
                     ).first()
-
-                    if not stock or stock.cantidad < cantidad:
+                    restaurable = int(registradas.get(str(ubicacion_id), 0))
+                    disponible = (stock.cantidad if stock else 0) + restaurable
+                    if ded["cantidad"] > disponible:
                         return Response(
-                            {"error": f"Stock insuficiente del producto {detalles_map[producto_id].producto.codigo_producto} en la ubicación seleccionada"},
+                            {"error": f"Stock insuficiente del producto {detalle.producto.codigo_producto} en la ubicación seleccionada"},
                             status=400,
                         )
 
-                    stock.cantidad -= cantidad
-                    stock.save()
+            for producto_id, registradas in deduccion_original.items():
+                for ubicacion_id, cantidad in registradas.items():
+                    stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                        producto_id=int(producto_id),
+                        ubicacion_id=int(ubicacion_id),
+                        defaults={"cantidad": 0},
+                    )
+                    stock.cantidad += cantidad
+                    stock.save(update_fields=["cantidad"])
 
-                    detalle = detalles_map[producto_id]
-                    detalle.ubicacion_id = ubicacion_id
-                    detalle.save(update_fields=["ubicacion"])
-
-        with transaction.atomic():
+            nueva = {}
             for producto_id, detalle in detalles_map.items():
-                cantidad_vendida = detalle.cantidad
-                ya_deducido = sum(
-                    d["cantidad"] for d in deducciones if d["producto_id"] == producto_id
-                ) if deducciones else 0
+                registradas = deduccion_original.get(str(producto_id), {})
+                if not registradas:
+                    continue
+                asignacion = {}
+                if producto_id in elegidas:
+                    for ded in elegidas[producto_id]:
+                        stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                            producto_id=ded["producto_id"],
+                            ubicacion_id=ded["ubicacion_id"],
+                            defaults={"cantidad": 0},
+                        )
+                        stock.cantidad -= ded["cantidad"]
+                        stock.save(update_fields=["cantidad"])
+                        key = str(ded["ubicacion_id"])
+                        asignacion[key] = asignacion.get(key, 0) + ded["cantidad"]
+                else:
+                    for ubicacion_id, cantidad in registradas.items():
+                        stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                            producto_id=producto_id,
+                            ubicacion_id=int(ubicacion_id),
+                            defaults={"cantidad": 0},
+                        )
+                        stock.cantidad -= cantidad
+                        stock.save(update_fields=["cantidad"])
+                        asignacion[str(ubicacion_id)] = cantidad
 
-                restante = cantidad_vendida - ya_deducido
+                if asignacion:
+                    primera = max(asignacion, key=asignacion.get)
+                    detalle.ubicacion_id_id = int(primera)
+                    detalle.save(update_fields=["ubicacion"])
+                nueva[str(producto_id)] = asignacion
 
-                if restante > 0:
-                    stocks = StockProductoUbicacion.objects.select_for_update().filter(
-                        producto_id=producto_id, cantidad__gt=0
-                    ).order_by("-cantidad")
-
-                    for stock in stocks:
-                        if restante <= 0:
-                            break
-                        disponible = min(stock.cantidad, restante)
-                        stock.cantidad -= disponible
-                        stock.save()
-                        restante -= disponible
-
-                        if not detalle.ubicacion_id and stock.ubicacion_id:
-                            detalle.ubicacion_id = stock.ubicacion_id
-                            detalle.save(update_fields=["ubicacion"])
+            venta.deduccion_original = nueva
+            venta.save(update_fields=["deduccion_original"])
 
         return Response({"status": "ok"})
 
