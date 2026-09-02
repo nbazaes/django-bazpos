@@ -4,6 +4,21 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.26.0] - 2026-09-02
+
+### Agregado
+
+- Catálogo público consultable con búsqueda, filtros por marca y OEM, disponibilidad por ubicación y desglose de stock.
+- Ahora puedes editar los productos del catálogo directamente desde la tabla de ítems de una factura.
+
+### Corregido
+
+- El aviso de stock insuficiente aparece dentro de la ventana de selección de ubicación e indica el producto correspondiente.
+
+### Rendimiento
+
+- La aplicación carga más rápido gracias a mejoras en la carga y almacenamiento de sus recursos.
+
 ## [1.25.0] - 2026-08-28
 
 ### Agregado
