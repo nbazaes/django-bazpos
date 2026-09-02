@@ -61,6 +61,8 @@ export default function VentaPage() {
   const [ubicacionItems, setUbicacionItems] = useState([]);
   const [selectedUbicaciones, setSelectedUbicaciones] = useState({});
   const [ubicacionError, setUbicacionError] = useState("");
+  const [ubicacionMixto, setUbicacionMixto] = useState(false);
+  const [cantidadesUbicacion, setCantidadesUbicacion] = useState({});
   const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(() => readStoredVenta().descuentoPorcentaje);
   const barraRef = useRef(null);
   const processingRef = useRef(false);
@@ -96,6 +98,15 @@ export default function VentaPage() {
   const medioPagoResuelto = esMixto || medioPago !== "";
   const documentoResuelto = documentoFiscal !== "";
   const conflictoSeleccion = confirmMode === "VE" && (!medioPagoResuelto || !documentoResuelto);
+
+  const sumaUbicaciones = (productoId) =>
+    Object.values(cantidadesUbicacion[productoId] || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+  const mixtoUbicacionesValido = !ubicacionMixto || ubicacionItems.every((item) => {
+    const suma = sumaUbicaciones(item.producto_id);
+    if (suma !== item.cantidad_vendida) return false;
+    const cants = cantidadesUbicacion[item.producto_id] || {};
+    return item.ubicaciones.every((u) => (Number(cants[u.id]) || 0) <= u.stock);
+  });
 
   useEffect(() => {
     if (!cotizacionOrigenId) return;
@@ -377,6 +388,8 @@ export default function VentaPage() {
         });
         setSelectedUbicaciones(defaults);
         setUbicacionError("");
+        setUbicacionMixto(false);
+        setCantidadesUbicacion({});
         setShowUbicacionDialog(true);
       } else {
         await apiRequest(`/ventas/${ventaId}/deducir-stock/`, {
@@ -389,16 +402,45 @@ export default function VentaPage() {
     }
   }
 
+  function handleToggleUbicacionMixto(e) {
+    const checked = e.target.checked;
+    setUbicacionMixto(checked);
+    if (checked) {
+      const seed = {};
+      ubicacionItems.forEach((item) => {
+        const sel = selectedUbicaciones[item.producto_id];
+        seed[item.producto_id] = {};
+        item.ubicaciones.forEach((u) => {
+          seed[item.producto_id][u.id] = u.id === sel ? item.cantidad_vendida : 0;
+        });
+      });
+      setCantidadesUbicacion(seed);
+    }
+    setUbicacionError("");
+  }
+
   async function handleDeducirStock() {
     if (!lastDocumento || deducirRef.current) return;
     deducirRef.current = true;
     setIsDeducing(true);
     try {
-      const deducciones = ubicacionItems.map((item) => ({
-        producto_id: item.producto_id,
-        ubicacion_id: selectedUbicaciones[item.producto_id],
-        cantidad: item.cantidad_vendida,
-      }));
+      const deducciones = ubicacionItems.flatMap((item) => {
+        if (ubicacionMixto) {
+          const cants = cantidadesUbicacion[item.producto_id] || {};
+          return item.ubicaciones
+            .filter((u) => Number(cants[u.id]) > 0)
+            .map((u) => ({
+              producto_id: item.producto_id,
+              ubicacion_id: u.id,
+              cantidad: Number(cants[u.id]),
+            }));
+        }
+        return [{
+          producto_id: item.producto_id,
+          ubicacion_id: selectedUbicaciones[item.producto_id],
+          cantidad: item.cantidad_vendida,
+        }];
+      });
       await apiRequest(`/ventas/${lastDocumento.ventaId}/deducir-stock/`, {
         method: "POST",
         body: { deducciones },
@@ -1165,10 +1207,19 @@ export default function VentaPage() {
               <div className="modal-body">
                 <p className="mb-3 text-secondary">Los siguientes productos tienen stock en múltiples ubicaciones. Seleccione de cuál descontar:</p>
                 {ubicacionError && <div className="alert alert-danger">{ubicacionError}</div>}
+                <label className="checkbox-custom mb-3" style={{ cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={ubicacionMixto}
+                    onChange={handleToggleUbicacionMixto}
+                  />
+                  <span className="checkbox-custom__mark" />
+                  <span className="checkbox-custom__label">Mixto (repartir la cantidad entre varias ubicaciones)</span>
+                </label>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Producto</th><th>Cantidad vendida</th><th>Ubicación</th></tr>
+                      <tr><th>Producto</th><th>Cantidad vendida</th><th>{ubicacionMixto ? "Reparto por ubicación" : "Ubicación"}</th></tr>
                     </thead>
                     <tbody>
                       {ubicacionItems.map((item) => (
@@ -1176,23 +1227,63 @@ export default function VentaPage() {
                           <td>{item.codigo_producto} - {item.nombre}</td>
                           <td>{item.cantidad_vendida}</td>
                           <td>
-                            <select
-                              className="form-control form-control-sm"
-                              value={selectedUbicaciones[item.producto_id] || ""}
-                              onChange={(e) => {
-                              setSelectedUbicaciones({
-                                ...selectedUbicaciones,
-                                [item.producto_id]: Number(e.target.value),
-                              });
-                              setUbicacionError("");
-                            }}
-                            >
-                              {item.ubicaciones.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.nombre} (stock: {u.stock})
-                                </option>
-                              ))}
-                            </select>
+                            {ubicacionMixto ? (
+                              <>
+                                {item.ubicaciones.map((u) => (
+                                  <div key={u.id} className="d-flex align-items-center mb-2">
+                                    <span className="mr-2 text-nowrap" style={{ width: 150 }}>{u.nombre} (máx {u.stock}):</span>
+                                    <input
+                                      type="number"
+                                      className="form-control form-control-sm"
+                                      style={{ width: 100 }}
+                                      min={0}
+                                      max={Math.min(u.stock, item.cantidad_vendida)}
+                                      step={1}
+                                      value={cantidadesUbicacion[item.producto_id]?.[u.id] ?? 0}
+                                      onChange={(e) => {
+                                        const val = e.target.value === "" ? 0 : Number(e.target.value);
+                                        setCantidadesUbicacion((prev) => ({
+                                          ...prev,
+                                          [item.producto_id]: { ...(prev[item.producto_id] || {}), [u.id]: val },
+                                        }));
+                                        setUbicacionError("");
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                                {(() => {
+                                  const suma = sumaUbicaciones(item.producto_id);
+                                  const faltante = item.cantidad_vendida - suma;
+                                  if (faltante === 0) {
+                                    return <div className="text-success">Suma: {suma} de {item.cantidad_vendida} — correcto</div>;
+                                  }
+                                  return (
+                                    <div className="text-danger">
+                                      Suma: {suma} de {item.cantidad_vendida} —{" "}
+                                      {faltante > 0 ? `faltan ${faltante}` : `sobran ${Math.abs(faltante)}`}.
+                                    </div>
+                                  );
+                                })()}
+                              </>
+                            ) : (
+                              <select
+                                className="form-control form-control-sm"
+                                value={selectedUbicaciones[item.producto_id] || ""}
+                                onChange={(e) => {
+                                  setSelectedUbicaciones({
+                                    ...selectedUbicaciones,
+                                    [item.producto_id]: Number(e.target.value),
+                                  });
+                                  setUbicacionError("");
+                                }}
+                              >
+                                {item.ubicaciones.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.nombre} (stock: {u.stock})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1202,7 +1293,7 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowUbicacionDialog(false)}>Cancelar</button>
-                <button type="button" className="btn btn-success" onClick={handleDeducirStock} disabled={isDeducing}>
+                <button type="button" className="btn btn-success" onClick={handleDeducirStock} disabled={isDeducing || !mixtoUbicacionesValido}>
                   {isDeducing ? "Deduciendo..." : "Confirmar"}
                 </button>
               </div>

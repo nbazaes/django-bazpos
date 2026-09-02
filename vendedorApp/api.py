@@ -1058,6 +1058,18 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             serializer.is_valid(raise_exception=True)
             deducciones = serializer.validated_data["deducciones"]
 
+            sumas = {}
+            for ded in deducciones:
+                sumas[ded["producto_id"]] = sumas.get(ded["producto_id"], 0) + ded["cantidad"]
+
+            for producto_id, total in sumas.items():
+                detalle = detalles_map.get(producto_id)
+                if detalle and total > detalle.cantidad:
+                    return Response(
+                        {"error": f"Las cantidades a descontar superan la cantidad vendida del producto {detalle.producto.codigo_producto}"},
+                        status=400,
+                    )
+
             with transaction.atomic():
                 for ded in deducciones:
                     producto_id = ded["producto_id"]

@@ -407,6 +407,62 @@ class VentaStockActionsTest(BaseTest):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_deducir_stock_mixto(self):
+        u2 = Ubicacion.objects.create(nombre="Bodega Norte")
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=u2, cantidad=5
+        )
+        venta_id = self._crear_venta()
+        resp = auth_client(self.vendedor).post(
+            f"/api/ventas/{venta_id}/deducir-stock/",
+            {
+                "deducciones": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": self.ubicacion.id,
+                        "cantidad": 1,
+                    },
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": u2.id,
+                        "cantidad": 1,
+                    },
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        stock1 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        stock2 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=u2
+        )
+        self.assertEqual(stock1.cantidad, 9)
+        self.assertEqual(stock2.cantidad, 4)
+
+    def test_deducir_stock_over_deduction(self):
+        venta_id = self._crear_venta()
+        resp = auth_client(self.vendedor).post(
+            f"/api/ventas/{venta_id}/deducir-stock/",
+            {
+                "deducciones": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": self.ubicacion.id,
+                        "cantidad": 2,
+                    },
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": self.ubicacion.id,
+                        "cantidad": 1,
+                    },
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
     def test_ubicaciones_para_deducir(self):
         u2 = Ubicacion.objects.create(nombre="Bodega Norte")
         StockProductoUbicacion.objects.create(
