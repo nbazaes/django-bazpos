@@ -237,6 +237,23 @@ Ship as **2.0.0** — config schema changes and Stellantis deprecation are break
 
 ---
 
+## Branching & Release Strategy
+
+We are not using repository forks. Execute this entire migration via Git feature branching off `main`:
+
+```text
+main (current stable v1.27.0)
+ └── feat/agnostization-v2 (epic branch)
+      ├── feat/phase-1-unified-config   --> PR into feat/agnostization-v2
+      ├── feat/phase-2-dynamic-rules    --> PR into feat/agnostization-v2
+      ├── feat/phase-3-feature-flags     --> PR into feat/agnostization-v2
+      └── feat/phase-4-packaging-seeds  --> PR into feat/agnostization-v2
+```
+
+Each phase branch merges into the epic branch via PR; the epic branch merges into `main` as the **2.0.0** release once all four phases land.
+
+---
+
 ## Out of scope (for now)
 
 - **No multi-tenant schema** (no `store_id` on `Producto`, `Venta`, etc.) — wrong model for one-install-per-customer
