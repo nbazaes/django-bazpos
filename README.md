@@ -212,12 +212,13 @@ bazpos/
 ### Guards (frontend)
 
 - `ProtectedRoute` — validates the JWT by calling `/auth/me/` on every protected route visit.
-- `GerenteGuard` — allows Gerente and Encargado (management routes: products, suppliers, users, invoices, supplier orders, configuration, reports, cash register closing).
+- `GerenteGuard` — allows Gerente and Encargado (management routes: products, suppliers, users, invoices, supplier orders, reports, cash register closing). The `/configuracion` page is open to all roles for the theme picker; the store form inside it is restricted to Gerente/Encargado.
 - `BodegueroGuard` — allows Bodeguero, Encargado and Gerente (`/ubicaciones` route).
 
 ## Notes
 
 - The frontend is a **SPA** with a single entrypoint at `frontend/index.html`; all routes live in `frontend/src/router.jsx`.
+- Selectable color schemes (6 themes with dark/light variants) are available to every user from Configuración; the store-settings form there is manager-only.
 - `DEBUG` is controlled by the `DJANGO_DEBUG` variable.
 - MySQL driver: **PyMySQL** (version pinned in `settings.py`). Do not change without reviewing MariaDB compatibility.
 - Gunicorn runs with **2 workers** (sync) due to the VPS memory budget (1 vCPU / 1 GiB). Do not raise to 4 without first measuring `docker stats` and latency.
@@ -228,14 +229,15 @@ bazpos/
 
 ## Roadmap
 
-BazPOS is a **productized, single-tenant retail POS**: one Docker installation per customer, each with its own MariaDB. Business rules (tax, currency, rounding, shipping, payment methods, document types, feature flags) live in a single configurable `StoreConfig` edited from the UI — not in code. Optional vertical profiles are enabled with feature flags, so the same codebase serves a generic retailer and an auto-parts shop without forks.
+BazPOS is a **productized, single-tenant retail POS**: one Docker installation per customer, each with its own MariaDB. Business rules (tax, currency, rounding, shipping, payment methods, document types, feature flags) live in a single `StoreConfig`; store name and locale are set at install time via `.env`, and the rest is edited from the Configuración UI — not in code. Optional vertical profiles are enabled with feature flags, so the same codebase serves a generic retailer and an auto-parts shop without forks.
 
 Current status (see `ROADMAP.md`):
 
 - **Unified config** — `StoreConfig` is the single source of truth for tax/rounding; `gerenteApp/pricing.py` + frontend `storeConfig.js` provide one pricing path and one config fetch at app init.
 - **Dynamic rules** — payment methods and document types are configurable JSON lists; order-line cost modifiers use a minimal `gerenteApp/store_extensions/` seam (Biocar's 20% rule ships as a reference extension); shipping defaults from config.
 - **Feature flags** — `product_oem_fields`, `oem_primary_search`, `order_shipping_toggle`, `order_pricing_rules`, `daily_supplier_orders`, `oem_stock_substitutes`, `supplier_rut_field` gate the auto-parts UI and report columns.
-- **Packaging** — store name/locale are install-time via `.env`, `seed_data --profile generic_retail|auto_parts`, install/backup/upgrade docs (`docs/instalacion.md`).
+- **UI & theming** — selectable color schemes (6 themes with dark/light variants, per user) available to every role from Configuración; store settings there are restricted to Gerente/Encargado.
+- **Packaging** — store name/locale are install-time via `.env` (synced on container start), `seed_data --profile generic_retail|auto_parts`, install/backup/upgrade docs (`docs/instalacion.md`).
 - **Next (post-2.0)** — full UI redesign (`feat/redesign`) and a plugin framework once there are 3+ vertical profiles.
 
 ## Licenses

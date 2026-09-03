@@ -113,7 +113,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - Node 24 required (`package.json` engines `>=24 <25`); CI uses Node 24.
 - Pages are lazy-loaded: register new pages in `frontend/src/lazyRoutes.jsx`, not as static imports in `router.jsx`.
 - `router.jsx` is the source of truth for all routes and page structure.
-- `Shell.jsx` is the layout wrapper (sidebar + topbar + content area with dark/light theme toggle).
+- `Shell.jsx` is the layout wrapper (sidebar + topbar + content area) with dark/light toggle and selectable color schemes (`data-scheme`, picker in Configuración for all roles).
 - Design uses a corporate purple palette with CSS custom properties (see `frontend/src/design-system.css`).
 
 ## Python Rules
