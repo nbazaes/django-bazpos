@@ -18,6 +18,7 @@ from vendedorApp.models import (
     PedidoDetalle,
     PedidoProveedorDia,
     Producto,
+    StockProductoUbicacion,
     Ubicacion,
     Venta,
 )
@@ -431,7 +432,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
                 )
 
         for i, (cantidad, producto, subtotal) in enumerate(items_data):
-            DetalleVenta.objects.create(
+            detalle = DetalleVenta.objects.create(
                 venta=venta,
                 producto=producto,
                 cantidad=cantidad,
@@ -439,6 +440,34 @@ class RegistrarVentaSerializer(serializers.Serializer):
                 precio_descontado=precios_descontados[i],
                 subtotal=subtotal,
             )
+
+            if tipo_documento != Venta.TipoDocumento.VENTA:
+                continue
+
+            restante = cantidad
+            deduccion_producto = {}
+            stocks = StockProductoUbicacion.objects.select_for_update().filter(
+                producto=producto, cantidad__gt=0
+            ).order_by("-cantidad")
+            for stock in stocks:
+                if restante <= 0:
+                    break
+                disponible = min(stock.cantidad, restante)
+                stock.cantidad -= disponible
+                stock.save(update_fields=["cantidad"])
+                restante -= disponible
+                key = str(stock.ubicacion_id)
+                deduccion_producto[key] = deduccion_producto.get(key, 0) + disponible
+                if not detalle.ubicacion_id:
+                    detalle.ubicacion_id = stock.ubicacion_id
+
+            if detalle.ubicacion_id:
+                detalle.save(update_fields=["ubicacion"])
+            if deduccion_producto:
+                venta.deduccion_original[str(producto.producto_id)] = deduccion_producto
+
+        if venta.deduccion_original:
+            venta.save(update_fields=["deduccion_original"])
 
         return venta
 
