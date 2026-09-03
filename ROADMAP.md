@@ -240,7 +240,7 @@ Ship as **2.0.0** — config schema changes and Stellantis deprecation are break
 We are not using repository forks. Execute this entire migration via Git feature branching off `main`:
 
 ```text
-main (current stable v1.27.0)
+main (current stable v1.x.x)
  └── feat/agnostization-v2 (epic branch)
       ├── feat/phase-1-unified-config   --> PR into feat/agnostization-v2
       ├── feat/phase-2-dynamic-rules    --> PR into feat/agnostization-v2
@@ -248,7 +248,7 @@ main (current stable v1.27.0)
       └── feat/phase-4-packaging-seeds  --> PR into feat/agnostization-v2
 ```
 
-Each phase branch merges into the epic branch via PR; the epic branch merges into `main` as the **2.0.0** release once all four phases land.
+Each phase branch merges into the epic branch via PR. **Release path:** the epic merges into `staging` first for testing (CI builds images on staging push; no deploy), and after validation `staging` is merged into `main` as the **2.0.0** release (CI push to `main` deploys to the VPS).
 
 ---
 
