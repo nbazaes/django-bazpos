@@ -18,6 +18,7 @@ const vendedorLinks = [
   { to: "/ventas/pedidos", label: "Pedidos", icon: "bi-bag-check" },
   { to: "/ventas/historial", label: "Historial", icon: "bi-clock-history" },
   { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
+  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
 ];
 
 const gerenteLinks = [
@@ -28,7 +29,6 @@ const gerenteLinks = [
   { to: "/facturas", label: "Facturas", icon: "bi-file-earmark-text" },
   { to: "/reportes", label: "Reportes", icon: "bi-graph-up" },
   { to: "/cierre-caja", label: "Cierre de caja", icon: "bi-cash-coin" },
-  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
 ];
 
 const bodegueroLinks = [
