@@ -36,8 +36,8 @@ class DetalleFacturaInline(admin.TabularInline):
 
 @admin.register(Proveedor)
 class ProveedorAdmin(SuperuserOnlyAdmin):
-    list_display = ('proveedor_id', 'rut', 'nombre', 'persona_contacto', 'telefono', 'correo', 'fecha_creacion')
-    search_fields = ('rut', 'nombre')
+    list_display = ('proveedor_id', 'tax_id', 'nombre', 'persona_contacto', 'telefono', 'correo', 'fecha_creacion')
+    search_fields = ('tax_id', 'nombre')
 
 
 @admin.register(Factura)

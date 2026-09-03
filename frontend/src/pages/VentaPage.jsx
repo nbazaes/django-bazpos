@@ -73,6 +73,10 @@ export default function VentaPage() {
   const ventaConfig = getStoreConfig();
   const paymentMethods = ventaConfig.effective_payment_methods || [];
   const documentTypes = ventaConfig.effective_document_types || [];
+  const showPartsFields = ventaConfig.feature_flags?.product_oem_fields === true;
+  const searchPlaceholder = ventaConfig.feature_flags?.oem_primary_search === true
+    ? "Ingrese código OEM"
+    : "Buscar por código o nombre";
   const esGerente = isGerente(getUser());
 
   useEffect(() => {
@@ -559,10 +563,10 @@ export default function VentaPage() {
         <div className="row">
           <div className="col-md-5">
             <div style={{ position: "relative" }}>
-              <input
-                className="form-control"
-                placeholder="Ingrese código OEM"
-                value={oem}
+<input
+        className="form-control"
+        placeholder={searchPlaceholder}
+        value={oem}
                 onChange={(e) => setOem(e.target.value)}
                 style={{ paddingRight: "2rem" }}
               />
@@ -618,9 +622,9 @@ export default function VentaPage() {
                 <thead>
                   <tr>
                     <th style={{ width: "1px" }}>Código</th>
-                    <th style={{ width: "1px" }}>OEM</th>
+                    {showPartsFields && <th style={{ width: "1px" }}>OEM</th>}
                     <th>Nombre</th>
-                    <th>Marca</th>
+                    {showPartsFields && <th>Marca</th>}
                     <th>Descripción</th>
                     <th style={{ width: "1px" }}>Stock</th>
                     <th style={{ width: "1px" }}>Última fecha de llegada</th>
@@ -633,9 +637,9 @@ export default function VentaPage() {
                   {productosEncontrados.map((p) => (
                     <tr key={p.producto_id}>
                       <td className="text-nowrap">{p.codigo_producto}</td>
-                      <td className="text-nowrap">{p.oem}</td>
+                      {showPartsFields && <td className="text-nowrap">{p.oem}</td>}
                       <td>{p.nombre}</td>
-                      <td>{p.marca}</td>
+                      {showPartsFields && <td>{p.marca}</td>}
                       <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
                       <td>
                         {esGerente ? (
@@ -736,9 +740,9 @@ export default function VentaPage() {
             <thead>
               <tr>
                 <th style={{ width: "1px" }}>Código</th>
-                <th style={{ width: "1px" }}>OEM</th>
+                {showPartsFields && <th style={{ width: "1px" }}>OEM</th>}
                 <th>Nombre</th>
-                <th style={{ width: "1px" }}>Marca</th>
+                {showPartsFields && <th style={{ width: "1px" }}>Marca</th>}
                 <th style={{ width: "1px" }}>Cantidad</th>
                 <th style={{ width: "1px" }}>Subtotal neto</th>
                 <th style={{ width: "1px" }}>Subtotal</th>
@@ -749,9 +753,9 @@ export default function VentaPage() {
               {carro.map((i) => (
                 <tr key={i.producto_id}>
                   <td className="text-nowrap">{i.codigo_producto}</td>
-                  <td className="text-nowrap">{i.oem}</td>
+                  {showPartsFields && <td className="text-nowrap">{i.oem}</td>}
                   <td>{i.nombre}</td>
-                  <td className="text-nowrap">{i.marca}</td>
+                  {showPartsFields && <td className="text-nowrap">{i.marca}</td>}
                   <td>
                     <StepperInput
                       value={i.cantidad}
@@ -1036,15 +1040,15 @@ export default function VentaPage() {
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Código</th><th>OEM</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
+                      <tr><th>Código</th>{showPartsFields && <th>OEM</th>}<th>Nombre</th>{showPartsFields && <th>Marca</th>}<th>Cantidad</th><th>Subtotal neto</th><th>Subtotal</th></tr>
                     </thead>
                     <tbody>
                       {carro.map((i) => (
                         <tr key={`confirm-${i.producto_id}`}>
                           <td>{i.codigo_producto}</td>
-                          <td>{i.oem}</td>
+                          {showPartsFields && <td>{i.oem}</td>}
                           <td>{i.nombre}</td>
-                          <td>{i.marca}</td>
+                          {showPartsFields && <td>{i.marca}</td>}
                           <td>{i.cantidad}</td>
                           <td>${netoFromBruto(i.precio * i.cantidad)}</td>
                           <td>${i.precio * i.cantidad}</td>

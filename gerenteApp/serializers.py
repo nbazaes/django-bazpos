@@ -11,7 +11,7 @@ class ProveedorSerializer(serializers.ModelSerializer):
         model = Proveedor
         fields = [
             "proveedor_id",
-            "rut",
+            "tax_id",
             "nombre",
             "persona_contacto",
             "telefono",
@@ -263,6 +263,7 @@ class StoreConfigSerializer(serializers.ModelSerializer):
     ubicacion_por_defecto_nombre = serializers.SerializerMethodField()
     effective_payment_methods = serializers.SerializerMethodField()
     effective_document_types = serializers.SerializerMethodField()
+    effective_product_search_fields = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreConfig
@@ -285,6 +286,8 @@ class StoreConfigSerializer(serializers.ModelSerializer):
             "document_types",
             "effective_payment_methods",
             "effective_document_types",
+            "product_search_fields",
+            "effective_product_search_fields",
             "ubicacion_por_defecto",
             "ubicacion_por_defecto_nombre",
         ]
@@ -297,3 +300,6 @@ class StoreConfigSerializer(serializers.ModelSerializer):
 
     def get_effective_document_types(self, obj):
         return obj.active_document_types()
+
+    def get_effective_product_search_fields(self, obj):
+        return obj.effective_product_search_fields()

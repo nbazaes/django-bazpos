@@ -10,6 +10,7 @@ import { getUser } from "../lib/auth";
 import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
+import { getStoreConfig } from "../lib/storeConfig";
 
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString()}`;
 
@@ -38,6 +39,9 @@ export default function DashboardPage() {
   const didToast = useRef(false);
   const { data, error } = useDashboardStats();
   const queryClient = useQueryClient();
+  const flags = getStoreConfig().feature_flags || {};
+  const showPartsFields = flags.product_oem_fields === true;
+  const showOemSubstitutes = flags.oem_stock_substitutes === true;
   const [popoverAbierto, setPopoverAbierto] = useState(null);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   const [stockPage, setStockPage] = useState(1);
@@ -259,7 +263,7 @@ export default function DashboardPage() {
                           <th style={{ width: "40px" }}></th>
                           <th>Nombre</th>
                           <th>Código</th>
-                          <th className="hide-mobile">OEM</th>
+                          {showPartsFields && <th className="hide-mobile">OEM</th>}
                           <th className="hide-mobile">Proveedor</th>
                           <th>Stock actual</th>
                           <th>Stock mínimo</th>
@@ -279,7 +283,7 @@ export default function DashboardPage() {
                           return (
                             <tr key={p.producto_id}>
                               <td className="text-center">
-                                {p.oem_productos && p.oem_productos.length > 0 && (
+                                {showOemSubstitutes && p.oem_productos && p.oem_productos.length > 0 && (
                                   <button
                                     type="button"
                                     className="stock-hover warning-icon popover-trigger"
@@ -314,7 +318,7 @@ export default function DashboardPage() {
                               </td>
                               <td>{p.nombre}</td>
                               <td>{p.codigo_producto}</td>
-                              <td className="hide-mobile">{p.oem}</td>
+                              {showPartsFields && <td className="hide-mobile">{p.oem}</td>}
                               <td className="hide-mobile">{p.proveedor_nombre}</td>
                               <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
                               <td>{p.stock_minimo}</td>

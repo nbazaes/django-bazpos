@@ -7,9 +7,9 @@ from gerenteApp.models import Proveedor
 class ProveedorForm(forms.ModelForm):
     class Meta:
         model = Proveedor
-        fields = ['rut', 'nombre', 'persona_contacto', 'telefono', 'correo', 'direccion']
+        fields = ['tax_id', 'nombre', 'persona_contacto', 'telefono', 'correo', 'direccion']
         widgets = {
-            'rut': forms.TextInput(attrs={'class': 'form-control'}),
+            'tax_id': forms.TextInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'persona_contacto': forms.TextInput(attrs={'class': 'form-control'}),
             'telefono': forms.TextInput(attrs={'class': 'form-control'}),

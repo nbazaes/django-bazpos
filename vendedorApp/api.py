@@ -196,7 +196,9 @@ class DashboardStatsView(APIView):
         bajo_minimo = list(bajo_minimo_qs)
 
         # Find related products by OEM that have active stock.
-        if bajo_minimo:
+        config = StoreConfig.current()
+        show_oem_substitutes = (config.feature_flags or {}).get("oem_stock_substitutes", False)
+        if bajo_minimo and show_oem_substitutes:
             oems = [p["oem"] for p in bajo_minimo]
             producto_ids = [p["producto_id"] for p in bajo_minimo]
             oem_productos = (
@@ -222,6 +224,10 @@ class DashboardStatsView(APIView):
             for p in bajo_minimo:
                 p["proveedor_nombre"] = p.pop("proveedor__nombre")
                 p["oem_productos"] = oem_map.get(p["oem"], [])
+        elif bajo_minimo:
+            for p in bajo_minimo:
+                p["proveedor_nombre"] = p.pop("proveedor__nombre")
+                p["oem_productos"] = []
 
         productos_en_pedido = []
         hoy_fecha = date.today()
@@ -804,7 +810,8 @@ class ProductoViewSet(viewsets.ModelViewSet):
             queryset = queryset.annotate(ultima_fecha_llegada=Subquery(ultima_fecha))
 
         if texto:
-            queryset = queryset.filter(Q(nombre__icontains=texto) | Q(oem__icontains=texto) | Q(codigo_producto__icontains=texto) | Q(oem_alternativo__icontains=texto) | Q(codigo_proveedor__icontains=texto))
+            from gerenteApp.search import product_search_q
+            queryset = queryset.filter(product_search_q(texto))
         if proveedor:
             queryset = queryset.filter(proveedor_id=proveedor)
         if "sin_stock" in self.request.query_params:
@@ -2128,13 +2135,8 @@ def build_productos_report(filters):
 
     texto = filters["texto"]
     if texto:
-        queryset = queryset.filter(
-            Q(nombre__icontains=texto)
-            | Q(oem__icontains=texto)
-            | Q(codigo_producto__icontains=texto)
-            | Q(oem_alternativo__icontains=texto)
-            | Q(codigo_proveedor__icontains=texto)
-        )
+        from gerenteApp.search import product_search_q
+        queryset = queryset.filter(product_search_q(texto))
 
     return queryset
 
@@ -2160,11 +2162,8 @@ def build_ventas_report(filters):
 
     texto = filters["texto"]
     if texto:
-        queryset = queryset.filter(
-            Q(producto__nombre__icontains=texto)
-            | Q(producto__oem__icontains=texto)
-            | Q(producto__codigo_producto__icontains=texto)
-        )
+        from gerenteApp.search import product_search_q
+        queryset = queryset.filter(product_search_q(texto, prefix="producto__"))
 
     return queryset.order_by("-venta__fecha_venta", "-id")
 

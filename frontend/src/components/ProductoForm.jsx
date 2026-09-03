@@ -8,7 +8,7 @@ import {
   useUpdateProducto,
 } from "../lib/queries";
 import { useDebounce } from "../lib/hooks";
-import { calcularPrecioVenta } from "../lib/storeConfig";
+import { calcularPrecioVenta, getStoreConfig } from "../lib/storeConfig";
 
 const initialState = {
   codigo_producto: "",
@@ -46,6 +46,7 @@ export default function ProductoForm({
   const codigoExistente = existeCodigo ? codigoCheck.producto : null;
 
   const proveedores = proveedoresData?.results ?? [];
+  const showPartsFields = getStoreConfig().feature_flags?.product_oem_fields === true;
 
   const precioVenta = useMemo(
     () => calcularPrecioVenta(data.precio_costo, data.margen_utilidad),
@@ -114,11 +115,15 @@ export default function ProductoForm({
               </div>
             )}
           </div>
-          <div className="col-md-4 form-group"><label>Código OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
           <div className="col-md-4 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
-          <div className="col-12 form-group"><label>OEM alternativos</label><textarea className="form-control" value={data.oem_alternativo} onChange={(e) => setData({ ...data, oem_alternativo: e.target.value })} rows={2} /></div>
-          <div className="col-md-4 form-group"><label>Código proveedor</label><input className="form-control" value={data.codigo_proveedor} onChange={(e) => setData({ ...data, codigo_proveedor: e.target.value })} /></div>
-          <div className="col-md-4 form-group"><label>Marca</label><input className="form-control" value={data.marca} onChange={(e) => setData({ ...data, marca: e.target.value })} /></div>
+          {showPartsFields && (
+            <>
+              <div className="col-md-4 form-group"><label>Código OEM</label><input className="form-control" value={data.oem} onChange={(e) => setData({ ...data, oem: e.target.value })} /></div>
+              <div className="col-12 form-group"><label>OEM alternativos</label><textarea className="form-control" value={data.oem_alternativo} onChange={(e) => setData({ ...data, oem_alternativo: e.target.value })} rows={2} /></div>
+              <div className="col-md-4 form-group"><label>Código proveedor</label><input className="form-control" value={data.codigo_proveedor} onChange={(e) => setData({ ...data, codigo_proveedor: e.target.value })} /></div>
+              <div className="col-md-4 form-group"><label>Marca</label><input className="form-control" value={data.marca} onChange={(e) => setData({ ...data, marca: e.target.value })} /></div>
+            </>
+          )}
           <div className="col-12 form-group"><label>Descripción</label><textarea className="form-control" value={data.descripcion} onChange={(e) => setData({ ...data, descripcion: e.target.value })} /></div>
           <div className="col-md-3 form-group"><label>Precio costo</label><input type="number" className="form-control" value={data.precio_costo} onChange={(e) => setData({ ...data, precio_costo: e.target.value })} required /></div>
           <div className="col-md-3 form-group">

@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from gerenteApp.search import product_search_q
 from vendedorApp.models import Producto
 from vendedorApp.pagination import DefaultPagination
 from vendedorApp.serializers import CatalogoProductoSerializer
@@ -29,13 +30,7 @@ class CatalogoPublicoViewSet(viewsets.ReadOnlyModelViewSet):
 
         if texto:
             queryset = queryset.filter(
-                Q(nombre__icontains=texto)
-                | Q(descripcion__icontains=texto)
-                | Q(marca__icontains=texto)
-                | Q(oem__icontains=texto)
-                | Q(oem_alternativo__icontains=texto)
-                | Q(codigo_producto__icontains=texto)
-                | Q(codigo_proveedor__icontains=texto)
+                Q(descripcion__icontains=texto) | product_search_q(texto)
             )
         if marca:
             queryset = queryset.filter(marca__iexact=marca)

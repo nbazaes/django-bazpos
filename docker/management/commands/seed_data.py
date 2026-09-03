@@ -138,7 +138,7 @@ class Command(BaseCommand):
             rut = self._generate_rut()
             nombre = f"{random.choice(empresas)} {random.choice(nombres)} {fake.company_suffix()}"
             p = Proveedor.objects.create(
-                rut=rut,
+                tax_id=rut,
                 nombre=nombre[:100],
                 persona_contacto=fake.name(),
                 telefono=fake.phone_number()[:20],

@@ -19,6 +19,8 @@ const DEFAULT_CONFIG = {
   feature_flags: {},
   payment_methods: [],
   document_types: [],
+  product_search_fields: [],
+  effective_product_search_fields: ["codigo_producto", "nombre", "oem", "oem_alternativo", "codigo_proveedor", "marca"],
   effective_payment_methods: [
     { code: "EF", label: "Efectivo", active: true },
     { code: "TJ", label: "Tarjeta", active: true },

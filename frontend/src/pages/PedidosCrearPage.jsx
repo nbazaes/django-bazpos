@@ -61,6 +61,8 @@ export default function PedidosCrearPage() {
     ...documentTypes.map((d) => ({ value: d.code, label: d.label })),
   ];
   const showOrderPricingRules = config.feature_flags?.order_pricing_rules === true;
+  const showPartsFields = config.feature_flags?.product_oem_fields === true;
+  const showShippingToggle = config.feature_flags?.order_shipping_toggle === true;
   const shippingCost = Number(config.default_shipping_cost || 0);
   const shippingLabel = shippingCost > 0 ? `(+$${shippingCost.toLocaleString("es-CL")})` : "";
 
@@ -409,7 +411,9 @@ export default function PedidosCrearPage() {
                       onClick={() => seleccionarProductoExistente(p)}
                     >
                       <div className="font-weight-bold">{p.codigo_producto} — {p.nombre}</div>
-                      <div className="text-xs text-muted">OEM: {p.oem} | Costo: ${p.precio_costo}</div>
+                      {showPartsFields
+                        ? <div className="text-xs text-muted">OEM: {p.oem} | Costo: ${p.precio_costo}</div>
+                        : <div className="text-xs text-muted">Costo: ${p.precio_costo}</div>}
                     </button>
                   ))}
                 </div>
@@ -417,18 +421,20 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="row">
-              <div className="col-md-6">
-                <div className="form-group">
-                  <label>Código proveedor</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={producto.codigo_proveedor}
-                    onChange={(e) => handleProductoChange("codigo_proveedor", e.target.value)}
-                    placeholder="Código proveedor"
-                  />
+              {showPartsFields && (
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>Código proveedor</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={producto.codigo_proveedor}
+                      onChange={(e) => handleProductoChange("codigo_proveedor", e.target.value)}
+                      placeholder="Código proveedor"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="col-md-6">
                 <div className="form-group">
                   <label>Proveedor</label>
@@ -447,19 +453,21 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="row">
-              <div className="col-md-6">
-                <div className="form-group">
-                  <label>OEM</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={producto.oem}
-                    onChange={(e) => handleProductoChange("oem", e.target.value)}
-                    placeholder="OEM"
-                  />
+              {showPartsFields && (
+                <div className="col-md-6">
+                  <div className="form-group">
+                    <label>OEM</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={producto.oem}
+                      onChange={(e) => handleProductoChange("oem", e.target.value)}
+                      placeholder="OEM"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="col-md-6">
+              )}
+              <div className={showPartsFields ? "col-md-6" : "col-md-12"}>
                 <div className="form-group">
                   <label>Nombre</label>
                   <input
@@ -504,14 +512,16 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 mt-3 mb-3">
-              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={producto.sumar_envio}
-                  onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
-                />
-                <span>Sumar envío {shippingLabel}</span>
-              </label>
+              {showShippingToggle && (
+                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={producto.sumar_envio}
+                    onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
+                  />
+                  <span>Sumar envío {shippingLabel}</span>
+                </label>
+              )}
               {showOrderPricingRules && (
                 <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
                   <input
@@ -545,9 +555,9 @@ export default function PedidosCrearPage() {
           <table className="table table-sm table-bordered">
             <thead>
               <tr>
-                <th>Cód. Prov.</th>
+                {showPartsFields && <th>Cód. Prov.</th>}
                 <th>Proveedor</th>
-                <th>OEM</th>
+                {showPartsFields && <th>OEM</th>}
                 <th>Nombre</th>
                 <th>Precio costo</th>
                 <th>% Utilidad</th>
@@ -558,9 +568,9 @@ export default function PedidosCrearPage() {
             <tbody>
               {items.map((it, idx) => (
                 <tr key={idx}>
-                  <td>{it.codigo_proveedor}</td>
+                  {showPartsFields && <td>{it.codigo_proveedor}</td>}
                   <td>{proveedores.find((p) => p.proveedor_id === it.proveedor_id)?.nombre || "—"}</td>
-                  <td>{it.oem}</td>
+                  {showPartsFields && <td>{it.oem}</td>}
                   <td>{it.nombre}</td>
                   <td>${it.precio_costo}</td>
                   <td>{it.porcentaje_utilidad}%</td>
@@ -574,7 +584,7 @@ export default function PedidosCrearPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="text-center text-muted">No hay productos agregados</td>
+                  <td colSpan={showPartsFields ? 8 : 6} className="text-center text-muted">No hay productos agregados</td>
                 </tr>
               )}
             </tbody>

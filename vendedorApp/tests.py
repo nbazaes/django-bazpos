@@ -36,7 +36,7 @@ class BaseTest(TestCase):
         cls.vendedor2 = make_user("Vendedor", first_name="Luis", last_name="Rojas")
         cls.bodeguero = make_user("Bodeguero")
         cls.proveedor = Proveedor.objects.create(
-            rut="7654321-8", nombre="Proveedor Uno"
+            tax_id="7654321-8", nombre="Proveedor Uno"
         )
         cls.ubicacion = Ubicacion.objects.create(nombre="Bodega Central")
 
@@ -45,7 +45,7 @@ class ProductoModelTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         create_business_groups()
-        cls.proveedor = Proveedor.objects.create(rut="1111111-1", nombre="Prov")
+        cls.proveedor = Proveedor.objects.create(tax_id="1111111-1", nombre="Prov")
 
     def _create(self, **kwargs):
         data = dict(
@@ -1790,7 +1790,7 @@ class RolePermissionTest(BaseTest):
     def test_vendedor_no_crea_proveedor(self):
         resp = auth_client(self.vendedor).post(
             "/api/proveedores/",
-            {"rut": "1234567-4", "nombre": "Prov"},
+            {"tax_id": "1234567-4", "nombre": "Prov"},
             format="json",
         )
         self.assertEqual(resp.status_code, 403)

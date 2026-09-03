@@ -5,7 +5,7 @@ from datetime import timedelta
 # Create your models here.
 class Proveedor(models.Model):
     proveedor_id = models.AutoField(primary_key=True, verbose_name='proveedor_id')
-    rut = models.CharField(max_length=10, unique=True)  
+    tax_id = models.CharField(max_length=20, null=True, blank=True, unique=True, verbose_name='ID tributario')  
     nombre = models.CharField(max_length=100)
     persona_contacto = models.CharField(max_length=100, null=True)
     telefono = models.CharField(max_length=20, null=True)
@@ -89,6 +89,7 @@ class StoreConfig(models.Model):
     feature_flags = models.JSONField(default=dict, blank=True)
     payment_methods = models.JSONField(default=list, blank=True)
     document_types = models.JSONField(default=list, blank=True)
+    product_search_fields = models.JSONField(default=list, blank=True)
     ubicacion_por_defecto = models.ForeignKey(
         "vendedorApp.Ubicacion",
         on_delete=models.SET_NULL,
@@ -135,6 +136,15 @@ class StoreConfig(models.Model):
         {"code": "OT", "label": "Otros", "active": True},
     ]
 
+    DEFAULT_PRODUCT_SEARCH_FIELDS = [
+        "codigo_producto",
+        "nombre",
+        "oem",
+        "oem_alternativo",
+        "codigo_proveedor",
+        "marca",
+    ]
+
     def payment_methods_list(self):
         return self.payment_methods or self.DEFAULT_PAYMENT_METHODS
 
@@ -146,6 +156,9 @@ class StoreConfig(models.Model):
 
     def active_document_types(self):
         return [d for d in self.document_types_list() if d.get("active", True)]
+
+    def effective_product_search_fields(self):
+        return self.product_search_fields or self.DEFAULT_PRODUCT_SEARCH_FIELDS
 
     @classmethod
     def current_payment_methods(cls):

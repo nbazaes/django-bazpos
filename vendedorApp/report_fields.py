@@ -1,3 +1,52 @@
+from gerenteApp.models import StoreConfig
+
+PARTS_FIELDS = {
+    "productos": {"oem", "codigo_proveedor", "marca"},
+    "ventas": {"producto_oem", "producto_marca"},
+}
+
+_TEXT_PLACEHOLDER = {
+    True: "Nombre, OEM o código",
+    False: "Nombre o código",
+}
+
+
+def parts_fields_enabled():
+    config = StoreConfig.current()
+    return bool((config.feature_flags or {}).get("product_oem_fields", False))
+
+
+def filtered_fields(dataset_key, fields):
+    if parts_fields_enabled():
+        return fields
+    excluded = PARTS_FIELDS.get(dataset_key, set())
+    return [f for f in fields if f["key"] not in excluded]
+
+
+def filtered_filters(dataset_key, filters):
+    show_parts = parts_fields_enabled()
+    result = []
+    for f in filters:
+        if f["key"] == "marcas" and not show_parts:
+            continue
+        item = dict(f)
+        if item["key"] == "texto":
+            item["placeholder"] = _TEXT_PLACEHOLDER[show_parts]
+        result.append(item)
+    return result
+
+
+def dataset_fields(dataset_key):
+    dataset = DATASETS.get(dataset_key)
+    if not dataset:
+        return []
+    return filtered_fields(dataset_key, dataset["fields"])
+
+
+def _text_placeholder():
+    return _TEXT_PLACEHOLDER[parts_fields_enabled()]
+
+
 def _field(key, label, type_="text"):
     return {"key": key, "label": label, "type": type_}
 
@@ -89,10 +138,7 @@ def get_dataset(key):
 
 
 def get_dataset_fields(dataset_key):
-    dataset = DATASETS.get(dataset_key)
-    if not dataset:
-        return []
-    return dataset["fields"]
+    return dataset_fields(dataset_key)
 
 
 def resolve_field_metas(dataset_key, requested_keys, ubicaciones_labels=None):
@@ -100,7 +146,7 @@ def resolve_field_metas(dataset_key, requested_keys, ubicaciones_labels=None):
     dataset = DATASETS.get(dataset_key)
     if not dataset:
         return []
-    by_key = {meta["key"]: meta for meta in dataset["fields"]}
+    by_key = {meta["key"]: meta for meta in dataset_fields(dataset_key)}
     metas = []
     seen = set()
     if requested_keys:
@@ -117,7 +163,7 @@ def resolve_field_metas(dataset_key, requested_keys, ubicaciones_labels=None):
                 metas.append(dynamic)
                 seen.add(key)
     if not metas:
-        return list(dataset["fields"])
+        return list(dataset_fields(dataset_key))
     return metas
 
 
@@ -139,18 +185,17 @@ def _dynamic_field_meta(dataset_key, key, ubicaciones_labels):
 def schema_payload(options_sources):
     datasets = []
     for dataset in DATASETS.values():
-        filters = []
-        for filtro in dataset["filters"]:
+        filters = filtered_filters(dataset["key"], dataset["filters"])
+        for filtro in filters:
             item = dict(filtro)
             source = options_sources.get(item["key"])
             if source is not None:
                 item["options"] = source()
-            filters.append(item)
         payload = {
             "key": dataset["key"],
             "label": dataset["label"],
             "description": dataset["description"],
-            "fields": [dict(meta) for meta in dataset["fields"]],
+            "fields": [dict(meta) for meta in filtered_fields(dataset["key"], dataset["fields"])],
             "filters": filters,
         }
         if dataset["key"] in DYNAMIC_FIELDS_META:

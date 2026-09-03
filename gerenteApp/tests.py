@@ -82,6 +82,59 @@ class StoreConfigListsTest(TestCase):
         self.assertEqual([d["code"] for d in config.active_document_types()], ["TC"])
 
 
+class ProductSearchTest(TestCase):
+    def test_search_respects_configured_fields(self):
+        from django.db.models import Q
+        from gerenteApp.search import product_search_q
+
+        config = StoreConfig.current()
+        config.product_search_fields = ["codigo_producto", "nombre"]
+        config.save()
+        q = product_search_q("abc")
+        self.assertIsInstance(q, Q)
+        sql = str(q)
+        self.assertIn("codigo_producto__icontains", sql)
+        self.assertNotIn("oem", sql)
+
+    def test_search_default_includes_parts_fields(self):
+        from django.db.models import Q
+        from gerenteApp.search import product_search_q
+
+        config = StoreConfig.current()
+        config.product_search_fields = []
+        config.save()
+        sql = str(product_search_q("abc"))
+        self.assertIn("oem", sql)
+        self.assertIn("codigo_proveedor", sql)
+
+
+class ReportFieldsFlagsTest(TestCase):
+    def test_report_fields_filtered_when_parts_disabled(self):
+        from vendedorApp.report_fields import dataset_fields, filtered_filters
+
+        config = StoreConfig.current()
+        config.feature_flags = {"product_oem_fields": False}
+        config.save()
+        keys = [f["key"] for f in dataset_fields("productos")]
+        self.assertNotIn("oem", keys)
+        self.assertNotIn("codigo_proveedor", keys)
+        self.assertNotIn("marca", keys)
+        venta_keys = [f["key"] for f in dataset_fields("ventas")]
+        self.assertNotIn("producto_oem", venta_keys)
+        self.assertNotIn("producto_marca", venta_keys)
+        filtros = filtered_filters("productos", [{"key": "marcas", "label": "Marcas"}])
+        self.assertEqual(filtros, [])
+
+    def test_report_fields_keep_parts_when_enabled(self):
+        from vendedorApp.report_fields import dataset_fields
+
+        config = StoreConfig.current()
+        config.feature_flags = {"product_oem_fields": True}
+        config.save()
+        keys = [f["key"] for f in dataset_fields("productos")]
+        self.assertIn("oem", keys)
+
+
 class ProveedorApiTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -90,7 +143,7 @@ class ProveedorApiTest(TestCase):
         cls.encargado = make_user("Encargado")
         cls.vendedor = make_user("Vendedor")
         cls.proveedor = Proveedor.objects.create(
-            rut="7654321-8",
+            tax_id="7654321-8",
             nombre="Proveedor Uno",
         )
 
@@ -102,11 +155,11 @@ class ProveedorApiTest(TestCase):
     def test_encargado_can_create(self):
         resp = auth_client(self.encargado).post(
             "/api/proveedores/",
-            {"rut": "1234567-4", "nombre": "Nuevo Proveedor"},
+            {"tax_id": "1234567-4", "nombre": "Nuevo Proveedor"},
             format="json",
         )
         self.assertEqual(resp.status_code, 201)
-        self.assertTrue(Proveedor.objects.filter(rut="1234567-4").exists())
+        self.assertTrue(Proveedor.objects.filter(tax_id="1234567-4").exists())
 
     def test_vendedor_forbidden(self):
         resp = auth_client(self.vendedor).get("/api/proveedores/")
@@ -123,7 +176,7 @@ class FacturaUpsertTest(TestCase):
         create_business_groups()
         cls.gerente = make_user("Gerente")
         cls.proveedor = Proveedor.objects.create(
-            rut="1111111-1",
+            tax_id="1111111-1",
             nombre="Proveedor Factura",
         )
         cls.ubicacion = Ubicacion.objects.create(nombre="Bodega Central")

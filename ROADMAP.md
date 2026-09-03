@@ -153,7 +153,7 @@ This is the largest refactor in the roadmap; do it after Phase 1 so tax/rounding
 
 **Goal:** same codebase serves a bakery and an auto-parts shop via flags, not forks.
 
-**Status:** not started
+**Status:** done (`feat/phase-3-feature-flags`)
 
 ### `feature_flags` on StoreConfig
 
@@ -279,5 +279,5 @@ Existing installs (e.g. EUROCAS) migrate with all current behavior preserved via
 - [x] **Phase 1:** Unify frontend config into single `storeConfig.js` module; expand `ConfiguracionPage` UI
 - [x] **Phase 2:** Replace `stellantis`/`costo_envio` hardcodes with configurable order pricing rules and `default_shipping_cost`
 - [x] **Phase 2:** Make document types and payment methods configurable JSON; dynamic cierre-caja columns
-- [ ] **Phase 3:** Add `feature_flags` + `product_search_fields`; gate OEM/parts UI and report columns
+- [x] **Phase 3:** Add `feature_flags` + `product_search_fields`; gate OEM/parts UI and report columns
 - [ ] **Phase 4:** First-run setup, seed profiles (`generic_retail` vs `auto_parts`), docs update, 2.0.0 release

@@ -163,7 +163,7 @@ Convenciones: todos los montos se almacenan como **`IntegerField`** en pesos chi
 | Tabla | Campo | Tipo | Restricciones | Descripción |
 | :--- | :--- | :--- | :--- | :--- |
 | `proveedores` | `proveedor_id` | AutoField | PK | — |
-| | `rut` | Char(10) | `UNIQUE`, NOT NULL | RUT del proveedor |
+| | `tax_id` | Char(20) | `UNIQUE`, NULL | ID tributario (RUT u otro) del proveedor |
 | | `nombre` | Char(100) | NOT NULL | — |
 | | `persona_contacto` | Char(100) | NULL | — |
 | | `telefono` | Char(20) | NULL | — |

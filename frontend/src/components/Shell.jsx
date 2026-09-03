@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
-import { useStoreName } from "../lib/storeConfig";
+import { useStoreName, getStoreConfig } from "../lib/storeConfig";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";
@@ -47,6 +47,11 @@ export default function Shell() {
   const filteredVendedorLinks = showBodeguero
     ? vendedorLinks.filter((link) => link.label !== "Inventario")
     : vendedorLinks;
+
+  const showSupplierOrders = getStoreConfig().feature_flags?.daily_supplier_orders === true;
+  const filteredGerenteLinks = showSupplierOrders
+    ? gerenteLinks
+    : gerenteLinks.filter((link) => link.label !== "Pedidos Prov.");
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -199,7 +204,7 @@ export default function Shell() {
               <hr className="sidebar-divider" />
               <div className="sidebar-heading">Gerente</div>
               <ul className="sidebar-nav">
-                {gerenteLinks.map((link) => (
+                {filteredGerenteLinks.map((link) => (
                   <li className="nav-item" key={link.to}>
                     <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
                       {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
