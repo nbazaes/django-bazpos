@@ -98,6 +98,8 @@ export default function ConfiguracionPage() {
     ubicacion_por_defecto: "",
   });
 
+  const setupComplete = configData?.[0]?.is_setup_complete !== false;
+
   useEffect(() => {
     if (configData?.length) {
       const cfg = configData[0];
@@ -168,6 +170,13 @@ export default function ConfiguracionPage() {
 
   return (
     <PageCard title="Configuración">
+      {!setupComplete && (
+        <div className="alert alert-info" role="status">
+          <strong>Primera configuración de la tienda.</strong> Complete el nombre, moneda, impuesto y redondeo
+          para comenzar a operar. Puede elegir un perfil vertical en las secciones de medios de pago, documentos
+          y ubicación por defecto.
+        </div>
+      )}
       <form onSubmit={submit}>
         <h5 className="mt-3 mb-2">Identidad</h5>
         <div className="form-group">

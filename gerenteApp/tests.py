@@ -37,6 +37,18 @@ class StoreConfigTest(TestCase):
         config.save()
         self.assertEqual(StoreConfig.apply_to_amount(1000), 1190)
 
+    def test_is_setup_complete_reflects_nombre(self):
+        from gerenteApp.serializers import StoreConfigSerializer
+
+        config = StoreConfig.current()
+        config.nombre = ""
+        config.save()
+        self.assertFalse(StoreConfigSerializer(config).data["is_setup_complete"])
+
+        config.nombre = "Biocar"
+        config.save()
+        self.assertTrue(StoreConfigSerializer(config).data["is_setup_complete"])
+
 
 class ExtensionSeamTest(TestCase):
     def test_apply_modifiers_empty_returns_costo(self):
@@ -133,6 +145,33 @@ class ReportFieldsFlagsTest(TestCase):
         config.save()
         keys = [f["key"] for f in dataset_fields("productos")]
         self.assertIn("oem", keys)
+
+
+class SeedDataProfilesTest(TestCase):
+    def test_generic_retail_profile(self):
+        from django.core.management import call_command
+        from gerenteApp.models import StoreConfig
+        from vendedorApp.models import Producto
+
+        call_command("seed_data", "--profile", "generic_retail", verbosity=0)
+        config = StoreConfig.current()
+        self.assertEqual(config.default_shipping_cost, 0)
+        self.assertEqual(config.feature_flags, {})
+        self.assertTrue(Producto.objects.exists())
+        self.assertFalse(Producto.objects.exclude(oem="").exists())
+
+    def test_auto_parts_profile(self):
+        from django.core.management import call_command
+        from gerenteApp.models import StoreConfig, Proveedor
+        from vendedorApp.models import Producto
+
+        call_command("seed_data", "--profile", "auto_parts", verbosity=0)
+        config = StoreConfig.current()
+        self.assertEqual(config.default_shipping_cost, 4500)
+        self.assertTrue(config.feature_flags.get("product_oem_fields"))
+        self.assertTrue(config.feature_flags.get("supplier_rut_field"))
+        self.assertTrue(Producto.objects.filter(oem__startswith="OEM").exists())
+        self.assertTrue(Proveedor.objects.exclude(tax_id__isnull=True).exists())
 
 
 class ProveedorApiTest(TestCase):

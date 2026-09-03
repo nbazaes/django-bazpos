@@ -4,6 +4,8 @@
 **Cuadrantes Diátaxis:** Referencia técnica (API y modelo de datos) + Explicación (arquitectura e infraestructura).  
 **Fuente de verdad:** Este documento se genera a partir del código fuente. Verifique rutas, campos y permisos en `bazpos/api_urls.py`, `vendedorApp/api.py`, `gerenteApp/api.py` y los modelos antes de asumir cambios.
 
+> **Perfil vertical.** BazPOS es un POS retail **de tenant único y configurable**. Los campos y flujos de autopartes descritos aquí (OEM, marca, RUT, Stellantis, pedidos a proveedores) corresponden al **perfil `auto_parts`**, activado por `StoreConfig.feature_flags`. Una instalación genérica (perfil `generic_retail`) oculta esos campos y usa los mismos núcleos de venta, stock, cierre de caja y reportes. Véase `ROADMAP.md` y `docs/instalacion.md`.
+
 ---
 
 ## 1. Resumen del sistema

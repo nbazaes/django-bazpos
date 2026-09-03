@@ -40,7 +40,7 @@ The API client (`frontend/src/lib/api.js`) automatically refreshes the JWT on 40
 
 - **Python 3.12+**
 - **MariaDB 12+** (or MySQL 8.0+)
-- **Node.js 20.19+** (frontend)
+- **Node.js 24** (frontend)
 - **Docker + Docker Compose** (production)
 
 ## Local Development
@@ -118,7 +118,7 @@ docker compose up -d --build
 
 - `python manage.py setup_groups` — creates groups and permissions (Vendedor, Bodeguero, Encargado, Gerente)
 - `python manage.py create_admin` — creates a superuser from environment variables
-- `python manage.py seed_data` — loads demo data (optional)
+- `python manage.py seed_data` — loads demo data (optional); `--profile auto_parts` (default) or `--profile generic_retail`
 - `python manage.py collectstatic` — collects static files
 
 ## Database
@@ -227,12 +227,15 @@ bazpos/
 
 ## Roadmap
 
-BazPOS is developed **custom-built for a local store**, addressing its real sales, inventory, cash register closing and reporting workflows. It is on its way to being **generalized** so it can be offered to other businesses, which involves:
+BazPOS is a **productized, single-tenant retail POS**: one Docker installation per customer, each with its own MariaDB. Business rules (tax, currency, rounding, shipping, payment methods, document types, feature flags) live in a single configurable `StoreConfig` edited from the UI — not in code. Optional vertical profiles are enabled with feature flags, so the same codebase serves a generic retailer and an auto-parts shop without forks.
 
-- **Multi-tenant**: supporting multiple stores in a single installation (per-store configurations instead of a single global `StoreConfig`).
-- **Parameterization**: making taxes (IVA/tax), currency, fiscal document formats and rounding rules configurable per business.
-- **UI redesign**: reactivating and completing the `feat/redesign` branch (full redesign with Tailwind CSS v4 and Material 3 tokens) as the visual foundation for the next major version.
-- **Packaging**: documenting installation, backup and updates for third parties (offsite backups, replicable staging, Docker deployment).
+Current status (see `ROADMAP.md`):
+
+- **Unified config** — `StoreConfig` is the single source of truth for tax/rounding; `gerenteApp/pricing.py` + frontend `storeConfig.js` provide one pricing path and one config fetch at app init.
+- **Dynamic rules** — payment methods and document types are configurable JSON lists; order-line cost modifiers use a minimal `gerenteApp/store_extensions/` seam (Biocar's 20% rule ships as a reference extension); shipping defaults from config.
+- **Feature flags** — `product_oem_fields`, `oem_primary_search`, `order_shipping_toggle`, `order_pricing_rules`, `daily_supplier_orders`, `oem_stock_substitutes`, `supplier_rut_field` gate the auto-parts UI and report columns.
+- **Packaging** — first-run setup redirects to configuration, `seed_data --profile generic_retail|auto_parts`, install/backup/upgrade docs (`docs/instalacion.md`).
+- **Next (post-2.0)** — full UI redesign (`feat/redesign`) and a plugin framework once there are 3+ vertical profiles.
 
 ## Licenses
 

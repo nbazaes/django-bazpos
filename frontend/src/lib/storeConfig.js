@@ -34,6 +34,8 @@ const DEFAULT_CONFIG = {
   ],
   ubicacion_por_defecto: null,
   ubicacion_por_defecto_nombre: null,
+  is_setup_complete: false,
+  config_loaded: false,
 };
 
 let cachedConfig = { ...DEFAULT_CONFIG };
@@ -42,6 +44,8 @@ let fetchPromise = null;
 
 function setConfig(config) {
   cachedConfig = { ...DEFAULT_CONFIG, ...config };
+  cachedConfig.config_loaded = true;
+  cachedConfig.is_setup_complete = Boolean(cachedConfig.nombre);
   listeners.forEach((listener) => listener());
 }
 
@@ -89,6 +93,10 @@ export function getStoreName() {
 export function useStoreName() {
   const config = useSyncExternalStore(subscribe, getStoreConfig, getStoreConfig);
   return config.nombre || FALLBACK_STORE_NAME;
+}
+
+export function useStoreConfigSync() {
+  return useSyncExternalStore(subscribe, getStoreConfig, getStoreConfig);
 }
 
 export function getTaxPercent() {

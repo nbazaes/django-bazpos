@@ -193,7 +193,7 @@ Rename `Proveedor.rut` → `tax_id` (migration preserves data; `max_length` incr
 
 **Goal:** a new customer can deploy without reading one store's SOPs.
 
-**Status:** not started
+**Status:** done (`feat/phase-4-packaging-seeds`)
 
 ### First-run setup
 
@@ -280,4 +280,4 @@ Existing installs (e.g. Biocar) migrate with all current behavior preserved via 
 - [x] **Phase 2:** Replace `stellantis`/`costo_envio` hardcodes with configurable order pricing rules and `default_shipping_cost`
 - [x] **Phase 2:** Make document types and payment methods configurable JSON; dynamic cierre-caja columns
 - [x] **Phase 3:** Add `feature_flags` + `product_search_fields`; gate OEM/parts UI and report columns
-- [ ] **Phase 4:** First-run setup, seed profiles (`generic_retail` vs `auto_parts`), docs update, 2.0.0 release
+- [x] **Phase 4:** First-run setup, seed profiles (`generic_retail` vs `auto_parts`), docs update, 2.0.0 release

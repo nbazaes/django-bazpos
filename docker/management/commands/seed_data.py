@@ -1,6 +1,6 @@
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.contrib.auth.models import Group, User
 from django.core.management import call_command
@@ -22,13 +22,23 @@ NOMBRES_UBICACIONES = [
     "Sucursal Sur", "Depósito General",
 ]
 
-MARCAS = [
+AUTOPARTS_FLAGS = {
+    "product_oem_fields": True,
+    "oem_primary_search": True,
+    "order_shipping_toggle": True,
+    "order_pricing_rules": True,
+    "daily_supplier_orders": True,
+    "oem_stock_substitutes": True,
+    "supplier_rut_field": True,
+}
+
+AUTOPARTS_MARCAS = [
     "Bosch", "Mann-Filter", "Febi", "Valeo", "Hella", "SKF", "TRW", "Denso",
     "NGK", "Monroe", "KYB", "Delphi", "Gates", "Dayco", "Brembo", "Luk",
     "Sachs", "Continental", "Mahle", "Meyle",
 ]
 
-DESCRIPCIONES_CATEGORIAS = [
+AUTOPARTS_CATEGORIAS = [
     ("Filtro de aceite", 8000, 15000),
     ("Filtro de aire", 10000, 20000),
     ("Filtro de combustible", 12000, 22000),
@@ -51,16 +61,57 @@ DESCRIPCIONES_CATEGORIAS = [
     ("Aceite de motor 5W-30", 15000, 30000),
 ]
 
+AUTOPARTS_EMPRESAS = [
+    "Importadora", "Distribuidora", "Comercial",
+    "Repuestos", "Automotriz", "Partes y Piezas",
+]
+
+GENERIC_MARCAS = [
+    "Nova", "Zafiro", "Delta", "Vega", "Aurora", "Cumbres", "Andes", "Pacífico",
+]
+
+GENERIC_CATEGORIAS = [
+    ("Camiseta", 4000, 12000),
+    ("Polera", 6000, 15000),
+    ("Pantalón", 8000, 25000),
+    ("Zapatilla", 12000, 45000),
+    ("Chaqueta", 15000, 60000),
+    ("Gorra", 3000, 9000),
+    ("Calcetines", 1500, 5000),
+    ("Buzo", 10000, 30000),
+    ("Mochila", 8000, 25000),
+    ("Cinturón", 4000, 12000),
+]
+
+GENERIC_EMPRESAS = [
+    "Distribuidora", "Importadora", "Comercial", "Mayorista", "Tienda", "Suministros",
+]
+
 
 class Command(BaseCommand):
     help = "Popula la base de datos con datos de prueba (Faker)."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--profile",
+            choices=["auto_parts", "generic_retail"],
+            default="auto_parts",
+            help="Perfil vertical de datos de prueba (default: auto_parts).",
+        )
+
     def handle(self, *args, **options):
+        self.profile = options["profile"]
+
+        self.stdout.write(f"Perfil: {self.profile}")
+
         self.stdout.write("Limpiando datos existentes...")
         self._clean()
 
         self.stdout.write("Configurando grupos...")
         call_command("setup_groups")
+
+        self.stdout.write("Configurando la tienda...")
+        self._configure_store()
 
         self.stdout.write("Creando ubicaciones...")
         ubicaciones = self._create_ubicaciones()
@@ -97,6 +148,17 @@ class Command(BaseCommand):
         Ubicacion.objects.all().delete()
         User.objects.filter(is_superuser=False).delete()
 
+    def _configure_store(self):
+        from gerenteApp.models import StoreConfig
+
+        is_auto = self.profile == "auto_parts"
+        config = StoreConfig.current()
+        config.nombre = config.nombre or os.getenv("STORE_NAME", "")
+        config.default_shipping_cost = 4500 if is_auto else 0
+        config.feature_flags = dict(AUTOPARTS_FLAGS) if is_auto else {}
+        config.save()
+        self.stdout.write(f"  StoreConfig: shipping={config.default_shipping_cost}")
+
     def _create_ubicaciones(self):
         ubicaciones = []
         for nombre in NOMBRES_UBICACIONES:
@@ -128,17 +190,15 @@ class Command(BaseCommand):
         return str(dv)
 
     def _create_proveedores(self):
+        is_auto = self.profile == "auto_parts"
         proveedores = []
-        empresas = [
-            "Importadora", "Distribuidora", "Comercial",
-            "Repuestos", "Automotriz", "Partes y Piezas",
-        ]
+        empresas = AUTOPARTS_EMPRESAS if is_auto else GENERIC_EMPRESAS
         nombres = [fake.last_name() for _ in range(6)]
-        for i in range(12):
-            rut = self._generate_rut()
+        for _ in range(12):
+            tax_id = self._generate_rut() if is_auto else None
             nombre = f"{random.choice(empresas)} {random.choice(nombres)} {fake.company_suffix()}"
             p = Proveedor.objects.create(
-                tax_id=rut,
+                tax_id=tax_id,
                 nombre=nombre[:100],
                 persona_contacto=fake.name(),
                 telefono=fake.phone_number()[:20],
@@ -185,19 +245,29 @@ class Command(BaseCommand):
         return usuarios_vendedores + usuarios_gerentes
 
     def _create_productos(self, proveedores):
+        is_auto = self.profile == "auto_parts"
+        categorias = AUTOPARTS_CATEGORIAS if is_auto else GENERIC_CATEGORIAS
+        marcas = AUTOPARTS_MARCAS if is_auto else GENERIC_MARCAS
         productos = []
-        for i in range(80):
-            cat = random.choice(DESCRIPCIONES_CATEGORIAS)
+        for _ in range(80):
+            cat = random.choice(categorias)
             nombre_cat, costo_min, costo_max = cat
-            marca = random.choice(MARCAS)
-            nombre = f"{nombre_cat} {marca} {fake.bothify(text='??###')}"
+            marca = random.choice(marcas)
+            sufijo = fake.bothify(text="??###") if is_auto else fake.bothify(text="##")
+            nombre = f"{nombre_cat} {marca} {sufijo}"
             costo = random.randint(costo_min, costo_max)
+            if is_auto:
+                oem = fake.bothify(text="OEM-#####")
+                descripcion = f"{nombre_cat} marca {marca}. Compatible con vehículos nacionales e importados."
+            else:
+                oem = ""
+                descripcion = f"{nombre_cat} marca {marca}."
             p = Producto.objects.create(
                 nombre=nombre[:100],
                 codigo_producto=f"COD-{fake.unique.bothify(text='??-####')}",
-                oem=fake.bothify(text="OEM-#####"),
+                oem=oem,
                 marca=marca,
-                descripcion=f"{nombre_cat} marca {marca}. Compatible con vehículos nacionales e importados.",
+                descripcion=descripcion,
                 precio_costo=costo,
                 stock_minimo=random.randint(5, 15),
                 stock_maximo=random.randint(50, 200),

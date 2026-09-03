@@ -264,6 +264,7 @@ class StoreConfigSerializer(serializers.ModelSerializer):
     effective_payment_methods = serializers.SerializerMethodField()
     effective_document_types = serializers.SerializerMethodField()
     effective_product_search_fields = serializers.SerializerMethodField()
+    is_setup_complete = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreConfig
@@ -288,6 +289,7 @@ class StoreConfigSerializer(serializers.ModelSerializer):
             "effective_document_types",
             "product_search_fields",
             "effective_product_search_fields",
+            "is_setup_complete",
             "ubicacion_por_defecto",
             "ubicacion_por_defecto_nombre",
         ]
@@ -303,3 +305,6 @@ class StoreConfigSerializer(serializers.ModelSerializer):
 
     def get_effective_product_search_fields(self, obj):
         return obj.effective_product_search_fields()
+
+    def get_is_setup_complete(self, obj):
+        return bool(obj.nombre)

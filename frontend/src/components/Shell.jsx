@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
-import { useStoreName, getStoreConfig } from "../lib/storeConfig";
+import { useStoreName, getStoreConfig, useStoreConfigSync } from "../lib/storeConfig";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";
@@ -53,6 +53,18 @@ export default function Shell() {
     ? gerenteLinks
     : gerenteLinks.filter((link) => link.label !== "Pedidos Prov.");
   const [theme, setTheme] = useState(() => getStoredTheme());
+  const reactiveConfig = useStoreConfigSync();
+
+  useEffect(() => {
+    if (
+      reactiveConfig.config_loaded &&
+      !reactiveConfig.is_setup_complete &&
+      showGerente &&
+      location.pathname !== "/configuracion"
+    ) {
+      navigate("/configuracion", { replace: true });
+    }
+  }, [reactiveConfig.config_loaded, reactiveConfig.is_setup_complete, showGerente, location.pathname, navigate]);
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
