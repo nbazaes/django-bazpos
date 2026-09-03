@@ -38,6 +38,50 @@ class StoreConfigTest(TestCase):
         self.assertEqual(StoreConfig.apply_to_amount(1000), 1190)
 
 
+class ExtensionSeamTest(TestCase):
+    def test_apply_modifiers_empty_returns_costo(self):
+        from decimal import Decimal
+        from gerenteApp.store_extensions import apply_modifiers
+
+        self.assertEqual(apply_modifiers(Decimal("1000"), []), Decimal("1000"))
+        self.assertEqual(apply_modifiers(Decimal("1000"), None), Decimal("1000"))
+
+    def test_stellantis_extension_applies_20_percent_discount(self):
+        from decimal import Decimal
+        from gerenteApp.store_extensions import apply_modifiers, get_modifier
+
+        modifier = get_modifier("stellantis")
+        self.assertIsNotNone(modifier)
+        self.assertEqual(modifier.label, "Stellantis (descuento 20%)")
+        self.assertEqual(apply_modifiers(Decimal("1000"), ["stellantis"]), Decimal("800"))
+
+    def test_unknown_modifier_key_is_ignored(self):
+        from decimal import Decimal
+        from gerenteApp.store_extensions import apply_modifiers
+
+        self.assertEqual(apply_modifiers(Decimal("1000"), ["no_existe"]), Decimal("1000"))
+
+
+class StoreConfigListsTest(TestCase):
+    def test_default_payment_methods_and_document_types(self):
+        config = StoreConfig.current()
+        codes = [m["code"] for m in config.active_payment_methods()]
+        self.assertEqual(codes, ["EF", "TJ", "TR", "CH"])
+        doc_codes = [d["code"] for d in config.active_document_types()]
+        self.assertEqual(doc_codes, ["BO", "FA", "OT"])
+
+    def test_custom_lists_override_defaults(self):
+        config = StoreConfig.current()
+        config.payment_methods = [{"code": "QR", "label": "QR", "active": True}]
+        config.document_types = [
+            {"code": "TC", "label": "Ticket", "active": True},
+            {"code": "FA", "label": "Factura", "active": False},
+        ]
+        config.save()
+        self.assertEqual([m["code"] for m in config.active_payment_methods()], ["QR"])
+        self.assertEqual([d["code"] for d in config.active_document_types()], ["TC"])
+
+
 class ProveedorApiTest(TestCase):
     @classmethod
     def setUpTestData(cls):

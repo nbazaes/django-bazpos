@@ -2021,12 +2021,12 @@ class CierreCajaTest(BaseTest):
         stats = resp.data
         self.assertEqual(stats["total_vendido"], 33000)
         self.assertEqual(stats["cantidad_ventas"], 2)
-        self.assertEqual(stats["pagos"]["efectivo"], 25000)
-        self.assertEqual(stats["pagos"]["tarjeta"], 5000)
-        self.assertEqual(stats["pagos"]["cheque"], 3000)
-        self.assertEqual(stats["pagos"]["transferencia"], 0)
-        self.assertEqual(stats["documentos"]["factura"], 18000)
-        self.assertEqual(stats["documentos"]["boleta"], 15000)
+        self.assertEqual(stats["pagos"]["EF"], 25000)
+        self.assertEqual(stats["pagos"]["TJ"], 5000)
+        self.assertEqual(stats["pagos"]["CH"], 3000)
+        self.assertEqual(stats["pagos"]["TR"], 0)
+        self.assertEqual(stats["documentos"]["FA"], 18000)
+        self.assertEqual(stats["documentos"]["BO"], 15000)
         self.assertFalse(stats["guardado"])
 
     def test_get_cierre_cuenta_transferencia_cheque_y_otros_de_pedidos(self):
@@ -2036,9 +2036,9 @@ class CierreCajaTest(BaseTest):
         resp = auth_client(self.gerente).get("/api/cierre-caja/")
         self.assertEqual(resp.status_code, 200)
         stats = resp.data
-        self.assertEqual(stats["pagos"]["transferencia"], 15000)
-        self.assertEqual(stats["pagos"]["cheque"], 15000)
-        self.assertEqual(stats["documentos"]["otros"], 30000)
+        self.assertEqual(stats["pagos"]["TR"], 15000)
+        self.assertEqual(stats["pagos"]["CH"], 15000)
+        self.assertEqual(stats["documentos"]["OT"], 30000)
 
     def test_get_cierre_resta_devoluciones_y_anulaciones(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
@@ -2085,8 +2085,8 @@ class CierreCajaTest(BaseTest):
 
         historial = auth_client(self.gerente).get("/api/cierre-caja/historial/")
         self.assertEqual(len(historial.data), 2)
-        self.assertEqual(historial.data[0]["pagos"]["transferencia"], 18000)
-        self.assertEqual(historial.data[0]["documentos"]["otros"], 18000)
+        self.assertEqual(historial.data[0]["pagos"]["TR"], 18000)
+        self.assertEqual(historial.data[0]["documentos"]["OT"], 18000)
 
     def test_cierre_solo_gerente_o_encargado(self):
         resp = auth_client(self.vendedor).get("/api/cierre-caja/")

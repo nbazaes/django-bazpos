@@ -113,24 +113,22 @@ Add sections: **Identidad** (nombre), **Moneda y formato**, **Impuestos y redond
 
 **Goal:** no code paths named after one supplier or one pricing trick.
 
-**Status:** not started
+**Status:** done (`feat/phase-2-dynamic-rules`)
 
-### `stellantis` → generic order-line modifier
+### `stellantis` → extension seam (store-specific order-line modifier)
 
-Today: boolean `stellantis` on `PedidoDetalle` applies a fixed 20% cost discount.
+Today: boolean `stellantis` on `PedidoDetalle` applies a fixed 20% cost discount. That rule is a uniqueness of the original store, so instead of a generic `OrderPricingRule` model we added a **minimal extension seam**:
 
-Replace with configurable approach (pick one):
-
-- **Option A (minimal):** `cost_modifier_percent` on `PedidoDetalle` (default 0; existing data migrates `stellantis=True → -20`)
-- **Option B (cleaner):** `OrderPricingRule` model linked to `StoreConfig` (`name`, `cost_multiplier`, `active`) — UI shows enabled rules as checkboxes
-
-Hide the rule in UI unless `feature_flags.order_pricing_rules` is true.
+- `gerenteApp/store_extensions/` — registry of `OrderLineCostModifier` classes (auto-discovered modules). Core code only calls `apply_modifiers(costo, keys)`.
+- `PedidoDetalle.stellantis` → `cost_modifiers` JSON list of applied keys (data migration moves `stellantis=True → ["stellantis"]`).
+- The 20% rule ships as `store_extensions/stellantis.py`, clearly marked EUROCAS-specific; generic installs delete it and define their own.
+- UI checkbox shown only when `feature_flags.order_pricing_rules` is true (migration enables it for existing installs).
 
 ### `costo_envio` → config-driven default
 
-- Change `Pedido.costo_envio` default from `4500` to `0`
-- On create, default from `StoreConfig.default_shipping_cost`
-- Existing rows keep their values via data migration
+- `Pedido.costo_envio` default changed from `4500` to `0`
+- On create (pedido + cotización→pedido) it defaults from `StoreConfig.default_shipping_cost`
+- Existing rows keep their values (column default change only)
 
 ### Document types and payment methods → configurable lists
 
@@ -142,10 +140,10 @@ Approach for single-tenant (no schema explosion):
    ```json
    {"code": "BO", "label": "Boleta", "active": true}
    ```
-2. Expose via `/api/configuracion/`
-3. Frontend renders `<option>` lists from config
-4. Keep DB `CharField` codes; validate against active config on write
-5. **Cierre de caja** columns in [`vendedorApp/api.py`](vendedorApp/api.py) become dynamic (pivot by active methods/docs instead of fixed `efectivo`/`boleta` fields)
+2. Expose via `/api/configuracion/` (raw editable lists + `effective_*` resolved lists)
+3. Frontend renders `<option>` lists from config (VentaPage, PedidosCrearPage, CierreCajaPage) + editable in ConfiguracionPage
+4. Keep DB `CharField` codes; validate against active config on write (`RegistrarVentaSerializer`, `PagoVentaInputSerializer`, `CrearPedidoSerializer`)
+5. **Cierre de caja** is now dynamic: `calcular_cierre`/historial pivot by active methods/docs keyed by code; `CierreCaja` stores a `desglose` JSON snapshot (legacy columns kept for backward compat); detail-view valid claves come from active config
 
 This is the largest refactor in the roadmap; do it after Phase 1 so tax/rounding are stable.
 
@@ -258,7 +256,7 @@ Each phase branch merges into the epic branch via PR; the epic branch merges int
 
 - **No multi-tenant schema** (no `store_id` on `Producto`, `Venta`, etc.) — wrong model for one-install-per-customer
 - **No big-bang UI redesign** before config is stable — `feat/redesign` can follow 2.0
-- **No plugin framework yet** — JSON flags + conditional UI is enough until there are 3+ vertical profiles
+- **No full plugin framework** — a minimal `store_extensions/` registry covers store-specific pricing rules; JSON flags + conditional UI is enough until there are 3+ vertical profiles
 
 ---
 
@@ -279,7 +277,7 @@ Existing installs (e.g. EUROCAS) migrate with all current behavior preserved via
 
 - [x] **Phase 1:** Expand `StoreConfig` model + pricing helpers; replace hardcoded `1.19`/rounding across backend and frontend
 - [x] **Phase 1:** Unify frontend config into single `storeConfig.js` module; expand `ConfiguracionPage` UI
-- [ ] **Phase 2:** Replace `stellantis`/`costo_envio` hardcodes with configurable order pricing rules and `default_shipping_cost`
-- [ ] **Phase 2:** Make document types and payment methods configurable JSON; dynamic cierre-caja columns
+- [x] **Phase 2:** Replace `stellantis`/`costo_envio` hardcodes with configurable order pricing rules and `default_shipping_cost`
+- [x] **Phase 2:** Make document types and payment methods configurable JSON; dynamic cierre-caja columns
 - [ ] **Phase 3:** Add `feature_flags` + `product_search_fields`; gate OEM/parts UI and report columns
 - [ ] **Phase 4:** First-run setup, seed profiles (`generic_retail` vs `auto_parts`), docs update, 2.0.0 release

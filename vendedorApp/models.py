@@ -338,7 +338,7 @@ class Pedido(models.Model):
     telefono_cliente = models.CharField(max_length=50)
     monto_subtotal = models.IntegerField()
     monto_total = models.IntegerField()
-    costo_envio = models.IntegerField(default=4500)
+    costo_envio = models.IntegerField(default=0)
     metodo_pago = models.CharField(
         max_length=2,
         choices=Venta.MetodoPago.choices,
@@ -402,7 +402,7 @@ class PedidoDetalle(models.Model):
     porcentaje_utilidad = models.DecimalField(max_digits=5, decimal_places=2)
     precio_final = models.IntegerField()
     sumar_envio = models.BooleanField(default=True)
-    stellantis = models.BooleanField(default=False)
+    cost_modifiers = models.JSONField(default=list, blank=True)
 
     class Meta:
         db_table = "pedido_detalles"
@@ -428,6 +428,7 @@ class CierreCaja(models.Model):
     factura = models.IntegerField(default=0)
     otros = models.IntegerField(default=0)
     doc_sin_clasificar = models.IntegerField(default=0)
+    desglose = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

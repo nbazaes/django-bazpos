@@ -261,6 +261,8 @@ class FacturaUpsertSerializer(serializers.Serializer):
 
 class StoreConfigSerializer(serializers.ModelSerializer):
     ubicacion_por_defecto_nombre = serializers.SerializerMethodField()
+    effective_payment_methods = serializers.SerializerMethodField()
+    effective_document_types = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreConfig
@@ -279,9 +281,19 @@ class StoreConfigSerializer(serializers.ModelSerializer):
             "default_shipping_cost",
             "default_margin_percent",
             "feature_flags",
+            "payment_methods",
+            "document_types",
+            "effective_payment_methods",
+            "effective_document_types",
             "ubicacion_por_defecto",
             "ubicacion_por_defecto_nombre",
         ]
 
     def get_ubicacion_por_defecto_nombre(self, obj):
         return obj.ubicacion_por_defecto.nombre if obj.ubicacion_por_defecto else None
+
+    def get_effective_payment_methods(self, obj):
+        return obj.active_payment_methods()
+
+    def get_effective_document_types(self, obj):
+        return obj.active_document_types()

@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
-from gerenteApp.models import PrecioHistorico
+from gerenteApp.models import PrecioHistorico, StoreConfig
 from vendedorApp.stock_utils import resolver_producto_por_identidad
 from vendedorApp.models import (
     AjusteStock,
@@ -302,7 +302,7 @@ def _distribute_discount(monto_subtotal, monto_total, descuento_porcentaje, item
 
 
 class PagoVentaInputSerializer(serializers.Serializer):
-    metodo_pago = serializers.ChoiceField(choices=Venta.MetodoPago.choices)
+    metodo_pago = serializers.CharField(max_length=2)
     monto = serializers.IntegerField(min_value=1)
 
 
@@ -318,10 +318,11 @@ class RegistrarVentaSerializer(serializers.Serializer):
     )
     venta_origen = serializers.IntegerField(required=False, allow_null=True)
     cliente_nombre = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
-    documento = serializers.ChoiceField(
-        choices=Venta.Documento.choices,
-        default=Venta.Documento.BOLETA,
+    documento = serializers.CharField(
+        max_length=2,
+        default=None,
         required=False,
+        allow_blank=True,
         allow_null=True,
     )
     pagos = PagoVentaInputSerializer(many=True, required=False)
@@ -371,6 +372,24 @@ class RegistrarVentaSerializer(serializers.Serializer):
                     "pagos": f"La suma de los pagos (${suma}) no coincide con el total (${total}). "
                              f"{signo.capitalize()} ${abs(diferencia)}."
                 })
+
+        config = StoreConfig.current()
+        if pagos is not None:
+            metodos_validos = {m["code"] for m in config.active_payment_methods()}
+            invalidos = [p["metodo_pago"] for p in pagos if p["metodo_pago"] not in metodos_validos]
+            if invalidos:
+                raise serializers.ValidationError({
+                    "pagos": f"Medios de pago no configurados: {', '.join(invalidos)}"
+                })
+
+        documento = data.get("documento")
+        if documento is None or documento == "":
+            docs = config.active_document_types()
+            data["documento"] = docs[0]["code"] if docs else None
+        elif documento not in {d["code"] for d in config.active_document_types()}:
+            raise serializers.ValidationError({
+                "documento": f"Documento no configurado: {documento}"
+            })
 
         return data
 
@@ -647,7 +666,7 @@ class PedidoDetalleSerializer(serializers.ModelSerializer):
             "porcentaje_utilidad",
             "precio_final",
             "sumar_envio",
-            "stellantis",
+            "cost_modifiers",
             "devuelto",
             "monto_devuelto",
         ]
@@ -755,13 +774,17 @@ class PedidoDetalleInputSerializer(serializers.Serializer):
     precio_costo = serializers.IntegerField(min_value=0)
     porcentaje_utilidad = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal(0))
     sumar_envio = serializers.BooleanField(default=True)
-    stellantis = serializers.BooleanField(default=False)
+    cost_modifiers = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        default=list,
+    )
 
 
 class CrearPedidoSerializer(serializers.Serializer):
     nombre_cliente = serializers.CharField(max_length=200)
     telefono_cliente = serializers.CharField(max_length=50)
-    metodo_pago = serializers.ChoiceField(choices=Pedido._meta.get_field("metodo_pago").choices)
+    metodo_pago = serializers.CharField(max_length=2)
     items = PedidoDetalleInputSerializer(many=True)
     es_cotizacion = serializers.BooleanField(default=False)
     estado_documento = serializers.ChoiceField(
@@ -769,12 +792,11 @@ class CrearPedidoSerializer(serializers.Serializer):
         default=Pedido.EstadoDocumento.SIN_BOLETEAR,
     )
 
-    def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
+    def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, cost_modifiers=None):
         from decimal import ROUND_HALF_UP
         from gerenteApp.pricing import round_price, tax_multiplier
-        costo = Decimal(precio_costo)
-        if stellantis:
-            costo = costo * Decimal("0.80")
+        from gerenteApp.store_extensions import apply_modifiers
+        costo = apply_modifiers(Decimal(precio_costo), cost_modifiers)
         utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
         base = costo * (Decimal(1) + utilidad)
         con_iva = base * tax_multiplier()
@@ -785,11 +807,20 @@ class CrearPedidoSerializer(serializers.Serializer):
         item_total = round_price(con_envio)
         return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
 
+    def validate(self, data):
+        config = StoreConfig.current()
+        metodos_validos = {m["code"] for m in config.active_payment_methods()}
+        if data.get("metodo_pago") not in metodos_validos:
+            raise serializers.ValidationError({
+                "metodo_pago": f"Medio de pago no configurado: {data.get('metodo_pago')}"
+            })
+        return data
+
     @transaction.atomic
     def create(self, validated_data):
         request = self.context["request"]
         items = validated_data["items"]
-        costo_envio = 4500
+        costo_envio = StoreConfig.current().default_shipping_cost
         es_cotizacion = validated_data.get("es_cotizacion", False)
 
         monto_subtotal = 0
@@ -800,7 +831,7 @@ class CrearPedidoSerializer(serializers.Serializer):
                 item["porcentaje_utilidad"],
                 costo_envio,
                 sumar_envio=item.get("sumar_envio", True),
-                stellantis=item.get("stellantis", False),
+                cost_modifiers=item.get("cost_modifiers", []),
             )
             monto_subtotal += base
             monto_total += item_total
@@ -824,7 +855,7 @@ class CrearPedidoSerializer(serializers.Serializer):
                 item["porcentaje_utilidad"],
                 costo_envio,
                 sumar_envio=item.get("sumar_envio", True),
-                stellantis=item.get("stellantis", False),
+                cost_modifiers=item.get("cost_modifiers", []),
             )
             producto = resolver_producto_por_identidad(
                 item["codigo_proveedor"], item["oem"]
@@ -841,7 +872,7 @@ class CrearPedidoSerializer(serializers.Serializer):
                 porcentaje_utilidad=item["porcentaje_utilidad"],
                 precio_final=item_total,
                 sumar_envio=item.get("sumar_envio", True),
-                stellantis=item.get("stellantis", False),
+                cost_modifiers=item.get("cost_modifiers", []),
             )
 
         if not es_cotizacion:

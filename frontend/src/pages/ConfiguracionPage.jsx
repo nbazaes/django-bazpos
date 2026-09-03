@@ -25,6 +25,52 @@ const CURRENCY_OPTIONS = ["CLP", "USD", "ARS", "COP", "PEN", "MXN", "BRL", "EUR"
 
 const LOCALE_OPTIONS = ["es-CL", "es-AR", "es-CO", "es-MX", "en-US"];
 
+function ListEditor({ items, onChange, codePlaceholder }) {
+  const update = (i, patch) => onChange(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const remove = (i) => onChange(items.filter((_, idx) => idx !== i));
+  const add = () => onChange([...items, { code: "", label: "", active: true }]);
+  return (
+    <div>
+      {items.map((it, i) => (
+        <div key={i} className="row mb-2 align-items-center">
+          <div className="col-md-2">
+            <input
+              className="form-control"
+              placeholder={codePlaceholder}
+              value={it.code || ""}
+              onChange={(e) => update(i, { code: e.target.value.toUpperCase() })}
+              maxLength={2}
+            />
+          </div>
+          <div className="col-md-4">
+            <input
+              className="form-control"
+              placeholder="Etiqueta"
+              value={it.label || ""}
+              onChange={(e) => update(i, { label: e.target.value })}
+            />
+          </div>
+          <div className="col-md-3">
+            <label className="form-check-label d-flex align-items-center gap-2 mb-0">
+              <input
+                type="checkbox"
+                checked={!!it.active}
+                onChange={(e) => update(i, { active: e.target.checked })}
+                className="form-check-input"
+              />
+              Activo
+            </label>
+          </div>
+          <div className="col-md-1">
+            <button type="button" className="btn btn-sm btn-danger" onClick={() => remove(i)}>✕</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" className="btn btn-sm btn-secondary" onClick={add}>+ Agregar</button>
+    </div>
+  );
+}
+
 export default function ConfiguracionPage() {
   usePageTitle("Configuración");
 
@@ -47,6 +93,8 @@ export default function ConfiguracionPage() {
     total_round_threshold: "900",
     default_shipping_cost: "4500",
     default_margin_percent: "30",
+    payment_methods: [],
+    document_types: [],
     ubicacion_por_defecto: "",
   });
 
@@ -69,6 +117,8 @@ export default function ConfiguracionPage() {
           total_round_threshold: cfg.total_round_threshold != null ? String(cfg.total_round_threshold) : "900",
           default_shipping_cost: cfg.default_shipping_cost != null ? String(cfg.default_shipping_cost) : "4500",
           default_margin_percent: cfg.default_margin_percent != null ? String(cfg.default_margin_percent) : "30",
+          payment_methods: cfg.payment_methods || [],
+          document_types: cfg.document_types || [],
           ubicacion_por_defecto: cfg.ubicacion_por_defecto != null ? String(cfg.ubicacion_por_defecto) : "",
         });
       });
@@ -95,6 +145,8 @@ export default function ConfiguracionPage() {
           total_round_threshold: data.total_round_threshold,
           default_shipping_cost: data.default_shipping_cost,
           default_margin_percent: data.default_margin_percent,
+          payment_methods: data.payment_methods,
+          document_types: data.document_types,
           ubicacion_por_defecto: data.ubicacion_por_defecto || null,
         },
       },
@@ -275,6 +327,20 @@ export default function ConfiguracionPage() {
             ))}
           </select>
         </div>
+
+        <h5 className="mt-4 mb-2">Medios de pago</h5>
+        <ListEditor
+          items={data.payment_methods}
+          onChange={(v) => setData({ ...data, payment_methods: v })}
+          codePlaceholder="EF"
+        />
+
+        <h5 className="mt-4 mb-2">Documentos</h5>
+        <ListEditor
+          items={data.document_types}
+          onChange={(v) => setData({ ...data, document_types: v })}
+          codePlaceholder="BO"
+        />
 
         <button
           className="btn btn-primary"

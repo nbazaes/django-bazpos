@@ -7,17 +7,24 @@ import { formatDateTime } from "../lib/format";
 import { getStoreName, getStoreConfig, fetchStoreConfig, applyTax, roundPrice } from "../lib/storeConfig";
 import { useToast } from "../lib/useToast";
 
-function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
+const COST_MODIFIER_LABELS = { stellantis: "Stellantis (descuento 20%)" };
+const COST_MODIFIER_FACTORS = { stellantis: 0.8 };
+
+function aplicarModificadores(costo, costModifiers) {
+  return (costModifiers || []).reduce((acc, key) => acc * (COST_MODIFIER_FACTORS[key] ?? 1), costo);
+}
+
+function calcularItemSubtotal(precioCosto, porcentajeUtilidad, costModifiers = []) {
   const costo = Number(precioCosto) || 0;
   const pct = Number(porcentajeUtilidad) || 0;
-  const costoBase = stellantis ? costo * 0.8 : costo;
+  const costoBase = aplicarModificadores(costo, costModifiers);
   const base = costoBase * (1 + pct / 100);
   return applyTax(base);
 }
 
-function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, stellantis = false) {
-  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis);
-  const conEnvio = sumarEnvio ? subtotal + 4500 : subtotal;
+function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, costModifiers = []) {
+  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, costModifiers);
+  const conEnvio = sumarEnvio ? subtotal + Number(getStoreConfig().default_shipping_cost || 0) : subtotal;
   return roundPrice(conEnvio);
 }
 
@@ -30,22 +37,8 @@ const productoVacio = {
   precio_costo: "",
   porcentaje_utilidad: "",
   sumar_envio: true,
-  stellantis: false,
+  cost_modifiers: [],
 };
-
-const METODO_PAGO_OPCIONES = [
-  { value: "EF", label: "Efectivo" },
-  { value: "TJ", label: "Tarjeta" },
-  { value: "TR", label: "Transferencia" },
-  { value: "CH", label: "Cheque" },
-];
-
-const DOCUMENTO_OPCIONES = [
-  { value: "SB", label: "Sin boletear" },
-  { value: "BO", label: "Boleteado" },
-  { value: "FA", label: "Facturado" },
-  { value: "OT", label: "Otros" },
-];
 
 export default function PedidosCrearPage() {
   const [tab, setTab] = useState("nuevo");
@@ -58,6 +51,28 @@ export default function PedidosCrearPage() {
   }, []);
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
+
+  const config = getStoreConfig();
+  const paymentMethods = config.effective_payment_methods || [];
+  const documentTypes = config.effective_document_types || [];
+  const METODO_PAGO_OPCIONES = paymentMethods.map((m) => ({ value: m.code, label: m.label }));
+  const DOCUMENTO_OPCIONES = [
+    { value: "SB", label: "Sin boletear" },
+    ...documentTypes.map((d) => ({ value: d.code, label: d.label })),
+  ];
+  const showOrderPricingRules = config.feature_flags?.order_pricing_rules === true;
+  const shippingCost = Number(config.default_shipping_cost || 0);
+  const shippingLabel = shippingCost > 0 ? `(+$${shippingCost.toLocaleString("es-CL")})` : "";
+
+  function toggleCostModifier(key) {
+    setProducto((prev) => {
+      const has = (prev.cost_modifiers || []).includes(key);
+      return {
+        ...prev,
+        cost_modifiers: has ? prev.cost_modifiers.filter((k) => k !== key) : [...(prev.cost_modifiers || []), key],
+      };
+    });
+  }
 
   const [cliente, setCliente] = useState({ nombre: "", telefono: "" });
   const [producto, setProducto] = useState({ ...productoVacio });
@@ -85,13 +100,13 @@ export default function PedidosCrearPage() {
       producto.precio_costo,
       producto.porcentaje_utilidad,
       producto.sumar_envio,
-      producto.stellantis,
+      producto.cost_modifiers,
     );
-  }, [producto.precio_costo, producto.porcentaje_utilidad, producto.sumar_envio, producto.stellantis]);
+  }, [producto.precio_costo, producto.porcentaje_utilidad, producto.sumar_envio, producto.cost_modifiers]);
 
   const totales = useMemo(() => {
     const subtotal = items.reduce((sum, it) => {
-      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.stellantis);
+      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.cost_modifiers);
     }, 0);
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
     return { subtotal, total };
@@ -162,7 +177,7 @@ export default function PedidosCrearPage() {
       producto.precio_costo,
       producto.porcentaje_utilidad,
       producto.sumar_envio,
-      producto.stellantis,
+      producto.cost_modifiers,
     );
     setItems((prev) => [
       ...prev,
@@ -213,7 +228,7 @@ export default function PedidosCrearPage() {
         precio_costo: it.precio_costo,
         porcentaje_utilidad: it.porcentaje_utilidad,
         sumar_envio: it.sumar_envio,
-        stellantis: it.stellantis,
+        cost_modifiers: it.cost_modifiers,
       })),
       es_cotizacion: esCotizacion,
     };
@@ -495,22 +510,24 @@ export default function PedidosCrearPage() {
                   checked={producto.sumar_envio}
                   onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
                 />
-                <span>Sumar envío (+$4.500)</span>
+                <span>Sumar envío {shippingLabel}</span>
               </label>
-              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={producto.stellantis}
-                  onChange={(e) => handleProductoChange("stellantis", e.target.checked)}
-                />
-                <span>Pedido Stellantis</span>
-              </label>
+              {showOrderPricingRules && (
+                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={(producto.cost_modifiers || []).includes("stellantis")}
+                    onChange={() => toggleCostModifier("stellantis")}
+                  />
+                  <span>{COST_MODIFIER_LABELS.stellantis}</span>
+                </label>
+              )}
             </div>
 
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
               <div className="text-right">
-                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis)}</div>
-                {producto.sumar_envio && <div className="text-secondary">Envío +$4.500</div>}
+                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.cost_modifiers)}</div>
+                {producto.sumar_envio && shippingCost > 0 && <div className="text-secondary">Envío +${shippingCost.toLocaleString("es-CL")}</div>}
                 <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
               </div>
               <button

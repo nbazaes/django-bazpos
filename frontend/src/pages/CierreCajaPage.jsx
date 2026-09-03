@@ -50,21 +50,24 @@ export default function CierreCajaPage() {
 
   const pagos = data?.pagos || {};
   const documentos = data?.documentos || {};
+  const pagosLabels = data?.pagos_labels || {};
+  const documentosLabels = data?.documentos_labels || {};
+  const pagosList = data?.pagos_list || Object.keys(pagos);
+  const documentosList = data?.documentos_list || Object.keys(documentos);
 
-  const filasPago = [
-    ["Efectivo", "EF", "Ventas en efectivo", pagos.efectivo],
-    ["Tarjeta", "TJ", "Ventas con tarjeta", pagos.tarjeta],
-    ["Transferencia", "TR", "Ventas por transferencia", pagos.transferencia],
-    ["Cheque", "CH", "Ventas con cheque", pagos.cheque],
-    ["Sin clasificar", "SIN", "Ventas sin clasificar", pagos.sin_clasificar],
-  ];
+  const filasPago = pagosList.map((code) => [
+    pagosLabels[code] || code,
+    code,
+    `Ventas ${pagosLabels[code] || code}`,
+    pagos[code] ?? 0,
+  ]);
 
-  const filasDoc = [
-    ["Boleta", "BO", "Ventas con boleta", documentos.boleta],
-    ["Factura", "FA", "Ventas con factura", documentos.factura],
-    ["Otros", "OT", "Ventas con otros documentos", documentos.otros],
-    ["Sin clasificar", "SIN", "Ventas sin clasificar", documentos.sin_clasificar],
-  ];
+  const filasDoc = documentosList.map((code) => [
+    documentosLabels[code] || code,
+    code,
+    `Ventas ${documentosLabels[code] || code}`,
+    documentos[code] ?? 0,
+  ]);
 
   const abrirDetalle = (tipo, clave, titulo, valor) => {
     if (valor > 0) setDetalle({ tipo, clave, titulo });

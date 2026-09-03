@@ -17,6 +17,19 @@ const DEFAULT_CONFIG = {
   default_shipping_cost: 4500,
   default_margin_percent: 30,
   feature_flags: {},
+  payment_methods: [],
+  document_types: [],
+  effective_payment_methods: [
+    { code: "EF", label: "Efectivo", active: true },
+    { code: "TJ", label: "Tarjeta", active: true },
+    { code: "TR", label: "Transferencia", active: true },
+    { code: "CH", label: "Cheque", active: true },
+  ],
+  effective_document_types: [
+    { code: "BO", label: "Boleta", active: true },
+    { code: "FA", label: "Factura", active: true },
+    { code: "OT", label: "Otros", active: true },
+  ],
   ubicacion_por_defecto: null,
   ubicacion_por_defecto_nombre: null,
 };

@@ -87,6 +87,8 @@ class StoreConfig(models.Model):
     default_shipping_cost = models.IntegerField(default=4500)
     default_margin_percent = models.DecimalField(max_digits=5, decimal_places=2, default=30)
     feature_flags = models.JSONField(default=dict, blank=True)
+    payment_methods = models.JSONField(default=list, blank=True)
+    document_types = models.JSONField(default=list, blank=True)
     ubicacion_por_defecto = models.ForeignKey(
         "vendedorApp.Ubicacion",
         on_delete=models.SET_NULL,
@@ -117,3 +119,38 @@ class StoreConfig(models.Model):
         from .pricing import apply_tax
 
         return apply_tax(amount)
+
+    # ── Payment methods & document types (configurable lists) ──
+
+    DEFAULT_PAYMENT_METHODS = [
+        {"code": "EF", "label": "Efectivo", "active": True},
+        {"code": "TJ", "label": "Tarjeta", "active": True},
+        {"code": "TR", "label": "Transferencia", "active": True},
+        {"code": "CH", "label": "Cheque", "active": True},
+    ]
+
+    DEFAULT_DOCUMENT_TYPES = [
+        {"code": "BO", "label": "Boleta", "active": True},
+        {"code": "FA", "label": "Factura", "active": True},
+        {"code": "OT", "label": "Otros", "active": True},
+    ]
+
+    def payment_methods_list(self):
+        return self.payment_methods or self.DEFAULT_PAYMENT_METHODS
+
+    def active_payment_methods(self):
+        return [m for m in self.payment_methods_list() if m.get("active", True)]
+
+    def document_types_list(self):
+        return self.document_types or self.DEFAULT_DOCUMENT_TYPES
+
+    def active_document_types(self):
+        return [d for d in self.document_types_list() if d.get("active", True)]
+
+    @classmethod
+    def current_payment_methods(cls):
+        return cls.current().active_payment_methods()
+
+    @classmethod
+    def current_document_types(cls):
+        return cls.current().active_document_types()

@@ -363,7 +363,20 @@ def _venta_cliente(venta):
     return pedido.nombre_cliente if pedido else None
 
 
-_MEDIO_PAGO_LABEL = dict(Venta.MetodoPago.choices)
+def _medio_pago_label_map():
+    config = StoreConfig.current()
+    labels = {m["code"]: m["label"] for m in config.payment_methods_list()}
+    for code, label in Venta.MetodoPago.choices:
+        labels.setdefault(code, label)
+    return labels
+
+
+def _documento_label_map():
+    config = StoreConfig.current()
+    labels = {d["code"]: d["label"] for d in config.document_types_list()}
+    for code, label in Venta.Documento.choices:
+        labels.setdefault(code, label)
+    return labels
 
 
 def calcular_cierre(fecha):
@@ -403,10 +416,15 @@ def calcular_cierre(fecha):
     )
     pagos_pedido_map = {p["pedido__metodo_pago"]: p["total"] for p in pagos_pedido}
 
-    efectivo = pagos_ve_map.get(Venta.MetodoPago.EFECTIVO, 0) + pagos_pedido_map.get("EF", 0)
-    tarjeta = pagos_ve_map.get(Venta.MetodoPago.TARJETA, 0) + pagos_pedido_map.get("TJ", 0)
-    transferencia = pagos_ve_map.get(Venta.MetodoPago.TRANSFERENCIA, 0) + pagos_pedido_map.get("TR", 0)
-    cheque = pagos_ve_map.get(Venta.MetodoPago.CHEQUE, 0) + pagos_pedido_map.get("CH", 0)
+    config = StoreConfig.current()
+    payment_methods = config.active_payment_methods()
+    document_types = config.active_document_types()
+
+    pagos = {}
+    for pm in payment_methods:
+        code = pm["code"]
+        pagos[code] = pagos_ve_map.get(code, 0) + pagos_pedido_map.get(code, 0)
+    pagos["SIN"] = sin_clasificar_pago
 
     # ── Desglose por documento ──
     docs_ve = (
@@ -420,13 +438,21 @@ def calcular_cierre(fecha):
     )
     docs_pedido_map = {d["pedido__estado_documento"]: d["total"] for d in docs_pedido}
 
-    boleta = docs_ve_map.get(Venta.Documento.BOLETA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.BOLETEADO, 0)
-    factura = docs_ve_map.get(Venta.Documento.FACTURA, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.FACTURADO, 0)
-    otros = docs_ve_map.get(Venta.Documento.OTROS, 0) + docs_pedido_map.get(Pedido.EstadoDocumento.OTROS, 0)
     doc_sin_clasificar = (
         docs_ve_map.get(None, 0)
         + docs_pedido_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
     )
+
+    documentos = {}
+    for dt in document_types:
+        code = dt["code"]
+        documentos[code] = docs_ve_map.get(code, 0) + docs_pedido_map.get(code, 0)
+    documentos["SIN"] = doc_sin_clasificar
+
+    pagos_labels = {m["code"]: m["label"] for m in payment_methods}
+    pagos_labels["SIN"] = "Sin clasificar"
+    documentos_labels = {d["code"]: d["label"] for d in document_types}
+    documentos_labels["SIN"] = "Sin clasificar"
 
     return {
         "fecha": str(fecha),
@@ -435,19 +461,12 @@ def calcular_cierre(fecha):
         "total_anulaciones": total_anulaciones,
         "total_final": total_final,
         "cantidad_ventas": cantidad_ventas,
-        "pagos": {
-            "efectivo": efectivo,
-            "tarjeta": tarjeta,
-            "transferencia": transferencia,
-            "cheque": cheque,
-            "sin_clasificar": sin_clasificar_pago,
-        },
-        "documentos": {
-            "boleta": boleta,
-            "factura": factura,
-            "otros": otros,
-            "sin_clasificar": doc_sin_clasificar,
-        },
+        "pagos": pagos,
+        "pagos_labels": pagos_labels,
+        "pagos_list": [m["code"] for m in payment_methods] + ["SIN"],
+        "documentos": documentos,
+        "documentos_labels": documentos_labels,
+        "documentos_list": [d["code"] for d in document_types] + ["SIN"],
     }
 
 
@@ -529,7 +548,7 @@ def detalle_cierre(fecha, tipo, clave):
                 "cliente": _venta_cliente(v),
                 "tipo": "venta",
                 "medio_pago": ", ".join(
-                    _MEDIO_PAGO_LABEL.get(p.metodo_pago, p.metodo_pago) for p in v.pagos.all()
+                    _medio_pago_label_map().get(p.metodo_pago, p.metodo_pago) for p in v.pagos.all()
                 ) or "Sin clasificar",
                 "monto": v.monto_total,
                 "usuario": v.usuario.username if v.usuario else None,
@@ -546,7 +565,7 @@ def detalle_cierre(fecha, tipo, clave):
                 "fecha": p.venta.fecha_venta,
                 "cliente": p.venta.cliente_nombre or p.nombre_cliente,
                 "tipo": "pedido",
-                "medio_pago": _MEDIO_PAGO_LABEL.get(p.metodo_pago, p.metodo_pago),
+                "medio_pago": _medio_pago_label_map().get(p.metodo_pago, p.metodo_pago),
                 "monto": p.monto_total,
                 "usuario": p.venta.usuario.username if p.venta.usuario else None,
             }
@@ -634,6 +653,8 @@ class CierreCajaView(APIView):
             fecha = timezone.localtime(timezone.now()).date()
 
         stats = calcular_cierre(fecha)
+        pagos = stats["pagos"]
+        documentos = stats["documentos"]
         cierre = CierreCaja.objects.create(
             fecha=fecha,
             usuario=request.user,
@@ -642,15 +663,16 @@ class CierreCajaView(APIView):
             total_anulaciones=stats["total_anulaciones"],
             total_final=stats["total_final"],
             cantidad_ventas=stats["cantidad_ventas"],
-            efectivo=stats["pagos"]["efectivo"],
-            tarjeta=stats["pagos"]["tarjeta"],
-            transferencia=stats["pagos"]["transferencia"],
-            cheque=stats["pagos"]["cheque"],
-            pago_sin_clasificar=stats["pagos"]["sin_clasificar"],
-            boleta=stats["documentos"]["boleta"],
-            factura=stats["documentos"]["factura"],
-            otros=stats["documentos"]["otros"],
-            doc_sin_clasificar=stats["documentos"]["sin_clasificar"],
+            efectivo=pagos.get("EF", 0),
+            tarjeta=pagos.get("TJ", 0),
+            transferencia=pagos.get("TR", 0),
+            cheque=pagos.get("CH", 0),
+            pago_sin_clasificar=pagos.get("SIN", 0),
+            boleta=documentos.get("BO", 0),
+            factura=documentos.get("FA", 0),
+            otros=documentos.get("OT", 0),
+            doc_sin_clasificar=documentos.get("SIN", 0),
+            desglose={"pagos": pagos, "documentos": documentos},
         )
 
         stats["guardado"] = True
@@ -674,6 +696,7 @@ class CierreCajaHistorialView(APIView):
             )
 
         cierres = CierreCaja.objects.select_related("usuario").all()
+        config = StoreConfig.current()
         data = [
             {
                 "id": c.id,
@@ -685,22 +708,34 @@ class CierreCajaHistorialView(APIView):
                 "total_anulaciones": c.total_anulaciones,
                 "total_final": c.total_final,
                 "cantidad_ventas": c.cantidad_ventas,
-                "pagos": {
-                    "efectivo": c.efectivo,
-                    "tarjeta": c.tarjeta,
-                    "transferencia": c.transferencia,
-                    "cheque": c.cheque,
-                    "sin_clasificar": c.pago_sin_clasificar,
-                },
-                "documentos": {
-                    "boleta": c.boleta,
-                    "factura": c.factura,
-                    "otros": c.otros,
-                    "sin_clasificar": c.doc_sin_clasificar,
-                },
+                "pagos": c.desglose.get("pagos") if c.desglose else None,
+                "documentos": c.desglose.get("documentos") if c.desglose else None,
+                "pagos_labels": {m["code"]: m["label"] for m in config.payment_methods_list()} | {"SIN": "Sin clasificar"},
+                "pagos_list": [m["code"] for m in config.active_payment_methods()] + ["SIN"],
+                "documentos_labels": {d["code"]: d["label"] for d in config.document_types_list()} | {"SIN": "Sin clasificar"},
+                "documentos_list": [d["code"] for d in config.active_document_types()] + ["SIN"],
             }
             for c in cierres
         ]
+
+        # Backward compatibility: records without a stored desglose fall back
+        # to the legacy fixed columns (pre-dynamic cierre).
+        for row, c in zip(data, cierres):
+            if row["pagos"] is None:
+                row["pagos"] = {
+                    "EF": c.efectivo,
+                    "TJ": c.tarjeta,
+                    "TR": c.transferencia,
+                    "CH": c.cheque,
+                    "SIN": c.pago_sin_clasificar,
+                }
+            if row["documentos"] is None:
+                row["documentos"] = {
+                    "BO": c.boleta,
+                    "FA": c.factura,
+                    "OT": c.otros,
+                    "SIN": c.doc_sin_clasificar,
+                }
         return Response(data)
 
 
@@ -723,9 +758,10 @@ class CierreCajaDetalleView(APIView):
         tipo = request.query_params.get("tipo", "").strip().lower()
         clave = request.query_params.get("clave", "").strip().upper()
 
+        config = StoreConfig.current()
         claves_validas = {
-            "pago": {"EF", "TJ", "TR", "CH", "SIN"},
-            "documento": {"BO", "FA", "OT", "SIN"},
+            "pago": {m["code"] for m in config.active_payment_methods()} | {"SIN"},
+            "documento": {d["code"] for d in config.active_document_types()} | {"SIN"},
         }
         if tipo in claves_validas:
             if clave not in claves_validas[tipo]:
@@ -1695,12 +1731,11 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 
-    def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
+    def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, cost_modifiers=None):
         from decimal import ROUND_HALF_UP
         from gerenteApp.pricing import round_price, tax_multiplier
-        costo = Decimal(precio_costo)
-        if stellantis:
-            costo = costo * Decimal("0.80")
+        from gerenteApp.store_extensions import apply_modifiers
+        costo = apply_modifiers(Decimal(precio_costo), cost_modifiers)
         utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
         base = costo * (Decimal(1) + utilidad)
         con_iva = base * tax_multiplier()
@@ -1732,7 +1767,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         if not detalles_originales.exists():
             return Response({"error": "Ninguno de los items seleccionados pertenece a esta cotización"}, status=400)
 
-        costo_envio = 4500
+        costo_envio = StoreConfig.current().default_shipping_cost
         monto_subtotal = 0
         monto_total = 0
         nuevos_items = []
@@ -1742,7 +1777,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                 detalle.porcentaje_utilidad,
                 costo_envio,
                 sumar_envio=detalle.sumar_envio,
-                stellantis=detalle.stellantis,
+                cost_modifiers=detalle.cost_modifiers,
             )
             monto_subtotal += base
             monto_total += item_total
@@ -1779,7 +1814,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     porcentaje_utilidad=d.porcentaje_utilidad,
                     precio_final=item["item_total"],
                     sumar_envio=d.sumar_envio,
-                    stellantis=d.stellantis,
+                    cost_modifiers=d.cost_modifiers,
                 )
 
                 fecha = date.today()

@@ -45,7 +45,9 @@ export default function VentaPage() {
   const [medioPago, setMedioPago] = useState("");
   const [documentoFiscal, setDocumentoFiscal] = useState("");
   const [esMixto, setEsMixto] = useState(false);
-  const [pagosMixtos, setPagosMixtos] = useState({ EF: 0, TJ: 0, TR: 0, CH: 0 });
+  const [pagosMixtos, setPagosMixtos] = useState(() =>
+    Object.fromEntries((getStoreConfig().effective_payment_methods || []).map((m) => [m.code, 0]))
+  );
   const [showVentaSuccess, setShowVentaSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [lastDocumento, setLastDocumento] = useState(null);
@@ -68,6 +70,9 @@ export default function VentaPage() {
   const [preciosModificados, setPreciosModificados] = useState({});
   const oemRequestRef = useRef(0);
   const taxPercent = getTaxPercent();
+  const ventaConfig = getStoreConfig();
+  const paymentMethods = ventaConfig.effective_payment_methods || [];
+  const documentTypes = ventaConfig.effective_document_types || [];
   const esGerente = isGerente(getUser());
 
   useEffect(() => {
@@ -497,7 +502,7 @@ export default function VentaPage() {
       setMedioPago("");
       setDocumentoFiscal("");
       setEsMixto(false);
-      setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
+      setPagosMixtos(Object.fromEntries((getStoreConfig().effective_payment_methods || []).map((m) => [m.code, 0])));
       setShowPreview(true);
       setShowVentaSuccess(true);
       if (cotizacionOrigenId) {
@@ -954,9 +959,9 @@ export default function VentaPage() {
                         onChange={(e) => setDocumentoFiscal(e.target.value)}
                       >
                         <option value="">Seleccione documento...</option>
-                        <option value="BO">Boleta</option>
-                        <option value="FA">Factura</option>
-                        <option value="OT">Otros</option>
+                        {documentTypes.map((d) => (
+                          <option key={d.code} value={d.code}>{d.label}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="col-md-6">
@@ -968,10 +973,9 @@ export default function VentaPage() {
                         disabled={esMixto}
                       >
                         <option value="">Seleccione medio de pago...</option>
-                        <option value="EF">Efectivo</option>
-                        <option value="TJ">Tarjeta</option>
-                        <option value="TR">Transferencia</option>
-                        <option value="CH">Cheque</option>
+                        {paymentMethods.map((m) => (
+                          <option key={m.code} value={m.code}>{m.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -996,24 +1000,19 @@ export default function VentaPage() {
                 )}
                 {confirmMode === "VE" && esMixto && (
                   <div className="row mb-3">
-                    {[
-                      ["EF", "Efectivo"],
-                      ["TJ", "Tarjeta"],
-                      ["TR", "Transferencia"],
-                      ["CH", "Cheque"],
-                    ].map(([code, label]) => (
-                      <div className="col-md-3" key={code}>
-                        <label className="font-weight-bold">{label}:</label>
+                    {paymentMethods.map((m) => (
+                      <div className="col-md-3" key={m.code}>
+                        <label className="font-weight-bold">{m.label}:</label>
                         <input
                           type="number"
                           className="form-control"
                           min={0}
                           step={1000}
-                          value={pagosMixtos[code]}
+                          value={pagosMixtos[m.code]}
                           onChange={(e) =>
                             setPagosMixtos((prev) => ({
                               ...prev,
-                              [code]: e.target.value === "" ? 0 : Number(e.target.value),
+                              [m.code]: e.target.value === "" ? 0 : Number(e.target.value),
                             }))
                           }
                         />
