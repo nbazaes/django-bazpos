@@ -1195,9 +1195,6 @@ export default function VentaPage() {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Seleccionar ubicación de descuento</h5>
-                <button type="button" className="modal-close" onClick={() => setShowUbicacionDialog(false)}>
-                  &times;
-                </button>
               </div>
               <div className="modal-body">
                 <p className="mb-3 text-secondary">Los siguientes productos tienen stock en múltiples ubicaciones. Seleccione de cuál descontar:</p>
@@ -1267,7 +1264,7 @@ export default function VentaPage() {
                                 onChange={(e) => {
                                   setSelectedUbicaciones({
                                     ...selectedUbicaciones,
-                                    [item.producto_id]: Number(e.target.value),
+                                    [item.producto_id]: e.target.value === "" ? null : Number(e.target.value),
                                   });
                                   setUbicacionError("");
                                 }}
@@ -1287,7 +1284,6 @@ export default function VentaPage() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowUbicacionDialog(false)}>Cancelar</button>
                 <button type="button" className="btn btn-success" onClick={handleDeducirStock} disabled={isDeducing || !mixtoUbicacionesValido}>
                   {isDeducing ? "Deduciendo..." : "Confirmar"}
                 </button>

@@ -916,7 +916,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
 class DeducirStockInputSerializer(serializers.Serializer):
     producto_id = serializers.IntegerField()
-    ubicacion_id = serializers.IntegerField()
+    ubicacion_id = serializers.IntegerField(allow_null=True)
     cantidad = serializers.IntegerField(min_value=1)
 
 
@@ -927,6 +927,11 @@ class DeducirStockSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("Debe especificar al menos una deducción")
         return value
+
+
+def _ubicacion_id_from_key(key):
+    """Convierte la clave de deduccion_original (JSON) a ubicacion_id (None = sin ubicación)."""
+    return None if key == "None" else int(key)
 
 
 class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -1025,7 +1030,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             registradas = deduccion_original.get(str(producto.producto_id), {})
 
             stocks = StockProductoUbicacion.objects.filter(
-                producto=producto, ubicacion__isnull=False
+                producto=producto
             ).select_related("ubicacion")
 
             ubicaciones_pre_venta = []
@@ -1033,11 +1038,19 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 stock_pre = s.cantidad + int(registradas.get(str(s.ubicacion_id), 0))
                 if stock_pre > 0:
                     ubicaciones_pre_venta.append(
-                        {"id": s.ubicacion.id, "nombre": s.ubicacion.nombre, "stock": stock_pre}
+                        {
+                            "id": s.ubicacion_id,
+                            "nombre": s.ubicacion.nombre if s.ubicacion else "Sin ubicación",
+                            "stock": stock_pre,
+                        }
                     )
 
             if len(ubicaciones_pre_venta) < 2:
                 continue
+
+            ubicaciones_pre_venta.sort(
+                key=lambda u: (-int(registradas.get(str(u["id"]), 0)), -u["stock"])
+            )
 
             resultado.append({
                 "producto_id": producto.producto_id,
@@ -1108,7 +1121,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 for ubicacion_id, cantidad in registradas.items():
                     stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
                         producto_id=int(producto_id),
-                        ubicacion_id=int(ubicacion_id),
+                        ubicacion_id=_ubicacion_id_from_key(ubicacion_id),
                         defaults={"cantidad": 0},
                     )
                     stock.cantidad += cantidad
@@ -1135,7 +1148,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                     for ubicacion_id, cantidad in registradas.items():
                         stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
                             producto_id=producto_id,
-                            ubicacion_id=int(ubicacion_id),
+                            ubicacion_id=_ubicacion_id_from_key(ubicacion_id),
                             defaults={"cantidad": 0},
                         )
                         stock.cantidad -= cantidad
@@ -1144,7 +1157,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
                 if asignacion:
                     primera = max(asignacion, key=asignacion.get)
-                    detalle.ubicacion_id_id = int(primera)
+                    detalle.ubicacion_id = _ubicacion_id_from_key(primera)
                     detalle.save(update_fields=["ubicacion"])
                 nueva[str(producto_id)] = asignacion
 
