@@ -32,7 +32,10 @@ export default function ProductoForm({
   onSaved,
 }) {
   const id = productoId;
-  const [data, setData] = useState(initialState);
+  const [data, setData] = useState(() => ({
+    ...initialState,
+    margen_utilidad: Number(getStoreConfig().default_margin_percent ?? 30),
+  }));
   const [error, setError] = useState("");
 
   const { data: proveedoresData } = useProveedores({ page_size: 200 });

@@ -62,6 +62,13 @@ sed -i "s#^APP_IMAGE=.*#APP_IMAGE=${APP_IMAGE}#; s#^NGINX_IMAGE=.*#NGINX_IMAGE=$
 grep -q '^APP_IMAGE=' "${LOCAL_ENV}"   || echo "APP_IMAGE=${APP_IMAGE}"   >> "${LOCAL_ENV}"
 grep -q '^NGINX_IMAGE=' "${LOCAL_ENV}" || echo "NGINX_IMAGE=${NGINX_IMAGE}" >> "${LOCAL_ENV}"
 
+# Sincronizar siempre el nombre de la tienda (no solo en la primera provisión),
+# para que un cambio de nombre no exija editar a mano el .env persistido.
+sed -i "s#^STORE_NAME=.*#STORE_NAME=BIOCAR#" "${LOCAL_ENV}"
+sed -i "s#^VITE_STORE_NAME=.*#VITE_STORE_NAME=BIOCAR#" "${LOCAL_ENV}"
+grep -q '^STORE_NAME=' "${LOCAL_ENV}"      || echo "STORE_NAME=BIOCAR"      >> "${LOCAL_ENV}"
+grep -q '^VITE_STORE_NAME=' "${LOCAL_ENV}" || echo "VITE_STORE_NAME=BIOCAR" >> "${LOCAL_ENV}"
+
 # 3) Certificados autofirmados si no existen
 if [ ! -f "${REPO_ROOT}/certs/origin.pem" ]; then
   echo "==> [deploy] Generando certificados TLS..."

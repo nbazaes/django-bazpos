@@ -440,6 +440,25 @@ class FacturaUpsertTest(TestCase):
         self.assertEqual(resp.data["aplicados"], [])
 
 
+    def test_crear_producto_rapido_usa_margen_por_defecto(self):
+        config = StoreConfig.current()
+        config.default_margin_percent = Decimal("45.00")
+        config.save()
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/crear-producto-rapido/",
+            {
+                "codigo_producto": "QR1",
+                "nombre": "Producto Rápido",
+                "precio_costo": 10000,
+                "proveedor_id": self.proveedor.proveedor_id,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        producto = Producto.objects.get(codigo_producto="QR1")
+        self.assertEqual(producto.margen_utilidad, Decimal("45.00"))
+
+
 class StoreConfigApiTest(TestCase):
     @classmethod
     def setUpTestData(cls):

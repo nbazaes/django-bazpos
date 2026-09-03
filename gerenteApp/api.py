@@ -273,7 +273,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
         precio_costo = int(request.data.get("precio_costo", 0))
         stock_minimo = int(request.data.get("stock_minimo", 0))
         stock_maximo = int(request.data.get("stock_maximo", 0))
-        margen_utilidad = float(request.data.get("margen_utilidad", 30))
+        margen_utilidad = float(request.data.get("margen_utilidad", StoreConfig.current().default_margin_percent))
         proveedor_id = request.data.get("proveedor_id")
 
         if not codigo_producto or not nombre or not precio_costo:
