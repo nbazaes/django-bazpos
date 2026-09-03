@@ -4,6 +4,25 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [1.27.0] - 2026-09-03
+
+### Agregado
+
+- Seis esquemas de color, con variantes clara y oscura, y selector de tema en Configuración que se aplica al instante.
+- Configuración disponible para todos los roles; los datos de la tienda quedan restringidos a Gerente y Encargado.
+
+### Cambiado
+
+- La deducción de stock ahora permite combinar existencias de distintas ubicaciones y valida que no se descuente más de lo disponible.
+
+### Corregido
+
+- El stock se descuenta de forma segura al crear una venta y al reasignar ubicaciones.
+
+### Eliminado
+
+- Se eliminó la opción de cancelar la deducción de stock desde el modal de ubicaciones.
+
 ## [1.26.0] - 2026-09-02
 
 ### Agregado
