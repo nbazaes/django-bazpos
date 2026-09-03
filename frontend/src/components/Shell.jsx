@@ -18,6 +18,7 @@ const vendedorLinks = [
   { to: "/ventas/pedidos", label: "Pedidos", icon: "bi-bag-check" },
   { to: "/ventas/historial", label: "Historial", icon: "bi-clock-history" },
   { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
+  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
 ];
 
 const gerenteLinks = [

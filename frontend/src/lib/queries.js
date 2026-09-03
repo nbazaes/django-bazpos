@@ -705,11 +705,12 @@ export function useCierreDetalle(fecha, tipo, clave, enabled) {
 
 // ── Configuración ──
 
-export function useStoreConfig() {
+export function useStoreConfig(options = {}) {
   return useQuery({
     queryKey: queryKeys.configuracion.all,
     queryFn: () => apiRequest("/configuracion/"),
     staleTime: 5 * 60_000,
+    enabled: options.enabled ?? true,
   });
 }
 
