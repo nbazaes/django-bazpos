@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getUser, isGerente, isBodeguero, clearTokens } from "../lib/auth";
 import { toggleTheme, getStoredTheme } from "../lib/theme";
-import { useStoreName } from "../lib/storeName";
+import { useStoreName } from "../lib/storeConfig";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, buildQuery, downloadFile } from "./api";
+import { refreshStoreConfig } from "./storeConfig";
 
 const keepPreviousData = (old, next) => next ?? old;
 
@@ -40,7 +41,6 @@ export const queryKeys = {
     detail: (id) => ["facturas", "detail", id],
     buscarProducto: (codigo) => ["facturas", "buscar-producto", codigo],
     checkExists: (numero_factura, proveedor_id) => ["facturas", "check-exists", numero_factura, proveedor_id],
-    impuesto: ["facturas", "impuesto"],
   },
   ubicaciones: {
     all: ["ubicaciones"],
@@ -521,14 +521,6 @@ export function useBuscarProductoFactura(codigo) {
   });
 }
 
-export function useImpuesto() {
-  return useQuery({
-    queryKey: queryKeys.facturas.impuesto,
-    queryFn: () => apiRequest("/facturas/impuesto/"),
-    staleTime: 5 * 60_000,
-  });
-}
-
 export function useCheckFacturaExiste() {
   return useMutation({
     mutationFn: ({ numero_factura, proveedor_id }) =>
@@ -720,7 +712,7 @@ export function useUpdateStoreConfig() {
       apiRequest(`/configuracion/${payload.id}/`, { method: "PATCH", body: payload.data }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.configuracion.all });
-      qc.invalidateQueries({ queryKey: queryKeys.facturas.impuesto });
+      refreshStoreConfig();
     },
   });
 }

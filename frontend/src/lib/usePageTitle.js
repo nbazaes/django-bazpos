@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect } from "react";
-import { useStoreName } from "./storeName";
+import { useStoreName } from "./storeConfig";
 
 const TitleContext = createContext(() => {});
 

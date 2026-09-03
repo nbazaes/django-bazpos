@@ -264,7 +264,24 @@ class StoreConfigSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StoreConfig
-        fields = ["id", "telefono", "direccion", "tax_percent", "timezone", "ubicacion_por_defecto", "ubicacion_por_defecto_nombre"]
+        fields = [
+            "id",
+            "nombre",
+            "telefono",
+            "direccion",
+            "tax_percent",
+            "timezone",
+            "currency_code",
+            "locale",
+            "price_round_to",
+            "total_round_to",
+            "total_round_threshold",
+            "default_shipping_cost",
+            "default_margin_percent",
+            "feature_flags",
+            "ubicacion_por_defecto",
+            "ubicacion_por_defecto_nombre",
+        ]
 
     def get_ubicacion_por_defecto_nombre(self, obj):
         return obj.ubicacion_por_defecto.nombre if obj.ubicacion_por_defecto else None

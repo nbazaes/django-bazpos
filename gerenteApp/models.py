@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
-from decimal import Decimal, ROUND_HALF_UP
 
 # Create your models here.
 class Proveedor(models.Model):
@@ -74,34 +73,20 @@ class PrecioHistorico(models.Model):
         return f'{self.producto.nombre} - {self.fecha.strftime("%d/%m/%Y")}'
 
 
-class Tax(models.Model):
-    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=19)
-
-    class Meta:
-        db_table = "taxes"
-
-    def __str__(self):
-        return f"IVA {self.tax_percent}%"
-
-    @classmethod
-    def current_percent(cls):
-        tax = cls.objects.order_by("id").first()
-        if not tax:
-            return Decimal("19")
-        return Decimal(str(tax.tax_percent))
-
-    @classmethod
-    def apply_to_amount(cls, amount):
-        percent = cls.current_percent()
-        total = Decimal(str(amount)) * (Decimal("1") + (percent / Decimal("100")))
-        return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
 class StoreConfig(models.Model):
+    nombre = models.CharField(max_length=100, blank=True, default="")
     telefono = models.CharField(max_length=20, blank=True, default="")
     direccion = models.TextField(blank=True, default="")
     tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=19)
     timezone = models.CharField(max_length=100, blank=True, default="America/Santiago")
+    currency_code = models.CharField(max_length=3, blank=True, default="CLP")
+    locale = models.CharField(max_length=20, blank=True, default="es-CL")
+    price_round_to = models.IntegerField(default=100)
+    total_round_to = models.IntegerField(default=1000)
+    total_round_threshold = models.IntegerField(default=900)
+    default_shipping_cost = models.IntegerField(default=4500)
+    default_margin_percent = models.DecimalField(max_digits=5, decimal_places=2, default=30)
+    feature_flags = models.JSONField(default=dict, blank=True)
     ubicacion_por_defecto = models.ForeignKey(
         "vendedorApp.Ubicacion",
         on_delete=models.SET_NULL,
@@ -129,6 +114,6 @@ class StoreConfig(models.Model):
 
     @classmethod
     def apply_to_amount(cls, amount):
-        percent = cls.current_percent()
-        total = Decimal(str(amount)) * (Decimal("1") + (percent / Decimal("100")))
-        return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        from .pricing import apply_tax
+
+        return apply_tax(amount)

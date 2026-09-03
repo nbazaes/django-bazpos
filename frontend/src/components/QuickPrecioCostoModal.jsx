@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useUpdateProducto } from "../lib/queries";
+import { calcularPrecioVenta } from "../lib/storeConfig";
 
 function autoFill(value, fallback) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -7,10 +8,7 @@ function autoFill(value, fallback) {
 }
 
 function roundPrecio(precioCosto, margen) {
-  const costo = Number(precioCosto) || 0;
-  const margin = Number(margen) || 0;
-  const total = costo * (1 + margin / 100) * 1.19;
-  return Math.round(total / 100) * 100;
+  return calcularPrecioVenta(precioCosto, margen);
 }
 
 export default function QuickPrecioCostoModal({ producto, initialPrecioCosto, initialMargenUtilidad, onClose }) {

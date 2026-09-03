@@ -3,7 +3,7 @@ import PageCard from "../components/PageCard";
 import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
-import { useStoreName } from "../lib/storeName";
+import { useStoreName } from "../lib/storeConfig";
 import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
 
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;

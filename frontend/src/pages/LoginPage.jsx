@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, me } from "../lib/api";
 import { saveUser } from "../lib/auth";
-import { useStoreName } from "../lib/storeName";
+import { useStoreName } from "../lib/storeConfig";
 
 export default function LoginPage() {
   const navigate = useNavigate();

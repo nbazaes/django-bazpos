@@ -277,10 +277,9 @@ class VentaSerializer(serializers.ModelSerializer):
 
 
 def _round_total(amount):
-    remainder = amount % 1000
-    if remainder >= 900:
-        return ((amount // 1000) + 1) * 1000
-    return (amount // 1000) * 1000
+    from gerenteApp.pricing import round_sale_total
+
+    return round_sale_total(amount)
 
 
 def _distribute_discount(monto_subtotal, monto_total, descuento_porcentaje, items_data):
@@ -771,18 +770,19 @@ class CrearPedidoSerializer(serializers.Serializer):
     )
 
     def _calcular_item(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
-        from decimal import ROUND_HALF_UP, ROUND_UP
+        from decimal import ROUND_HALF_UP
+        from gerenteApp.pricing import round_price, tax_multiplier
         costo = Decimal(precio_costo)
         if stellantis:
             costo = costo * Decimal("0.80")
         utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
         base = costo * (Decimal(1) + utilidad)
-        con_iva = base * Decimal("1.19")
+        con_iva = base * tax_multiplier()
         if sumar_envio:
             con_envio = con_iva + Decimal(costo_envio)
         else:
             con_envio = con_iva
-        item_total = int((con_envio / Decimal(100)).to_integral_value(rounding=ROUND_UP) * Decimal(100))
+        item_total = round_price(con_envio)
         return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
 
     @transaction.atomic

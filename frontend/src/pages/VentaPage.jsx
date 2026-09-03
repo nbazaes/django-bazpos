@@ -3,9 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
 import { apiRequest } from "../lib/api";
-import { getTaxPercent } from "../lib/tax";
-import { getStoreName } from "../lib/storeName";
-import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+import { getTaxPercent, getStoreName, getStoreConfig, fetchStoreConfig, roundSaleTotal } from "../lib/storeConfig";
 import { useDebounce } from "../lib/hooks";
 import { getUser, isGerente } from "../lib/auth";
 import StepperInput from "../components/StepperInput";
@@ -29,12 +27,6 @@ function readStoredVenta() {
     localStorage.removeItem(VENTA_STORAGE_KEY);
   }
   return { carro: [], descuentoPorcentaje: 0, oem: "" };
-}
-
-function roundTotal(amount) {
-  const remainder = amount % 1000;
-  if (remainder >= 900) return (Math.floor(amount / 1000) + 1) * 1000;
-  return Math.floor(amount / 1000) * 1000;
 }
 
 export default function VentaPage() {
@@ -86,7 +78,7 @@ export default function VentaPage() {
   const subtotalCarro = carro.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
   const discount = descuentoPorcentaje > 0 ? descuentoPorcentaje : 0;
   const discountedTotal = Math.round(subtotalCarro * (1 - discount / 100));
-  const totalConDescuento = discount > 0 ? roundTotal(discountedTotal) : subtotalCarro;
+  const totalConDescuento = discount > 0 ? roundSaleTotal(discountedTotal) : subtotalCarro;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const cotizacionParam = searchParams.get("cotizacion");
@@ -470,7 +462,7 @@ export default function VentaPage() {
     try {
       const subtotal = subtotalCarro;
       const discounted = Math.round(subtotal * (1 - discount / 100));
-      const total = discount > 0 ? roundTotal(discounted) : subtotal;
+      const total = discount > 0 ? roundSaleTotal(discounted) : subtotal;
       await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
       const pagos = esMixto
         ? Object.entries(pagosMixtos)

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from gerenteApp.models import Proveedor, Factura, DetalleFactura, PrecioHistorico, Tax
+from gerenteApp.models import Proveedor, Factura, DetalleFactura, PrecioHistorico, StoreConfig
 
 
 class SuperuserOnlyAdmin(admin.ModelAdmin):
@@ -55,6 +55,6 @@ class PrecioHistoricoAdmin(SuperuserOnlyAdmin):
     readonly_fields = ('producto', 'precio_costo_anterior', 'precio_costo_nuevo', 'precio_venta_anterior', 'precio_venta_nuevo', 'fecha', 'factura')
 
 
-@admin.register(Tax)
-class TaxAdmin(SuperuserOnlyAdmin):
-    list_display = ("id", "tax_percent")
+@admin.register(StoreConfig)
+class StoreConfigAdmin(SuperuserOnlyAdmin):
+    list_display = ("id", "nombre", "tax_percent", "currency_code", "timezone")

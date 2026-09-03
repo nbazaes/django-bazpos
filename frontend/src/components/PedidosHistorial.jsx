@@ -11,8 +11,7 @@ import {
   usePedidos,
   useUbicaciones,
 } from "../lib/queries";
-import { getStoreName } from "../lib/storeName";
-import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+import { getStoreName, getStoreConfig, fetchStoreConfig } from "../lib/storeConfig";
 import { useToast } from "../lib/useToast";
 import { getUser, isGerente } from "../lib/auth";
 import Pagination from "./Pagination";

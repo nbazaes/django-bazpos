@@ -1402,7 +1402,7 @@ hr {{ border: none; border-top: 1px dashed #999; margin: 8px 0; }}
 </style>
 </head>
 <body>
-<h1>{settings.STORE_NAME}</h1>
+<h1>{config.nombre or settings.STORE_NAME}</h1>
 {direccion_line}
 {telefono_line}
 <p class="subtitle">{titulo}</p>
@@ -1696,18 +1696,19 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 
     def _calcular_item_view(self, precio_costo, porcentaje_utilidad, costo_envio, sumar_envio=True, stellantis=False):
-        from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
+        from decimal import ROUND_HALF_UP
+        from gerenteApp.pricing import round_price, tax_multiplier
         costo = Decimal(precio_costo)
         if stellantis:
             costo = costo * Decimal("0.80")
         utilidad = Decimal(porcentaje_utilidad) / Decimal(100)
         base = costo * (Decimal(1) + utilidad)
-        con_iva = base * Decimal("1.19")
+        con_iva = base * tax_multiplier()
         if sumar_envio:
             con_envio = con_iva + Decimal(costo_envio)
         else:
             con_envio = con_iva
-        item_total = int((con_envio / Decimal(100)).to_integral_value(rounding=ROUND_UP) * Decimal(100))
+        item_total = round_price(con_envio)
         return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
 
     @action(detail=True, methods=["post"], url_path="convertir-a-pedido")

@@ -3,17 +3,25 @@ from decimal import Decimal
 from django.test import TestCase
 
 from docker.test_utils import auth_client, create_business_groups, make_user
-from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig, Tax
+from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig
+from gerenteApp.pricing import apply_tax, round_price, round_sale_total
 from vendedorApp.models import Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion, Venta
 
 
-class TaxTest(TestCase):
-    def test_apply_to_amount_19_percent(self):
-        self.assertEqual(Tax.apply_to_amount(1000), 1190)
-        self.assertEqual(Tax.apply_to_amount(841), 1001)
+class PricingTest(TestCase):
+    def test_apply_tax_19_percent(self):
+        self.assertEqual(apply_tax(1000), 1190)
+        self.assertEqual(apply_tax(841), 1001)
 
-    def test_current_percent_default(self):
-        self.assertEqual(Tax.current_percent(), Decimal("19"))
+    def test_round_price_default_100(self):
+        self.assertEqual(round_price(1001), 1100)
+        self.assertEqual(round_price(1000), 1000)
+        self.assertEqual(round_price(199), 200)
+
+    def test_round_sale_total_default_1000_threshold_900(self):
+        self.assertEqual(round_sale_total(9100), 9000)
+        self.assertEqual(round_sale_total(9900), 10000)
+        self.assertEqual(round_sale_total(9000), 9000)
 
 
 class StoreConfigTest(TestCase):

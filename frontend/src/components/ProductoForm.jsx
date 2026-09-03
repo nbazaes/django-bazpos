@@ -8,7 +8,7 @@ import {
   useUpdateProducto,
 } from "../lib/queries";
 import { useDebounce } from "../lib/hooks";
-import { calcularPrecioVenta } from "../lib/tax";
+import { calcularPrecioVenta } from "../lib/storeConfig";
 
 const initialState = {
   codigo_producto: "",

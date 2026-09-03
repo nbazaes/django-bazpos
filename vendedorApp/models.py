@@ -93,12 +93,11 @@ class Producto(models.Model):
         self.__dict__['stock_actual'] = value
 
     def save(self, *args, **kwargs):
-        if self.precio_costo and self.margen_utilidad: 
-            precio_costo_decimal = Decimal(self.precio_costo) 
-            margen_utilidad_decimal = Decimal(self.margen_utilidad) / Decimal(100) 
-            margen_total = precio_costo_decimal * (Decimal(1) + margen_utilidad_decimal) 
-            precio_calculado = int(margen_total * Decimal(1.19))
-            self.precio = ((precio_calculado + 99) // 100) * 100
+        if self.precio_costo and self.margen_utilidad:
+            from gerenteApp.pricing import round_price, tax_multiplier
+            margen_total = Decimal(self.precio_costo) * (Decimal(1) + Decimal(self.margen_utilidad) / Decimal(100))
+            precio_calculado = int(margen_total * tax_multiplier())
+            self.precio = round_price(precio_calculado)
         super(Producto, self).save(*args, **kwargs)
 
 class Venta(models.Model):

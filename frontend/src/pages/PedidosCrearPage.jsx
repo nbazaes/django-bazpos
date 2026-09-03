@@ -4,8 +4,7 @@ import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { getStoreName } from "../lib/storeName";
-import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+import { getStoreName, getStoreConfig, fetchStoreConfig, applyTax, roundPrice } from "../lib/storeConfig";
 import { useToast } from "../lib/useToast";
 
 function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
@@ -13,13 +12,13 @@ function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = fals
   const pct = Number(porcentajeUtilidad) || 0;
   const costoBase = stellantis ? costo * 0.8 : costo;
   const base = costoBase * (1 + pct / 100);
-  return Math.round(base * 1.19);
+  return applyTax(base);
 }
 
 function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, stellantis = false) {
   const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis);
   const conEnvio = sumarEnvio ? subtotal + 4500 : subtotal;
-  return Math.ceil(conEnvio / 100) * 100;
+  return roundPrice(conEnvio);
 }
 
 const productoVacio = {

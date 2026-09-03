@@ -53,7 +53,7 @@ Each customer gets their own Docker stack + MariaDB. Configuration lives in `Sto
 
 **Goal:** one config object, one API fetch, no duplicated tax/rounding logic.
 
-**Status:** not started
+**Status:** done (`feat/phase-1-unified-config`)
 
 ### Backend: expand `StoreConfig`
 
@@ -277,8 +277,8 @@ Existing installs (e.g. EUROCAS) migrate with all current behavior preserved via
 
 ## Checklist
 
-- [ ] **Phase 1:** Expand `StoreConfig` model + pricing helpers; replace hardcoded `1.19`/rounding across backend and frontend
-- [ ] **Phase 1:** Unify frontend config into single `storeConfig.js` module; expand `ConfiguracionPage` UI
+- [x] **Phase 1:** Expand `StoreConfig` model + pricing helpers; replace hardcoded `1.19`/rounding across backend and frontend
+- [x] **Phase 1:** Unify frontend config into single `storeConfig.js` module; expand `ConfiguracionPage` UI
 - [ ] **Phase 2:** Replace `stellantis`/`costo_envio` hardcodes with configurable order pricing rules and `default_shipping_cost`
 - [ ] **Phase 2:** Make document types and payment methods configurable JSON; dynamic cierre-caja columns
 - [ ] **Phase 3:** Add `feature_flags` + `product_search_fields`; gate OEM/parts UI and report columns

@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 
-from gerenteApp.models import Factura, Proveedor, StoreConfig, Tax
+from gerenteApp.models import Factura, Proveedor, StoreConfig
 from gerenteApp.serializers import (
     FacturaDetalleSerializer,
     FacturaSerializer,
@@ -92,7 +92,6 @@ class FacturaViewSet(viewsets.ModelViewSet):
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
         "buscar_producto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "crear_producto_rapido": [ROLE_ENCARGADO, ROLE_GERENTE],
-        "impuesto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "check_exists": [ROLE_ENCARGADO, ROLE_GERENTE],
         "reconciliar_pedidos": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
@@ -260,10 +259,6 @@ class FacturaViewSet(viewsets.ModelViewSet):
                 },
             }
         )
-
-    @action(detail=False, methods=["get"], url_path="impuesto")
-    def impuesto(self, request):
-        return Response({"tax_percent": float(StoreConfig.current_percent())})
 
     @action(detail=False, methods=["post"], url_path="crear-producto-rapido")
     def crear_producto_rapido(self, request):

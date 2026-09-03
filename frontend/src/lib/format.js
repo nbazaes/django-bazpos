@@ -1,4 +1,4 @@
-import { getConfiguredTimezone } from "./store";
+import { getConfiguredTimezone } from "./storeConfig";
 
 export function formatDateTime(value) {
   if (!value) return "—";
