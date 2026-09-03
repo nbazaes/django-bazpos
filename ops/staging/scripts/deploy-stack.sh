@@ -9,6 +9,10 @@ source "$(dirname "$0")/lib.sh"
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
+# Nombre de la tienda para staging: por defecto BAZPOS, sobrescribible vía entorno.
+STORE_NAME="${STORE_NAME:-BAZPOS}"
+VITE_STORE_NAME="${VITE_STORE_NAME:-$STORE_NAME}"
+
 # 1) Resolver el SHA (DEPLOY_SHA explícito o última de main) → imágenes de CI en GHCR
 if [ -n "${DEPLOY_SHA:-}" ]; then
   echo "==> [deploy] Usando DEPLOY_SHA=${DEPLOY_SHA}"
@@ -41,8 +45,8 @@ DB_USER=bazpos
 DB_PASSWORD=${DB_PASS}
 DB_HOST=db
 DB_PORT=3306
-STORE_NAME=${STORE_NAME:-BAZPOS}
-VITE_STORE_NAME=${VITE_STORE_NAME:-BAZPOS}
+STORE_NAME=${STORE_NAME}
+VITE_STORE_NAME=${VITE_STORE_NAME}
 ADMIN_USER=admin
 ADMIN_EMAIL=admin@staging.local
 ADMIN_PASS=${ADMIN_PASS}
