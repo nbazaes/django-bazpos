@@ -36,6 +36,9 @@ PY
 echo "--- Ejecutando migraciones... ---"
 python manage.py migrate --noinput
 
+echo "--- Sincronizando nombre y locale de la tienda desde .env... ---"
+python manage.py sync_store_config
+
 echo "--- Configurando grupos y permisos... ---"
 python manage.py setup_groups
 

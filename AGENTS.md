@@ -3,8 +3,9 @@
 ## Repo Map
 - `bazpos/` — Django project config (settings, urls, WSGI, API router at `api_urls.py`, middleware, permissions).
 - `gerenteApp/` — management app: Proveedor, Factura (DetalleFactura), PrecioHistorico, Tax, StoreConfig models + DRF ViewSets (Usuarios via Django's User through UserViewSet).
-- `vendedorApp/` — sales app: Producto, Venta (PagoVenta, DetalleVenta, Anulacion), Devolucion (DetalleDevolucion), StockProductoUbicacion, Ubicacion, AjusteStock, StockHistorico, Pedido, PedidoDetalle, PedidoProveedorDia, ItemPedidoProveedor, CierreCaja models + DRF ViewSets. Also hosts `CierreCaja*`, `DashboardStats`, `ReportesStats`, and the custom report builder (`ReporteSchemaView`, `ReporteQueryView`, `ReporteExportView`) API views.
+- `vendedorApp/` — sales app: Producto, Venta (PagoVenta, DetalleVenta, Anulacion), Devolucion (DetalleDevolucion), StockProductoUbicacion, Ubicacion, AjusteStock, StockHistorico, Pedido, PedidoDetalle, PedidoProveedorDia, ItemPedidoProveedor, CierreCaja models + DRF ViewSets. Also hosts `CierreCaja*`, `DashboardStats`, `ReportesStats`, the custom report builder (`ReporteSchemaView`, `ReporteQueryView`, `ReporteExportView`) API views, and the public catalog (`publico_api.py`). Cross-app quirk: the `Ubicacion` model is here but its `UbicacionViewSet` lives in `gerenteApp/api.py`.
 - `chatApp/` — internal team chat (ChatMessage, ChatPresence + two APIView endpoints, no ViewSet/router). Polls `/api/chat/state/`, posts to `/api/chat/messages/`; messages purge after 8h idle (daily reset).
+- `.agents/skills/` + `skills-lock.json` — repo-local OpenCode agent skills, not part of the app.
 - `docker/` — helper Django app with management commands (`setup_groups`, `create_admin`, `seed_data`, `seed_ventas_diarias`, `seed_stock_historico`, `profile_endpoints`).
 - `frontend/` — Vite 8 / React 19 SPA with react-router-dom v7. Single entrypoint: `src/main.jsx` → `src/router.jsx`.
 - `static/` — legacy assets (Django admin, vendor).
@@ -77,6 +78,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `store-name/` (public, no auth): returns `{"name": settings.STORE_NAME}` — runtime store name
 - `dashboard/stats/`, `reportes/stats/`, `reportes/custom/schema/`, `reportes/custom/query/`, `reportes/custom/export/`, `cierre-caja/`, `cierre-caja/historial/`, `cierre-caja/detalle/`
 - `chat/state/`, `chat/messages/` (team chat — APIViews, not router)
+- `publico/catalogo/` — public product catalog with stock. The only `AllowAny` endpoint besides `store-name/`; throttled 120/min. Actions: `/marcas`, `/oems`. Impl: `vendedorApp/publico_api.py`.
 - CRUD: `productos`, `ventas`, `proveedores`, `facturas`, `usuarios`, `devoluciones`, `ubicaciones`, `pedidos`, `configuracion`, `pedidos-proveedor`
 - Health check: `/health/` (used by Docker healthcheck)
 
@@ -104,10 +106,12 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `LANGUAGE_CODE = "es-cl"` (Chilean Spanish). DRF responses may be in Spanish from the DB.
 - `RequestLogMiddleware` is first in `MIDDLEWARE` to log all requests to a ring buffer (viewable at `/admin/logs/` by superusers).
 - `ALLOWED_HOSTS` reads from `DJANGO_ALLOWED_HOSTS` comma-separated env var.
-- `STORE_NAME` (settings) reads the env var of the same name. It is served publicly at `/api/store-name/`. In production the app container reads `STORE_NAME` from `.env`; the frontend fetches it at runtime (see `frontend/src/lib/storeName.js`), falling back to the build-time `VITE_STORE_NAME`. Edit `.env` → `docker compose up -d` to change the name without rebuilding the nginx image.
+- `STORE_NAME` (settings) reads the env var of the same name (default `BAZPOS`). Install-time: the container runs `sync_store_config` on start, copying `STORE_NAME`/`STORE_LOCALE` into `StoreConfig.nombre`/`locale`, which are read-only in the API (not editable in the Configuración UI). Served publicly at `/api/store-name/`; the frontend reads `config.nombre` at runtime (see `frontend/src/lib/storeConfig.js`), falling back to the build-time `VITE_STORE_NAME`. Edit `.env` → `docker compose up -d` to change the name without rebuilding the nginx image.
 
 ## Frontend Rules
 - Plain JSX with ESLint only. No TypeScript.
+- Node 24 required (`package.json` engines `>=24 <25`); CI uses Node 24.
+- Pages are lazy-loaded: register new pages in `frontend/src/lazyRoutes.jsx`, not as static imports in `router.jsx`.
 - `router.jsx` is the source of truth for all routes and page structure.
 - `Shell.jsx` is the layout wrapper (sidebar + topbar + content area with dark/light theme toggle).
 - Design uses a corporate purple palette with CSS custom properties (see `frontend/src/design-system.css`).
@@ -116,7 +120,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - No linting, typechecking, or test framework (pytest) configured. Tests use Django's `manage.py test` (TestCases in each app's `tests.py`).
 - Tests create business groups via `call_command("setup_groups")`; shared fixtures live in `docker/test_utils.py` (`create_business_groups`, `make_user`, `auth_client`).
 - The test DB is `test_bazpos_db` — the local DB user needs `ALL ON test_bazpos_db.*`. CI uses the MariaDB service with root, so it works out of the box.
-- Run tests locally: `python manage.py test --noinput`. Run the full suite via CI: `.github/workflows/test.yml`.
+- Run tests locally: `python manage.py test --noinput`. CI (`.github/workflows/test.yml`) runs the backend suite on a MariaDB 12 service, then frontend lint+build on Node 24, then builds/pushes `app-*`/`nginx-*` images to `ghcr.io`. `.github/workflows/deploy.yml` auto-deploys to the VPS via SSH after a successful CI push to `main`.
 - MySQL driver is PyMySQL (pinned). Do not swap to mysqlclient or other drivers.
 - Docker entrypoint runs: `wait-for-db → migrate → setup_groups → create_admin → collectstatic --clear → gunicorn` (2 sync workers).
 - MariaDB (not SQLite): SQLite was evaluated and rejected — `select_for_update` is a no-op there and multi-worker stock updates would race. Keep MariaDB for scaling; mitigate resource use with the mem_limits and `docker/mariadb/zz-bazpos-tuning.cnf`.

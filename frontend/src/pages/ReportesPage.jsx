@@ -15,6 +15,7 @@ import PageCard from "../components/PageCard";
 import ReportesPersonalizadosPage from "./ReportesPersonalizadosPage";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useReportesStats } from "../lib/queries";
+import { formatMoney } from "../lib/storeConfig";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -27,7 +28,7 @@ const TABS = [
 ];
 
 function formatCLP(value) {
-  return `$${Number(value || 0).toLocaleString("es-CL")}`;
+  return formatMoney(value);
 }
 
 export default function ReportesPage() {

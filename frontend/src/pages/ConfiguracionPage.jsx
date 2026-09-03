@@ -23,8 +23,6 @@ const TIMEZONE_OPTIONS = [
 
 const CURRENCY_OPTIONS = ["CLP", "USD", "ARS", "COP", "PEN", "MXN", "BRL", "EUR"];
 
-const LOCALE_OPTIONS = ["es-CL", "es-AR", "es-CO", "es-MX", "en-US"];
-
 function ListEditor({ items, onChange, codePlaceholder }) {
   const update = (i, patch) => onChange(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const remove = (i) => onChange(items.filter((_, idx) => idx !== i));
@@ -81,13 +79,11 @@ export default function ConfiguracionPage() {
 
   const [data, setData] = useState({
     id: null,
-    nombre: "",
     telefono: "",
     direccion: "",
     tax_percent: "19",
     timezone: "America/Santiago",
     currency_code: "CLP",
-    locale: "es-CL",
     price_round_to: "100",
     total_round_to: "1000",
     total_round_threshold: "900",
@@ -98,8 +94,6 @@ export default function ConfiguracionPage() {
     ubicacion_por_defecto: "",
   });
 
-  const setupComplete = configData?.[0]?.is_setup_complete !== false;
-
   useEffect(() => {
     if (configData?.length) {
       const cfg = configData[0];
@@ -107,13 +101,11 @@ export default function ConfiguracionPage() {
       Promise.resolve().then(() => {
         if (!cancelled) setData({
           id: cfg.id,
-          nombre: cfg.nombre || "",
           telefono: cfg.telefono || "",
           direccion: cfg.direccion || "",
           tax_percent: cfg.tax_percent != null ? String(cfg.tax_percent) : "19",
           timezone: cfg.timezone || "America/Santiago",
           currency_code: cfg.currency_code || "CLP",
-          locale: cfg.locale || "es-CL",
           price_round_to: cfg.price_round_to != null ? String(cfg.price_round_to) : "100",
           total_round_to: cfg.total_round_to != null ? String(cfg.total_round_to) : "1000",
           total_round_threshold: cfg.total_round_threshold != null ? String(cfg.total_round_threshold) : "900",
@@ -135,13 +127,11 @@ export default function ConfiguracionPage() {
       {
         id: data.id,
         data: {
-          nombre: data.nombre,
           telefono: data.telefono,
           direccion: data.direccion,
           tax_percent: data.tax_percent,
           timezone: data.timezone,
           currency_code: data.currency_code,
-          locale: data.locale,
           price_round_to: data.price_round_to,
           total_round_to: data.total_round_to,
           total_round_threshold: data.total_round_threshold,
@@ -170,24 +160,8 @@ export default function ConfiguracionPage() {
 
   return (
     <PageCard title="Configuración">
-      {!setupComplete && (
-        <div className="alert alert-info" role="status">
-          <strong>Primera configuración de la tienda.</strong> Complete el nombre, moneda, impuesto y redondeo
-          para comenzar a operar. Puede elegir un perfil vertical en las secciones de medios de pago, documentos
-          y ubicación por defecto.
-        </div>
-      )}
       <form onSubmit={submit}>
         <h5 className="mt-3 mb-2">Identidad</h5>
-        <div className="form-group">
-          <label>Nombre de la tienda</label>
-          <input
-            className="form-control"
-            value={data.nombre}
-            onChange={set("nombre")}
-            placeholder="Mi Tienda"
-          />
-        </div>
         <div className="row">
           <div className="col-md-6 form-group">
             <label>Teléfono</label>
@@ -212,44 +186,28 @@ export default function ConfiguracionPage() {
         <h5 className="mt-4 mb-2">Moneda y formato</h5>
         <div className="row">
           <div className="col-md-6 form-group">
-            <label>Moneda (ISO 4217)</label>
-            <input
+            <label>Moneda</label>
+            <select
               className="form-control"
               value={data.currency_code}
               onChange={set("currency_code")}
-              placeholder="CLP"
-              list="currency-list"
-            />
-            <datalist id="currency-list">
-              {CURRENCY_OPTIONS.map((c) => <option key={c} value={c} />)}
-            </datalist>
+            >
+              {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           <div className="col-md-6 form-group">
-            <label>Locale</label>
+            <label>Zona horaria</label>
             <input
               className="form-control"
-              value={data.locale}
-              onChange={set("locale")}
-              placeholder="es-CL"
-              list="locale-list"
+              value={data.timezone}
+              onChange={set("timezone")}
+              placeholder="America/Santiago"
+              list="timezone-list"
             />
-            <datalist id="locale-list">
-              {LOCALE_OPTIONS.map((l) => <option key={l} value={l} />)}
+            <datalist id="timezone-list">
+              {TIMEZONE_OPTIONS.map((tz) => <option key={tz} value={tz} />)}
             </datalist>
           </div>
-        </div>
-        <div className="form-group">
-          <label>Zona horaria</label>
-          <input
-            className="form-control"
-            value={data.timezone}
-            onChange={set("timezone")}
-            placeholder="America/Santiago"
-            list="timezone-list"
-          />
-          <datalist id="timezone-list">
-            {TIMEZONE_OPTIONS.map((tz) => <option key={tz} value={tz} />)}
-          </datalist>
         </div>
 
         <h5 className="mt-4 mb-2">Impuestos y redondeo</h5>

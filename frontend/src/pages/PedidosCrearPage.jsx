@@ -4,7 +4,7 @@ import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { getStoreName, getStoreConfig, fetchStoreConfig, applyTax, roundPrice } from "../lib/storeConfig";
+import { getStoreName, getStoreConfig, fetchStoreConfig, applyTax, roundPrice, formatMoney } from "../lib/storeConfig";
 import { useToast } from "../lib/useToast";
 
 const COST_MODIFIER_LABELS = { stellantis: "Stellantis (descuento 20%)" };
@@ -64,7 +64,7 @@ export default function PedidosCrearPage() {
   const showPartsFields = config.feature_flags?.product_oem_fields === true;
   const showShippingToggle = config.feature_flags?.order_shipping_toggle === true;
   const shippingCost = Number(config.default_shipping_cost || 0);
-  const shippingLabel = shippingCost > 0 ? `(+$${shippingCost.toLocaleString("es-CL")})` : "";
+  const shippingLabel = shippingCost > 0 ? `(+${formatMoney(shippingCost)})` : "";
 
   function toggleCostModifier(key) {
     setProducto((prev) => {
@@ -537,7 +537,7 @@ export default function PedidosCrearPage() {
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
               <div className="text-right">
                 <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.cost_modifiers)}</div>
-                {producto.sumar_envio && shippingCost > 0 && <div className="text-secondary">Envío +${shippingCost.toLocaleString("es-CL")}</div>}
+                {producto.sumar_envio && shippingCost > 0 && <div className="text-secondary">Envío +{formatMoney(shippingCost)}</div>}
                 <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
               </div>
               <button

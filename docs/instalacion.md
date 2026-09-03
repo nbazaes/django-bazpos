@@ -31,7 +31,7 @@ Al arrancar, el contenedor de la app ejecuta automáticamente:
 Una vez arriba:
 
 1. Inicie sesión con el superusuario en `https://<host>/`.
-2. La primera vez, el sistema **redirige al Gerente a Configuración** para completar la puesta a punto inicial: nombre de la tienda, moneda, impuesto, redondeo, costo de envío por defecto, ubicación por defecto, medios de pago y documentos.
+2. El nombre de la tienda y el locale se definen en `.env` (`STORE_NAME`, `STORE_LOCALE`) y se aplican al arrancar el contenedor. En **Configuración** se ajustan moneda, impuesto, redondeo, costo de envío por defecto, ubicación por defecto, medios de pago y documentos.
 3. (Opcional) Cargue datos de demostración con un perfil vertical:
 
 ```bash
@@ -47,7 +47,7 @@ Toda la configuración vive en **Configuración** (módulo `/configuracion`) y s
 
 | Sección | Qué configura |
 |---|---|
-| Identidad | Nombre de la tienda (reemplaza `STORE_NAME`), teléfono, dirección |
+| Identidad | Teléfono y dirección (el nombre de la tienda viene de `STORE_NAME` en `.env`) |
 | Moneda y formato | Código de moneda ISO 4217, locale, zona horaria |
 | Impuestos y redondeo | Impuesto %, redondeo de precio, redondeo de total, umbral de redondeo |
 | Pedidos | Costo de envío por defecto, margen de utilidad por defecto |

@@ -6,6 +6,7 @@ import MultiSelect from "../components/MultiSelect";
 import { formatDateTime } from "../lib/format";
 import { useToast } from "../lib/useToast";
 import { downloadReporteCsv, useReporteCustom, useReportesCustomSchema } from "../lib/queries";
+import { formatMoney } from "../lib/storeConfig";
 
 const PRESETS = {
   productos: ["codigo_producto", "nombre", "marca", "proveedor_nombre", "precio_costo", "stock_actual"],
@@ -26,7 +27,7 @@ const EMPTY_FILTERS = {
 };
 
 function formatCLP(value) {
-  return `$${Number(value || 0).toLocaleString("es-CL")}`;
+  return formatMoney(value);
 }
 
 function formatDate(value) {

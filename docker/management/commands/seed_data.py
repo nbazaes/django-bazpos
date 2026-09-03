@@ -152,8 +152,8 @@ class Command(BaseCommand):
         from gerenteApp.models import StoreConfig
 
         is_auto = self.profile == "auto_parts"
+        call_command("sync_store_config")
         config = StoreConfig.current()
-        config.nombre = config.nombre or os.getenv("STORE_NAME", "")
         config.default_shipping_cost = 4500 if is_auto else 0
         config.feature_flags = dict(AUTOPARTS_FLAGS) if is_auto else {}
         config.save()

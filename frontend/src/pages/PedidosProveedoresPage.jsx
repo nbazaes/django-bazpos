@@ -14,6 +14,7 @@ import {
 import { apiRequest } from "../lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeysPedidoProveedor } from "../lib/queries";
+import { formatMoney } from "../lib/storeConfig";
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return "";
@@ -27,11 +28,7 @@ function formatFecha(fechaStr) {
 }
 
 function formatCLP(n) {
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatMoney(n);
 }
 
 function ProveedorTableDesktop({ proveedores, diaId, editable, onToggle, onDelete }) {

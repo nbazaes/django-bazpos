@@ -10,9 +10,9 @@ import { getUser } from "../lib/auth";
 import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
-import { getStoreConfig } from "../lib/storeConfig";
+import { getStoreConfig, formatMoney } from "../lib/storeConfig";
 
-const fmtMoney = (n) => `$${Number(n || 0).toLocaleString()}`;
+const fmtMoney = (n) => formatMoney(n);
 
 function StatCard({ title, value, variant, breakdown }) {
   return (

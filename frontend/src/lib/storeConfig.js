@@ -86,6 +86,29 @@ export function getConfiguredTimezone() {
   return cachedConfig.timezone || "America/Santiago";
 }
 
+export function getLocale() {
+  return cachedConfig.locale || "es-CL";
+}
+
+export function getCurrencyCode() {
+  return cachedConfig.currency_code || "CLP";
+}
+
+export function formatMoney(amount, options = {}) {
+  const locale = getLocale();
+  const currency = getCurrencyCode();
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: options.minimumFractionDigits ?? 0,
+      maximumFractionDigits: options.maximumFractionDigits ?? 0,
+    }).format(Number(amount) || 0);
+  } catch {
+    return `$${Number(amount || 0).toLocaleString("es-CL")}`;
+  }
+}
+
 export function getStoreName() {
   return cachedConfig.nombre || FALLBACK_STORE_NAME;
 }

@@ -158,7 +158,8 @@ For production with Docker copy `.env.production.example` → `.env`.
 | `ADMIN_USER` | Superuser created by `create_admin` (Docker) |
 | `ADMIN_EMAIL` | Superuser email (Docker) |
 | `ADMIN_PASS` | Superuser password (Docker) |
-| `STORE_NAME` | Store name served at runtime by `/api/store-name/` (default: `BAZPOS`) |
+| `STORE_NAME` | Store name (default: `BAZPOS`). Install-time: synced into `StoreConfig.nombre` on container start; not editable in the UI |
+| `STORE_LOCALE` | Locale for number/date formatting (default: `es-CL`). Install-time; not editable in the UI |
 
 ### Frontend
 
@@ -234,7 +235,7 @@ Current status (see `ROADMAP.md`):
 - **Unified config** — `StoreConfig` is the single source of truth for tax/rounding; `gerenteApp/pricing.py` + frontend `storeConfig.js` provide one pricing path and one config fetch at app init.
 - **Dynamic rules** — payment methods and document types are configurable JSON lists; order-line cost modifiers use a minimal `gerenteApp/store_extensions/` seam (Biocar's 20% rule ships as a reference extension); shipping defaults from config.
 - **Feature flags** — `product_oem_fields`, `oem_primary_search`, `order_shipping_toggle`, `order_pricing_rules`, `daily_supplier_orders`, `oem_stock_substitutes`, `supplier_rut_field` gate the auto-parts UI and report columns.
-- **Packaging** — first-run setup redirects to configuration, `seed_data --profile generic_retail|auto_parts`, install/backup/upgrade docs (`docs/instalacion.md`).
+- **Packaging** — store name/locale are install-time via `.env`, `seed_data --profile generic_retail|auto_parts`, install/backup/upgrade docs (`docs/instalacion.md`).
 - **Next (post-2.0)** — full UI redesign (`feat/redesign`) and a plugin framework once there are 3+ vertical profiles.
 
 ## Licenses

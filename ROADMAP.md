@@ -197,7 +197,7 @@ Rename `Proveedor.rut` → `tax_id` (migration preserves data; `max_length` incr
 
 ### First-run setup
 
-After `create_admin`, redirect Gerente to Configuracion if `StoreConfig` is still defaults. Collect: nombre, dirección, teléfono, moneda, impuesto, timezone, ubicación por defecto, feature flags preset.
+Store name and locale are **install-time** (`.env` → `sync_store_config` on container start; read-only in the API). After `create_admin`, the Gerente completes the rest in Configuración: moneda, impuesto, redondeo, timezone, ubicación por defecto, feature flags preset.
 
 ### Seed profiles
 
@@ -265,7 +265,7 @@ Each phase branch merges into the epic branch via PR. **Release path:** the epic
 A new retailer can:
 
 1. `docker compose up` with their `.env`
-2. Complete first-run config (name, tax, currency, rounding)
+2. Complete first-run config (currency, tax, rounding)
 3. Choose a vertical profile (generic vs auto-parts)
 4. Sell, manage stock, close caja, and run reports **without code changes**
 

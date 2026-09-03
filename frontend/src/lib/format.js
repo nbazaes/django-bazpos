@@ -1,4 +1,4 @@
-import { getConfiguredTimezone } from "./storeConfig";
+import { getConfiguredTimezone, getLocale } from "./storeConfig";
 
 export function formatDateTime(value) {
   if (!value) return "—";
@@ -6,7 +6,7 @@ export function formatDateTime(value) {
   if (Number.isNaN(d.getTime())) return value;
 
   const tz = getConfiguredTimezone();
-  const fmt = new Intl.DateTimeFormat("es-CL", {
+  const fmt = new Intl.DateTimeFormat(getLocale(), {
     timeZone: tz,
     day: "2-digit",
     month: "2-digit",

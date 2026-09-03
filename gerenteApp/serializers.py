@@ -260,6 +260,8 @@ class FacturaUpsertSerializer(serializers.Serializer):
 
 
 class StoreConfigSerializer(serializers.ModelSerializer):
+    nombre = serializers.CharField(read_only=True)
+    locale = serializers.CharField(read_only=True)
     ubicacion_por_defecto_nombre = serializers.SerializerMethodField()
     effective_payment_methods = serializers.SerializerMethodField()
     effective_document_types = serializers.SerializerMethodField()

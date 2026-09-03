@@ -461,3 +461,34 @@ class StoreConfigApiTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         config = StoreConfig.current()
         self.assertEqual(config.telefono, "2222 3333")
+
+    def test_patch_ignores_readonly_nombre_y_locale(self):
+        config = StoreConfig.current()
+        config.nombre = "Nombre Fijo"
+        config.locale = "es-CL"
+        config.save()
+        resp = auth_client(self.gerente).patch(
+            "/api/configuracion/1/",
+            {"nombre": "Nombre Nuevo", "locale": "en-US"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        config.refresh_from_db()
+        self.assertEqual(config.nombre, "Nombre Fijo")
+        self.assertEqual(config.locale, "es-CL")
+
+
+class SyncStoreConfigTest(TestCase):
+    def test_sync_from_settings(self):
+        from django.conf import settings
+        from django.core.management import call_command
+
+        config = StoreConfig.current()
+        config.nombre = "X"
+        config.locale = "X"
+        config.save()
+
+        call_command("sync_store_config", verbosity=0)
+        config.refresh_from_db()
+        self.assertEqual(config.nombre, settings.STORE_NAME)
+        self.assertEqual(config.locale, settings.STORE_LOCALE)

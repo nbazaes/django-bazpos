@@ -3,10 +3,10 @@ import PageCard from "../components/PageCard";
 import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
-import { useStoreName } from "../lib/storeConfig";
+import { useStoreName, formatMoney, getLocale } from "../lib/storeConfig";
 import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
 
-const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;
+const fmtMoney = (n) => formatMoney(n);
 
 function fmtFecha(iso) {
   if (!iso) return "—";
@@ -17,7 +17,7 @@ function fmtFecha(iso) {
 function fmtFechaHora(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString("es-CL");
+  return d.toLocaleString(getLocale());
 }
 
 export default function CierreCajaPage() {

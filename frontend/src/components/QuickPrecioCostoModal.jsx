@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useUpdateProducto } from "../lib/queries";
-import { calcularPrecioVenta } from "../lib/storeConfig";
+import { calcularPrecioVenta, formatMoney } from "../lib/storeConfig";
 
 function autoFill(value, fallback) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -107,7 +107,7 @@ export default function QuickPrecioCostoModal({ producto, initialPrecioCosto, in
                 <input
                   type="text"
                   className="form-control"
-                  value={`$${precioCalculado.toLocaleString("es-CL")}`}
+                  value={formatMoney(precioCalculado)}
                   disabled
                   style={{ background: "var(--bg-input)", fontWeight: 700 }}
                 />
