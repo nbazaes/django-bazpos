@@ -4,6 +4,26 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.0.0] - 2026-09-03
+
+### Agregado
+
+- Configuración completa de la tienda desde un solo lugar: nombre, moneda, zona horaria, impuesto, redondeo de precios y totales, costo de envío y margen por defecto, ubicación por defecto, medios de pago y documentos.
+- Al instalar por primera vez, el sistema guía al encargado a completar la configuración inicial antes de operar.
+- Medios de pago y documentos editables y activables según el negocio; el cierre de caja se adapta automáticamente a ellos.
+- Datos de demostración con perfiles: retail genérico (sin OEM) o autopartes.
+- Los campos de autopartes (OEM, marca, código de proveedor) y módulos opcionales se activan según el perfil del negocio.
+
+### Cambiado
+
+- El impuesto y el redondeo se calculan siempre con la configuración de la tienda, en ventas, pedidos, facturas y precios de productos, para que los montos cuadren entre pantallas.
+- El descuento de costo en pedidos (antes fijo para Stellantis) ahora es una regla configurable por línea de pedido.
+- El RUT de proveedor se renombra a «ID tributario» y pasa a ser opcional según el perfil.
+
+### Eliminado
+
+- El código y los flujos atados a una sola tienda o un solo proveedor; el sistema ahora es un POS retail genérico y configurable.
+
 ## [1.27.0] - 2026-09-03
 
 ### Agregado
