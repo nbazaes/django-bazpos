@@ -1930,10 +1930,10 @@ class StoreNameApiTest(TestCase):
     def test_store_name_publico(self):
         from django.test import override_settings
 
-        with override_settings(STORE_NAME="EUROCAS"):
+        with override_settings(STORE_NAME="BIOCAR"):
             resp = self.client.get("/api/store-name/")
             self.assertEqual(resp.status_code, 200)
-            self.assertEqual(resp.data["name"], "EUROCAS")
+            self.assertEqual(resp.data["name"], "BIOCAR")
 
     def test_store_name_sin_auth(self):
         resp = self.client.get("/api/store-name/")

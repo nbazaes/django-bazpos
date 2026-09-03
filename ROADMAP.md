@@ -121,7 +121,7 @@ Today: boolean `stellantis` on `PedidoDetalle` applies a fixed 20% cost discount
 
 - `gerenteApp/store_extensions/` — registry of `OrderLineCostModifier` classes (auto-discovered modules). Core code only calls `apply_modifiers(costo, keys)`.
 - `PedidoDetalle.stellantis` → `cost_modifiers` JSON list of applied keys (data migration moves `stellantis=True → ["stellantis"]`).
-- The 20% rule ships as `store_extensions/stellantis.py`, clearly marked EUROCAS-specific; generic installs delete it and define their own.
+- The 20% rule ships as `store_extensions/stellantis.py`, clearly marked Biocar-specific; generic installs delete it and define their own.
 - UI checkbox shown only when `feature_flags.order_pricing_rules` is true (migration enables it for existing installs).
 
 ### `costo_envio` → config-driven default
@@ -269,7 +269,7 @@ A new retailer can:
 3. Choose a vertical profile (generic vs auto-parts)
 4. Sell, manage stock, close caja, and run reports **without code changes**
 
-Existing installs (e.g. EUROCAS) migrate with all current behavior preserved via migration defaults and `feature_flags` set to today's values.
+Existing installs (e.g. Biocar) migrate with all current behavior preserved via migration defaults and `feature_flags` set to today's values.
 
 ---
 

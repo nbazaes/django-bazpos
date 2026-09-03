@@ -1,4 +1,4 @@
-"""EUROCAS-specific order-line cost modifier.
+"""Biocar-specific order-line cost modifier.
 
 This rule is a uniqueness of the original store and ships only as a reference
 extension. Generic installs should delete this module and define their own
