@@ -83,6 +83,14 @@
   --spacing-gutter: 1rem;
   --spacing-container-max: 1400px;
   --spacing-topbar-height: 56px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+  --radius-4xl: 32px;
 }
 
 body {
@@ -114,4 +122,55 @@ body {
   text-transform: uppercase;
   font-size: 0.7rem;
   letter-spacing: 0.05em;
+}
+
+/* Sidebar nav links — look heredado del diseño previo */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  position: relative;
+}
+.sidebar-link:hover,
+.sidebar-link.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-left-color: var(--accent);
+}
+.sidebar-link--collapsed {
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: center;
+}
+.sidebar-link-icon {
+  font-size: 1rem;
+  width: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: color var(--transition), transform var(--transition);
+  flex-shrink: 0;
+}
+.sidebar-link:hover .sidebar-link-icon,
+.sidebar-link.active .sidebar-link-icon {
+  color: var(--accent);
+  transform: scale(1.1);
+}
+.sidebar-link--ventas {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.sidebar-link--ventas .sidebar-link-icon {
+  color: var(--accent);
+  font-size: 1.05rem;
 }

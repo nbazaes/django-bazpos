@@ -162,7 +162,7 @@ export default function DashboardPage() {
           {/* Welcome Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
             <div>
-              <h2 className="font-display text-xl sm:text-2xl font-bold text-text-accent">
+              <h2 className="font-display text-xl sm:text-2xl font-bold text-text-primary">
                 Hola, {user?.first_name || user?.username} 👋
               </h2>
               <p className="text-xs sm:text-sm text-text-secondary mt-0.5">
@@ -180,7 +180,7 @@ export default function DashboardPage() {
               {data.es_gerente && (
                 <button
                   onClick={() => navigate("/cierre-caja")}
-                  className="px-3.5 py-2 rounded-lg border border-border-default text-text-secondary hover:text-text-accent hover:bg-surface-variant font-bold text-xs transition-colors flex items-center gap-1"
+                  className="px-3.5 py-2 rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:bg-surface-variant font-bold text-xs transition-colors flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-base">account_balance_wallet</span>
                   Cierre de Caja
@@ -197,7 +197,7 @@ export default function DashboardPage() {
                 <span className="font-label-caps text-xs text-text-muted uppercase tracking-wider font-semibold">Ventas Hoy</span>
                 <span className="material-symbols-outlined text-success text-lg">trending_up</span>
               </div>
-              <div className="font-mono text-2xl font-bold text-text-accent mt-1">
+              <div className="font-mono text-2xl font-bold text-text-primary mt-1">
                 {fmtMoney(data.ventas_dia.total)}
               </div>
               <div className="text-xs text-text-secondary mt-1 flex items-center gap-1.5 flex-wrap">
@@ -217,7 +217,7 @@ export default function DashboardPage() {
                 <span className="font-label-caps text-xs text-text-muted uppercase tracking-wider font-semibold">Transacciones</span>
                 <span className="material-symbols-outlined text-info text-lg">receipt</span>
               </div>
-              <div className="font-mono text-2xl font-bold text-text-accent mt-1">
+              <div className="font-mono text-2xl font-bold text-text-primary mt-1">
                 {data.ventas_dia.cantidad}
               </div>
               <div className="text-xs text-text-secondary mt-1">
@@ -231,7 +231,7 @@ export default function DashboardPage() {
                 <span className="font-label-caps text-xs text-text-muted uppercase tracking-wider font-semibold">Stock Bajo</span>
                 <span className="material-symbols-outlined text-warning text-lg">warning</span>
               </div>
-              <div className="font-mono text-2xl font-bold text-text-accent mt-1">
+              <div className="font-mono text-2xl font-bold text-text-primary mt-1">
                 {data.stock.bajo_minimo?.length || 0}
               </div>
               <div className="text-xs text-text-secondary mt-1">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                 <span className="font-label-caps text-xs text-text-muted uppercase tracking-wider font-semibold">Total Productos</span>
                 <span className="material-symbols-outlined text-accent text-lg">inventory_2</span>
               </div>
-              <div className="font-mono text-2xl font-bold text-text-accent mt-1">
+              <div className="font-mono text-2xl font-bold text-text-primary mt-1">
                 {data.stock.total_productos}
               </div>
               <div className="text-xs text-text-secondary mt-1">
@@ -263,7 +263,7 @@ export default function DashboardPage() {
             {/* Left Column: Ventas por Vendedor / Resumen (8 cols) */}
             <div className="lg:col-span-8 bg-bg-surface border border-border-default rounded-xl shadow-sm flex flex-col overflow-hidden">
               <div className="p-4 border-b border-border-default flex justify-between items-center bg-surface-container-low">
-                <h3 className="font-display text-base font-bold text-text-accent flex items-center gap-2">
+                <h3 className="font-display text-base font-bold text-text-primary flex items-center gap-2">
                   <span className="material-symbols-outlined text-accent text-lg">payments</span>
                   {data.es_gerente ? "Ventas por Vendedor" : "Mis Ventas de Hoy"}
                 </h3>
@@ -291,9 +291,9 @@ export default function DashboardPage() {
                     {data.ventas_dia.desglose && data.ventas_dia.desglose.length > 0 ? (
                       data.ventas_dia.desglose.map((row, i) => (
                         <tr key={i} className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3 px-4 font-bold text-text-accent">{row.vendedor}</td>
+                          <td className="py-3 px-4 font-bold text-text-primary">{row.vendedor}</td>
                           <td className="py-3 px-4 text-right">
-                            <div className="font-mono font-bold text-text-accent text-sm">
+                            <div className="font-mono font-bold text-text-primary text-sm">
                               {fmtMoney(row.total)}
                             </div>
                             <div className="text-[11px] text-text-muted">
@@ -302,7 +302,7 @@ export default function DashboardPage() {
                               {row.anulaciones > 0 && <span> · -{fmtMoney(row.anulaciones)} anul.</span>}
                             </div>
                           </td>
-                          <td className="py-3 px-4 font-mono text-center text-text-accent">{row.cantidad}</td>
+                          <td className="py-3 px-4 font-mono text-center text-text-primary">{row.cantidad}</td>
                           <td className="py-3 px-4 text-center">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
                               Activo
@@ -327,7 +327,7 @@ export default function DashboardPage() {
               {/* Alertas de Stock */}
               <div className="bg-bg-surface border border-border-default rounded-xl shadow-sm flex flex-col overflow-hidden">
                 <div className="p-4 border-b border-border-default flex justify-between items-center bg-surface-container-low">
-                  <h3 className="font-display text-sm font-bold text-text-accent flex items-center gap-2">
+                  <h3 className="font-display text-sm font-bold text-text-primary flex items-center gap-2">
                     <span className="material-symbols-outlined text-warning text-base">warning</span>
                     Alertas de Stock
                   </h3>
@@ -364,7 +364,7 @@ export default function DashboardPage() {
                             >
                               <div className="flex justify-between items-start gap-2">
                                 <div className="min-w-0">
-                                  <div className="text-xs font-bold text-text-accent truncate" title={p.nombre}>
+                                  <div className="text-xs font-bold text-text-primary truncate" title={p.nombre}>
                                     {p.nombre}
                                   </div>
                                   <div className="text-[10px] text-text-muted font-mono flex items-center gap-1">
@@ -418,21 +418,21 @@ export default function DashboardPage() {
                                 <button
                                   onClick={() => ignorarMutation.mutate({ productoId: p.producto_id, accion: "recordar_manana" })}
                                   disabled={ignorarMutation.isPending}
-                                  className="px-2 py-0.5 rounded bg-bg-input text-text-secondary hover:text-text-accent border border-border-default transition-colors"
+                                  className="px-2 py-0.5 rounded-md bg-bg-input text-text-secondary hover:text-text-primary border border-border-default transition-colors"
                                 >
                                   Mañana
                                 </button>
                                 <button
                                   onClick={() => ignorarMutation.mutate({ productoId: p.producto_id, accion: "ignorar_permanente" })}
                                   disabled={ignorarMutation.isPending}
-                                  className="px-2 py-0.5 rounded bg-bg-input text-text-secondary hover:text-text-accent border border-border-default transition-colors"
+                                  className="px-2 py-0.5 rounded-md bg-bg-input text-text-secondary hover:text-text-primary border border-border-default transition-colors"
                                 >
                                   Ignorar
                                 </button>
                                 <button
                                   onClick={() => agregarPedidoMutation.mutate(p.producto_id)}
                                   disabled={agregarPedidoMutation.isPending || yaAgregado}
-                                  className={`ml-auto px-2 py-0.5 rounded font-bold transition-colors ${
+                                  className={`ml-auto px-2 py-0.5 rounded-md font-bold transition-colors ${
                                     yaAgregado
                                       ? "bg-success/10 text-success border border-success/30"
                                       : "bg-primary text-on-primary hover:bg-primary-container"
@@ -471,7 +471,7 @@ export default function DashboardPage() {
               {/* Novedades del Sistema */}
               <div className="bg-bg-elevated border border-border-default rounded-xl shadow-sm p-4 relative overflow-hidden space-y-2">
                 <div className="absolute top-0 left-0 w-full h-1 gradient-strip"></div>
-                <h4 className="font-display text-sm font-bold text-text-accent flex items-center gap-2">
+                <h4 className="font-display text-sm font-bold text-text-primary flex items-center gap-2">
                   <span className="material-symbols-outlined text-accent text-base">campaign</span>
                   Novedades del Sistema
                 </h4>
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                   style={{ top: popoverPos.top, left: popoverPos.left, width: 300 }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="font-bold text-text-accent border-b border-border-default pb-1">
+                  <div className="font-bold text-text-primary border-b border-border-default pb-1">
                     Productos con mismo OEM en stock
                   </div>
                   <ul className="space-y-1.5 max-h-40 overflow-y-auto">

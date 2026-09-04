@@ -13,28 +13,32 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
 const desktopMediaQuery = "(min-width: 1024px)";
 
 const vendedorLinks = [
-  { to: "/", label: "Dashboard", icon: "dashboard", end: true },
-  { to: "/ventas", label: "Ventas", icon: "point_of_sale", end: true, highlight: true },
-  { to: "/ventas/pedidos", label: "Pedidos", icon: "receipt_long" },
-  { to: "/ventas/historial", label: "Historial", icon: "history" },
-  { to: "/ventas/inventario", label: "Inventario", icon: "inventory_2" },
-  { to: "/configuracion", label: "Configuración", icon: "settings" },
+  { to: "/", label: "Dashboard", icon: "bi-grid-1x2-fill", end: true },
+  { to: "/ventas", label: "Ventas", icon: "bi-cart-fill", end: true, highlight: true },
+  { to: "/ventas/pedidos", label: "Pedidos", icon: "bi-bag-check" },
+  { to: "/ventas/historial", label: "Historial", icon: "bi-clock-history" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
+  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
 ];
 
 const gerenteLinks = [
-  { to: "/productos", label: "Productos", icon: "category" },
-  { to: "/proveedores", label: "Proveedores", icon: "local_shipping" },
-  { to: "/pedidos-proveedores", label: "Pedidos Prov.", icon: "shopping_bag" },
-  { to: "/usuarios", label: "Usuarios", icon: "group" },
-  { to: "/facturas", label: "Facturas", icon: "receipt" },
-  { to: "/reportes", label: "Reportes", icon: "analytics" },
-  { to: "/cierre-caja", label: "Cierre de Caja", icon: "account_balance_wallet" },
+  { to: "/productos", label: "Productos", icon: "bi-box-seam" },
+  { to: "/proveedores", label: "Proveedores", icon: "bi-truck" },
+  { to: "/pedidos-proveedores", label: "Pedidos Prov.", icon: "bi-receipt-cutoff" },
+  { to: "/usuarios", label: "Usuarios", icon: "bi-people" },
+  { to: "/facturas", label: "Facturas", icon: "bi-file-earmark-text" },
+  { to: "/reportes", label: "Reportes", icon: "bi-graph-up" },
+  { to: "/cierre-caja", label: "Cierre de Caja", icon: "bi-cash-coin" },
 ];
 
 const bodegueroLinks = [
-  { to: "/ventas/inventario", label: "Inventario", icon: "inventory_2" },
-  { to: "/ubicaciones", label: "Ubicaciones", icon: "warehouse" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
+  { to: "/ubicaciones", label: "Ubicaciones", icon: "bi-geo-alt" },
 ];
+
+function navLinkClass(isActive, highlight, collapsed) {
+  return `sidebar-link${isActive ? " active" : ""}${highlight ? " sidebar-link--ventas" : ""}${collapsed ? " sidebar-link--collapsed" : ""}`;
+}
 
 export default function Shell() {
   const navigate = useNavigate();
@@ -161,7 +165,7 @@ export default function Shell() {
 
   return (
     <TitleContext.Provider value={setTitle}>
-      <div className="flex h-screen overflow-hidden bg-bg-base text-text-accent font-body antialiased">
+      <div className="flex h-screen overflow-hidden bg-bg-base text-text-primary font-body antialiased">
         {/* Mobile Backdrop */}
         {sidebarOpen && !isDesktop && (
           <div
@@ -196,7 +200,7 @@ export default function Shell() {
               </div>
               {(!isDesktop || !sidebarCollapsed) && (
                 <div className="min-w-0">
-                  <h1 className="font-display font-bold text-sm tracking-wide text-text-accent truncate">
+                  <h1 className="font-display font-bold text-sm tracking-wide text-text-primary truncate">
                     {storeName || "BazPos"}
                   </h1>
                   <span className="text-[10px] font-mono text-text-muted flex items-center gap-1">
@@ -210,7 +214,7 @@ export default function Shell() {
             {!isDesktop && (
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="text-text-muted hover:text-text-accent p-1"
+                className="text-text-muted hover:text-text-primary p-1"
                 aria-label="Cerrar menú"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -236,16 +240,10 @@ export default function Shell() {
                       onClick={handleNav}
                       title={sidebarCollapsed ? link.label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
-                          isActive
-                            ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
-                            : link.highlight
-                            ? "text-accent hover:bg-surface-variant hover:text-accent font-extrabold"
-                            : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
-                        } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                        navLinkClass(isActive, link.highlight, sidebarCollapsed && isDesktop)
                       }
                     >
-                      <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                      <i className={`bi ${link.icon} sidebar-link-icon`} aria-hidden="true" />
                       {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
                     </NavLink>
                   </li>
@@ -269,14 +267,10 @@ export default function Shell() {
                         onClick={handleNav}
                         title={sidebarCollapsed ? link.label : undefined}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
-                            isActive
-                              ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
-                              : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
-                          } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                          navLinkClass(isActive, false, sidebarCollapsed && isDesktop)
                         }
                       >
-                        <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                        <i className={`bi ${link.icon} sidebar-link-icon`} aria-hidden="true" />
                         {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
                       </NavLink>
                     </li>
@@ -301,14 +295,10 @@ export default function Shell() {
                         onClick={handleNav}
                         title={sidebarCollapsed ? link.label : undefined}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
-                            isActive
-                              ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
-                              : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
-                          } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                          navLinkClass(isActive, false, sidebarCollapsed && isDesktop)
                         }
                       >
-                        <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                        <i className={`bi ${link.icon} sidebar-link-icon`} aria-hidden="true" />
                         {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
                       </NavLink>
                     </li>
@@ -349,7 +339,7 @@ export default function Shell() {
                     title="Novedades del sistema"
                   >
                     <span className="material-symbols-outlined text-sm">campaign</span>
-                    <span>v{import.meta.env.APP_VERSION}</span>
+                    <span>{storeName} v{import.meta.env.APP_VERSION}</span>
                     {unseenChangelog.length > 0 && (
                       <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
                     )}
@@ -389,7 +379,7 @@ export default function Shell() {
               <button
                 type="button"
                 onClick={handleToggleSidebar}
-                className="p-1.5 rounded-lg text-text-secondary hover:text-text-accent hover:bg-surface-variant transition-colors"
+                className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-variant transition-colors"
                 aria-label={isDesktop ? (sidebarCollapsed ? "Expandir menú" : "Colapsar menú") : "Abrir menú"}
                 title={isDesktop ? (sidebarCollapsed ? "Expandir menú" : "Colapsar menú") : undefined}
               >
@@ -397,7 +387,7 @@ export default function Shell() {
                   {isDesktop ? (sidebarCollapsed ? "menu_open" : "menu") : "menu"}
                 </span>
               </button>
-              <h2 className="font-display font-bold text-base sm:text-lg text-text-accent tracking-tight truncate">
+              <h2 className="font-display font-bold text-base sm:text-lg text-text-primary tracking-tight truncate">
                 {title}
               </h2>
             </div>
@@ -437,7 +427,7 @@ export default function Shell() {
                   {user?.first_name ? user.first_name[0].toUpperCase() : user?.username ? user.username[0].toUpperCase() : "U"}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <div className="text-xs font-bold text-text-accent leading-none">
+                  <div className="text-xs font-bold text-text-primary leading-none">
                     {user?.first_name || user?.username}
                   </div>
                   <div className="text-[10px] text-text-muted mt-0.5 leading-none">
@@ -478,7 +468,7 @@ export default function Shell() {
                 <span className="material-symbols-outlined text-xl">logout</span>
               </div>
               <div>
-                <h4 className="font-display font-bold text-sm text-text-accent">Cerrar Sesión</h4>
+                <h4 className="font-display font-bold text-sm text-text-primary">Cerrar Sesión</h4>
                 <p className="text-xs text-text-secondary mt-0.5">¿Estás seguro de que deseas salir del sistema?</p>
               </div>
             </div>
@@ -487,7 +477,7 @@ export default function Shell() {
               <button
                 type="button"
                 onClick={() => setShowLogoutModal(false)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-text-secondary hover:text-text-accent hover:bg-surface-variant transition-colors"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-surface-variant transition-colors"
               >
                 Cancelar
               </button>
