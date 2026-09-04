@@ -800,7 +800,7 @@ export default function VentaPage() {
 
             {/* Filter and View Options */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border-default/60">
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary select-none">
+              <label className="checkbox-field select-none">
                 <input
                   type="checkbox"
                   className="rounded border-border-default bg-bg-input text-accent focus:ring-primary h-4 w-4"
@@ -1166,8 +1166,8 @@ export default function VentaPage() {
       {/* MODALS */}
       {/* 1. Confirmar Venta / Cotización Modal */}
       {showConfirmVenta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden modal-animate">
             <div className="p-5 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h3 className="font-display text-lg font-bold text-text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined text-accent">
@@ -1248,7 +1248,7 @@ export default function VentaPage() {
 
                   {/* Mixed Payment Toggle */}
                   <div>
-                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+                    <label className="checkbox-field">
                       <input
                         type="checkbox"
                         className="rounded border-border-default bg-bg-input text-accent h-4 w-4"
@@ -1358,8 +1358,8 @@ export default function VentaPage() {
 
       {/* 2. Receipt Preview Modal */}
       {showPreview && lastDocumento && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-md w-full overflow-hidden modal-animate">
             <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h4 className="font-bold text-text-primary text-sm">
                 {lastDocumento.tipo_documento === "CO" ? "Cotización" : "Comprobante de Venta"} #{lastDocumento.ventaId}
@@ -1429,8 +1429,8 @@ export default function VentaPage() {
 
       {/* 3. Deducción de Stock por Ubicación Modal */}
       {showUbicacionDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden modal-animate">
             <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h4 className="font-bold text-text-primary text-base flex items-center gap-2">
                 <span className="material-symbols-outlined text-accent">inventory_2</span>
@@ -1449,7 +1449,7 @@ export default function VentaPage() {
                   {ubicacionError}
                 </div>
               )}
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+              <label className="checkbox-field">
                 <input
                   type="checkbox"
                   className="rounded border-border-default bg-bg-input text-accent h-4 w-4"
@@ -1548,7 +1548,7 @@ export default function VentaPage() {
 
       {/* 4. Success Floating Toast */}
       {showVentaSuccess && (
-        <div className="fixed bottom-8 right-8 z-50 bg-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
+        <div className="fixed bottom-8 right-8 z-50 bg-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 toast-animate">
           <span className="material-symbols-outlined text-2xl">check_circle</span>
           <span className="font-bold text-sm">
             {lastDocumento?.tipo_documento === "CO" ? "Cotización generada exitosamente" : "Venta registrada exitosamente"}
