@@ -174,3 +174,68 @@ body {
   color: var(--accent);
   font-size: 1.05rem;
 }
+
+/* Labels de campos con checkbox (rediseño). Especificidad mayor que el selector
+   `label` global de design-system.css (display:block), que pisaría el flex/gap. */
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+  margin-bottom: 0;
+}
+
+.checkbox-field input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+/* Animaciones del rediseño (modales, overlays y toast) */
+@keyframes bazpos-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bazpos-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bazpos-toast-in {
+  from { opacity: 0; transform: translateX(20px) scale(0.98); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.fade-animate {
+  animation: bazpos-fade-in 150ms ease backwards;
+}
+
+.modal-animate {
+  animation: bazpos-modal-in 170ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.toast-animate {
+  animation: bazpos-toast-in 220ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-animate,
+  .modal-animate,
+  .toast-animate {
+    animation: none;
+  }
+}
+
+/* Anillo de foco por teclado en elementos interactivos */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

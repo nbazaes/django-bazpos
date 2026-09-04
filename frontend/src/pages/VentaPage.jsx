@@ -780,7 +780,7 @@ export default function VentaPage() {
                   <span className="material-symbols-outlined text-lg">search</span>
                 </div>
                 <input
-                  className="w-full pl-10 pr-9 py-2.5 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full pl-10 pr-14 py-2.5 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder={searchPlaceholder}
                   value={oem}
                   onChange={(e) => setOem(e.target.value)}
@@ -789,10 +789,11 @@ export default function VentaPage() {
                   <button
                     type="button"
                     onClick={() => { setOem(""); setProductosEncontrados([]); setHayMasProductos(false); setError(""); }}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-primary text-sm"
+                    className="absolute inset-y-0 right-0 my-auto flex items-center justify-center mr-1.5 w-9 h-9 rounded-full bg-bg-elevated border border-border-default text-text-secondary hover:text-text-primary hover:bg-surface-variant hover:border-border-light transition-colors"
                     title="Limpiar búsqueda"
+                    aria-label="Limpiar búsqueda"
                   >
-                    &times;
+                    <span className="material-symbols-outlined text-2xl leading-none">close</span>
                   </button>
                 )}
               </div>
@@ -800,7 +801,7 @@ export default function VentaPage() {
 
             {/* Filter and View Options */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border-default/60">
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary select-none">
+              <label className="checkbox-field select-none">
                 <input
                   type="checkbox"
                   className="rounded border-border-default bg-bg-input text-accent focus:ring-primary h-4 w-4"
@@ -873,6 +874,8 @@ export default function VentaPage() {
                       </div>
                       <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
                         <span>{i.codigo_producto}</span>
+                        {showPartsFields && i.oem && <span>OEM: {i.oem}</span>}
+                        {showPartsFields && i.marca && <span>· {i.marca}</span>}
                         <span>· {fmtMoney(i.precio)} c/u</span>
                       </div>
                     </div>
@@ -1125,16 +1128,35 @@ export default function VentaPage() {
                             <td className="py-2 px-3 font-bold text-text-primary">{p.nombre}</td>
                             {showPartsFields && <td className="py-2 px-3">{p.marca || "—"}</td>}
                             <td className="py-2 px-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${tieneStock ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
-                                {p.stock_actual}
-                              </span>
+                              {esGerente ? (
+                                <button
+                                  onClick={() => setQuickStockProducto(p)}
+                                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold text-[10px] bg-surface-variant text-text-secondary hover:text-text-primary hover:bg-bg-input transition-colors"
+                                  title="Ajustar stock"
+                                >
+                                  <span className="material-symbols-outlined text-[12px]">edit_note</span>
+                                  {p.stock_actual}
+                                </button>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${tieneStock ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
+                                  {p.stock_actual}
+                                </span>
+                              )}
                             </td>
                             <td className="py-2 px-3 font-mono font-bold text-right text-accent">
                               {fmtMoney(mod?.precio ?? p.precio)}
                             </td>
                             {esGerente && (
                               <td className="py-2 px-3 font-mono text-right text-text-muted">
-                                {p.precio_costo != null ? fmtMoney(mod?.precioCosto ?? p.precio_costo) : "—"}
+                                {p.precio_costo != null ? (
+                                  <button
+                                    onClick={() => setQuickPrecioCostoProducto(p)}
+                                    className="hover:text-accent transition-colors"
+                                    title="Editar costo y margen"
+                                  >
+                                    {fmtMoney(mod?.precioCosto ?? p.precio_costo)}
+                                  </button>
+                                ) : "—"}
                               </td>
                             )}
                             <td className="py-2 px-3 text-right">
@@ -1166,8 +1188,8 @@ export default function VentaPage() {
       {/* MODALS */}
       {/* 1. Confirmar Venta / Cotización Modal */}
       {showConfirmVenta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden modal-animate">
             <div className="p-5 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h3 className="font-display text-lg font-bold text-text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined text-accent">
@@ -1248,7 +1270,7 @@ export default function VentaPage() {
 
                   {/* Mixed Payment Toggle */}
                   <div>
-                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+                    <label className="checkbox-field">
                       <input
                         type="checkbox"
                         className="rounded border-border-default bg-bg-input text-accent h-4 w-4"
@@ -1358,8 +1380,8 @@ export default function VentaPage() {
 
       {/* 2. Receipt Preview Modal */}
       {showPreview && lastDocumento && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-md w-full overflow-hidden modal-animate">
             <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h4 className="font-bold text-text-primary text-sm">
                 {lastDocumento.tipo_documento === "CO" ? "Cotización" : "Comprobante de Venta"} #{lastDocumento.ventaId}
@@ -1429,8 +1451,8 @@ export default function VentaPage() {
 
       {/* 3. Deducción de Stock por Ubicación Modal */}
       {showUbicacionDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden modal-animate">
             <div className="p-4 border-b border-border-default flex items-center justify-between bg-surface-container-low">
               <h4 className="font-bold text-text-primary text-base flex items-center gap-2">
                 <span className="material-symbols-outlined text-accent">inventory_2</span>
@@ -1449,7 +1471,7 @@ export default function VentaPage() {
                   {ubicacionError}
                 </div>
               )}
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+              <label className="checkbox-field">
                 <input
                   type="checkbox"
                   className="rounded border-border-default bg-bg-input text-accent h-4 w-4"
@@ -1548,7 +1570,7 @@ export default function VentaPage() {
 
       {/* 4. Success Floating Toast */}
       {showVentaSuccess && (
-        <div className="fixed bottom-8 right-8 z-50 bg-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce">
+        <div className="fixed bottom-8 right-8 z-50 bg-success text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 toast-animate">
           <span className="material-symbols-outlined text-2xl">check_circle</span>
           <span className="font-bold text-sm">
             {lastDocumento?.tipo_documento === "CO" ? "Cotización generada exitosamente" : "Venta registrada exitosamente"}

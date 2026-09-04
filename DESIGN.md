@@ -1,197 +1,180 @@
-# BazPOS — Sistema de Diseño & Especificación de Rediseño (v2.0 Preview)
+# BazPOS — Sistema de Diseño & Especificación de Rediseño (v2.0)
 
-> **Estado de la Rama (`feat/redesign`)**:  
-> Esta rama contiene la base del rediseño UI/UX integral de BazPOS construido con **Google Stitch** ([stitch.withgoogle.com](https://stitch.withgoogle.com)) y **Tailwind CSS v4**. Queda pausada y documentada para su posterior activación y culminación en la próxima **versión mayor**.
+> **Estado actual**: rediseño activo e integrado en `staging` (rama `feat/redesign-v2`).
+> Enfoque **híbrido-gradual**: las pantallas principales (Shell, POS, Dashboard) usan **Tailwind CSS v4** + tokens Stitch; el resto de módulos conserva su estructura y recibe el mismo lenguaje visual vía `design-system.css`.
 
 ---
 
-## 1. Visión & Objetivos del Rediseño
+## 1. Visión & Objetivos
 
-1. **Modernización Visual & Ergonómica**: Transformar la interfaz de BazPOS en un punto de venta (POS) y panel administrativo de alta gama, con estética dark-mode nativa de alto contraste, acentos violetas/púrpura vibrantes y tipografía distintiva.
-2. **Alta Eficiencia para Cajeros & Operadores**: Flujos de trabajo ultra rápidos para el escaneo de código de barras, selección de productos, pagos mixtos y control de inventario sin fricción.
-3. **Compatibilidad Híbrida Gradual**: Convivencia transparente entre el motor de utilidades **Tailwind CSS v4** y el sistema previo de variables CSS (`design-system.css`), facilitando la migración progresiva pantalla por pantalla.
+1. **Modernización Visual & Ergonómica**: punto de venta y panel administrativo de alta gama, dark-mode nativo de alto contraste, acentos violetas/púrpura y tipografía distintiva.
+2. **Alta Eficiencia para Cajeros & Operadores**: flujos rápidos para escaneo de código de barras, selección de productos, pagos mixtos y control de inventario sin fricción.
+3. **Compatibilidad Híbrida Gradual**: convivencia transparente entre **Tailwind CSS v4** y el sistema previo de variables CSS (`design-system.css`).
+4. **Consistencia sin cambiar el flujo**: el lenguaje nuevo se aplica a los módulos legacy solo a nivel de estilo (tablas, botones, encabezados, modales, alertas, inputs), sin mover posiciones ni alterar funcionalidades.
 
 ---
 
 ## 2. Fundamentos del Sistema de Diseño (Design Tokens)
 
-### 2.1. Paleta de Colores (Tokens Stitch / Material 3 Dark)
+### 2.1. Paleta de Colores
 
-Configurados en `frontend/src/index.css` bajo la directiva `@theme` de Tailwind CSS v4:
+Los tokens de color de Tailwind (`@theme` en `frontend/src/index.css`) se **enlazan a las variables de `design-system.css`** para que el tema claro/oscuro y los esquemas de color seleccionables sigan funcionando en todo el sistema:
 
-| Token | Valor Hex | Uso Principal |
+| Token Tailwind | Fuente | Uso |
 | :--- | :--- | :--- |
-| `--color-bg-base` | `#09090f` | Fondo principal de la aplicación |
-| `--color-bg-surface` | `#0e0e1a` | Superficie de tarjetas, sidebar y paneles |
-| `--color-bg-elevated` | `#151528` | Tarjetas elevadas, modales y cajas de totales |
-| `--color-bg-input` | `#111128` | Entradas de texto, selectores y campos de escáner |
-| `--color-border-default` | `#24244a` | Bordes estándar y divisores de tablas |
-| `--color-primary` | `#d0bcff` / `#8b5cf6` | Color de marca, botones principales y totales |
-| `--color-primary-container` | `#a078ff` | Estados hover y acentos interactivos |
-| `--color-on-primary` | `#3c0091` | Texto sobre botones primarios |
-| `--color-secondary-container` | `#4f319c` | Fondos de enlaces activos y chips |
-| `--color-text-primary` | `#edecf2` | Texto principal de alto contraste |
-| `--color-text-secondary` | `#a8a5c0` | Subtítulos, metadatos y descripciones |
-| `--color-text-muted` | `#656388` | Placeholders, bordes tenues e información secundaria |
-| `--color-success` | `#22c55e` | Estados completados, stock disponible e ingresos |
-| `--color-warning` | `#f59e0b` | Alertas de stock, advertencias y productos críticos |
-| `--color-danger` | `#ef4444` | Sin stock, anulaciones, faltantes y errores |
-| `--color-info` | `#3b82f6` | Transacciones, estados en proceso y avisos |
+| `--color-primary` / `--color-accent` | `var(--primary)` (= `--accent`) | Color de marca, botones principales, totales |
+| `--color-primary-container` | `var(--accent-hover)` | Hover de botones primarios y acentos |
+| `--color-on-primary` | `var(--on-accent)` | Texto sobre botones primarios |
+| `--color-bg-base/surface/elevated/input` | `var(--bg-*)` | Fondos de app, tarjetas, paneles, inputs |
+| `--color-border-default` | `var(--border-default)` | Bordes y divisores |
+| `--color-text-primary/secondary/muted` | `var(--text-*)` | Jerarquía de texto |
+| `--color-success/warning/danger/info` | `var(--success/warning/danger/info)` | Estados semánticos |
+| `--color-secondary-container` | estático `#4f319c` | Chips/acentos (hoy solo en el POS/estados) |
+| `--color-surface-container*` | `var(--bg-hover/bg-elevated)` | Fondo de filas, cabeceras y paneles |
 
----
+### 2.2. Escala de Radios (más redondez)
 
-### 2.2. Tipografía
+Definida en `@theme` (única fuente de verdad; `design-system.css` ya no la redefine):
+
+| Token | Valor |
+| :--- | :--- |
+| `--radius-sm` | `8px` |
+| `--radius-md` | `12px` (botones `btn-sm`, inputs) |
+| `--radius-lg` | `16px` (**botones** estándar) |
+| `--radius-xl` | `20px` (tarjetas) |
+| `--radius-2xl` | `24px` (modales) |
+| `--radius-3xl` / `4xl` | `28px` / `32px` |
+
+Regla de oro: **los botones comparten el mismo lenguaje en toda la app** (16px, bold 700, primario con sombra suave, efecto de presión `scale(0.96)`).
+
+### 2.3. Tipografía
 
 Integrada vía Google Fonts en `frontend/index.html`:
 
-- **Display & Encabezados (`--font-display: 'Syne'`)**: Utilizada en marcas, títulos de módulo y encabezados principales para dar carácter y personalidad única.
-- **Cuerpo & Formularios (`--font-body: 'DM Sans'`)**: Tipografía geométrica legible y limpia para navegación, etiquetas, tablas y controles.
-- **Cifras & Datos Técnicos (`--font-mono: 'JetBrains Mono'`)**: Utilizada en precios en pesos chilenos (`$1.990`), códigos OEM, SKUs, códigos de barras y comprobantes de venta.
+- **Display & Encabezados (`--font-display: 'Syne'`)**: marcas, títulos de módulo, `h1–h6`, títulos de tarjetas (`PageCard`).
+- **Cuerpo & Formularios (`--font-body: 'DM Sans'`)**: navegación, etiquetas, tablas y controles.
+- **Cifras & Datos Técnicos (`--font-mono: 'JetBrains Mono'`)**: precios (`$1.990`), OEM, SKUs, códigos de barra y comprobantes.
 
----
+### 2.4. Iconografía
 
-### 2.3. Iconografía
+- **Pantallas rediseñadas (Shell, POS, Dashboard)**: **Google Material Symbols Outlined** (`<span className="material-symbols-outlined">…</span>`).
+- **Sidebar + módulos legacy**: **Bootstrap Icons** (`bi bi-*`) — la navegación lateral conserva deliberadamente los iconos clásicos.
 
-- **Iconos Principales**: **Google Material Symbols Outlined** (`<span className="material-symbols-outlined">...</span>`).
-- **Iconos Complementarios**: Bootstrap Icons (`bi bi-*`) mantenidos para retrocompatibilidad.
-
----
-
-### 2.4. Clases Utilitarias Propias
+### 2.5. Clases Utilitarias Propias
 
 ```css
-/* Tira con gradiente decorativo en encabezados de tarjetas */
-.gradient-strip {
-  background: linear-gradient(90deg, #d0bcff 0%, #8b5cf6 100%);
-}
+/* Tira con gradiente decorativo en tarjetas destacadas */
+.gradient-strip { background: linear-gradient(90deg, #d0bcff 0%, #8b5cf6 100%); }
 
 /* Tarjeta estadística con borde superior luminoso */
-.stat-card {
-  position: relative;
-}
+.stat-card { position: relative; }
 .stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
   background: linear-gradient(90deg, #d0bcff 0%, #a078ff 100%);
-  border-top-left-radius: 0.75rem;
-  border-top-right-radius: 0.75rem;
+  border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem;
 }
 
-/* Encabezados compactos para tablas POS */
-.pos-table th {
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
+/* Encabezados compactos de tablas (POS y CRUDs) */
+.pos-table th, .table thead th {
+  text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em;
 }
+
+/* Sidebar: enlace de navegación con look clásico (raíl de acento) */
+.sidebar-link { border-left: 3px solid transparent; ... }
+.sidebar-link:hover, .sidebar-link.active { background: var(--bg-hover); color: var(--text-primary); border-left-color: var(--accent); }
+.sidebar-link--collapsed { padding-left: 0; padding-right: 0; justify-content: center; }
 ```
 
 ---
 
-## 3. Estado de la Implementación (Qué está listo en esta rama)
+## 3. Estado de la Implementación
 
 ### 3.1. Infraestructura de Estilos
-- [x] Instalación de `tailwindcss` y `@tailwindcss/vite` (Tailwind v4).
-- [x] Configuración de plugins en `frontend/vite.config.js`.
-- [x] Importación de fuentes y Material Symbols en `frontend/index.html`.
-- [x] Tokenización completa de temas en `frontend/src/index.css`.
-- [x] Carpeta `frontend/src/stitch/` para almacenamiento de prototipos y plantillas exportadas.
+- [x] `tailwindcss` + `@tailwindcss/vite` (Tailwind v4) en `frontend/vite.config.js`.
+- [x] Fuentes y Material Symbols en `frontend/index.html`.
+- [x] Tokens `@theme` en `frontend/src/index.css` enlazados a `design-system.css`.
+- [x] Escala de radios unificada en `@theme`.
+- [x] Carpeta `frontend/src/stitch/` con prototipos.
 
 ### 3.2. Navegación Principal (`frontend/src/components/Shell.jsx`)
-- [x] **Sidebar Reorganizada**:
-  - Navegación agrupada semánticamente por rol: *Operaciones* (Vendedor), *Bodega* (Bodeguero), y *Administración* (Gerente).
-  - Indicadores activos con diseño de chip redondeado (`bg-secondary-container/30 border border-primary/30 text-primary`).
-  - Colapsable en escritorio (250px ↔ 72px) con selector accesible y menú lateral para móviles.
-  - Botón de acceso directo **"Nueva Venta"** y lanzador del modal de novedades con punto rojo de notificación.
-- [x] **Topbar Rediseñada**:
-  - Encabezado sticky con efecto *glassmorphism* (`backdrop-blur-md`).
-  - Título dinámico por vista, campana de novedades, alternador de tema Claro/Oscuro y badge de usuario con rol activo (`Gerente`, `Vendedor`, `Bodeguero`).
-  - Diálogo de confirmación para cierre de sesión.
+- [x] **Topbar**: sticky con *glassmorphism* (`backdrop-blur-md`), título dinámico por vista, campana de novedades, alternador de tema Claro/Oscuro y badge de usuario con rol (`Gerente`, `Vendedor`, `Bodeguero`).
+- [x] **Sidebar**:
+  - **Header**: logo + nombre de tienda.
+  - Navegación agrupada por rol: *Operaciones* (Vendedor), *Bodega* (Bodeguero), *Administración* (Gerente).
+  - **Botones de navegación con look clásico** (decisión de producto): iconos Bootstrap, raíl izquierdo de acento de 3px y fondo `bg-hover` en hover/activo.
+  - **Colapsable 250px ↔ 72px** (en colapso se siguen mostrando los iconos) y menú lateral en móviles.
+  - **Footer**: botón **"Nueva Venta"**, nombre de tienda + versión (`BAZPOS v2.0.0`) y lanzador de novedades con punto de notificación.
+  - Gateo por feature flags (`daily_supplier_orders`) y `Suspense`/`PageLoader` (rutas lazy).
 
 ### 3.3. Punto de Venta (`frontend/src/pages/VentaPage.jsx`)
-- [x] **Arquitectura POS en 2 Columnas**:
-  - **Columna Izquierda (Catálogo & Búsqueda)**:
-    - Escáner de código de barras con feedback reactivo de pulso verde/rojo.
-    - Buscador rápido con debounce por texto y código OEM con botón de limpieza instantánea.
-    - Conmutador de vista en Tarjetas (*Grid*) vs. Tabla densa (*Table*).
-    - Tarjetas con chips de stock en tiempo real y accesos rápidos a ajuste de stock y costo para gerentes.
-  - **Columna Derecha (Gaveta de Checkout Sticky)**:
-    - Lista de items con controles de cantidad stepper (`+`/`-`).
-    - Regulador de descuento porcentual interactivo.
-    - Desglose financiero completo: Subtotal bruto, Descuento, Neto, IVA chileno (19%) y Total en Pesos con regla de redondeo chileno (`roundTotal`).
-    - Acciones directas para **Cobrar** y **Generar Cotización**.
-- [x] **Flujo Completo de Pago & Modales**:
-  - Modal de pago con selección de documento fiscal (Boleta, Factura, Otros) y medios de pago (Efectivo, Tarjeta, Transferencia, Cheque).
-  - Soporte para **Pagos Mixtos** con validación en tiempo real del saldo restante.
-  - Vista previa e impresión de comprobante / ticket.
-  - Diálogo de deducción de stock por ubicación física (`checkUbicaciones`).
+- [x] **Layout single-column** (decisión de producto): tarjeta de búsqueda → **carrito en su posición original** (tarjeta full-width).
+- [x] **Resultados de búsqueda como overlay sobre el carrito (eje z)**: panel `absolute left-0 right-0 top-0 z-10`, altura máxima `70vh` con scroll, contador de resultados y botón **Cerrar**; al limpiar la búsqueda el carrito reaparece con los ítems acumulados.
+- [x] **Vista de resultados por defecto en lista (tabla)**, con conmutador Grid/Lista; la preferencia se conserva **por terminal** (`localStorage["bazpos_venta_vista"]`).
+- [x] Buscador con debounce (OEM/texto), escáner de código de barra con feedback verde/rojo, filtro "mostrar sin stock".
+- [x] **Carrito**: ítems con steppers `+`/`-`, descuento porcentual interactivo, desglose financiero (Subtotal, Descuento, Neto, IVA configurable, Total con redondeo chileno `roundSaleTotal`) y acciones **Cobrar** / **Generar Cotización**.
+- [x] **Pago configurable**: documentos fiscales y medios de pago desde `effective_document_types` / `effective_payment_methods`; soporte de **pagos mixtos** con validación de saldo.
+- [x] Modal de deducción de stock por ubicación (simple o **reparto mixto**), comprobante con vista previa/impresión, banner de cotización origen.
+- [x] **Ventas resilientes**: idempotencia (`idempotencia_key`), reintentos automáticos con espera progresiva, verificación manual y aviso offline (carrito persistente).
 
 ### 3.4. Dashboard Ejecutivo (`frontend/src/pages/DashboardPage.jsx`)
-- [x] **Estructura Stitch Integrada**:
-  - 4 Stat Cards superiores con desglose de ventas brutas, devoluciones, anulaciones, cantidad de tickets y total de productos.
-  - Tabla de rendimiento de ventas por vendedor en tiempo real.
-  - Panel lateral de alertas de stock bajo mínimo con acciones inmediatas (*Recordar mañana*, *Ignorar*, *+ Pedir a proveedor*).
-  - Popover interactivo con alternativas del mismo OEM que tienen stock en tienda o bodega.
-  - Tarjeta de Novedades del Sistema conectada al `ChangelogModal`.
+- [x] **Conservado íntegro** (decisión de producto):
+  - 4 Stat Cards (Ventas Hoy, Transacciones, Stock Bajo, Total Productos) con tira de gradiente.
+  - Tabla de ventas por vendedor en tiempo real.
+  - Panel de alertas de stock bajo mínimo con **paginación**, acciones rápidas (*Mañana*, *Ignorar*, *+ Pedir*) y actualización optimista.
+  - Popover de alternativas del mismo OEM con stock.
+  - Tarjeta de Novedades conectada al `ChangelogModal`.
+  - Formato monetario configurable (`formatMoney`) y feature flags (`product_oem_fields`, `oem_stock_substitutes`).
+
+### 3.5. Módulos Legacy (nuevo lenguaje vía `design-system.css`)
+- [x] **Tablas** (`table`/`table-bordered`): banda de encabezado (`bg-hover`, uppercase, letter-spacing) + **divisores de fila** (sin rejilla vertical), idénticas al lenguaje del POS.
+- [x] **Botones** (`.btn`/`.btn-sm`/`.btn-lg`): radio 16px (12px en chico), bold 700, primario con sombra, `:active { scale(0.96) }`.
+- [x] **Encabezados**: `h1–h6` y títulos de `PageCard` en Syne 700.
+- [x] **Login** (`.auth-card`): radio 20px con banda de gradiente superior.
+- [x] **Inputs** (`.form-control`): radio 12px y focus con anillo de acento.
+- [x] **Modales** (`.modal-content`): radio 24px con header/footer de superficie y banda de gradiente.
+- [x] **Empty states**: contenedor de borde punteado.
 
 ---
 
-## 4. Hoja de Ruta para la Siguiente Versión Mayor (Futura Reactivación)
+## 4. Decisiones de Diseño Tomadas (Conservar / Revertir)
 
-Cuando se decida retomar este rediseño para lanzar la nueva versión mayor, seguir estos pasos en orden:
+Durante la integración se tomaron decisiones de producto que **modificaron el rediseño original**:
 
-```mermaid
-graph TD
-    A["Paso 1: Checkout de rama feat/redesign"] --> B["Paso 2: Migrar Gestión de Stock e Inventario"]
-    B --> C["Paso 3: Migrar Tablas CRUD de Administración"]
-    C --> D["Paso 4: Migrar Cierre de Caja & Reportes"]
-    D --> E["Paso 5: Auditoría de Accesibilidad & QA Final"]
-    E --> F["Paso 6: Merge a main & Release Mayor (v2.0.0)"]
-```
-
-### Pantallas Pendientes por Migrar al Estilo Stitch:
-
-1. **Gestión de Stock & Bodega**:
-   - `frontend/src/pages/InventarioPage.jsx`
-   - `frontend/src/pages/UbicacionPage.jsx`
-   - `frontend/src/components/QuickStockModal.jsx` y `AjusteStockModal.jsx`
-2. **Gestión de Pedidos**:
-   - `frontend/src/pages/PedidosPage.jsx`
-   - `frontend/src/pages/PedidosCrearPage.jsx`
-   - `frontend/src/pages/PedidosProveedoresPage.jsx`
-3. **Catálogo & Administración CRUD**:
-   - `frontend/src/components/CrudTable.jsx` (Aplicar estilo `.pos-table` y filtros en píldoras)
-   - `frontend/src/pages/ProductosPage.jsx` & `ProductoFormPage.jsx`
-   - `frontend/src/pages/ProveedoresPage.jsx` & `ProveedorFormPage.jsx`
-   - `frontend/src/pages/FacturasPage.jsx` & `FacturaFormPage.jsx`
-   - `frontend/src/pages/UsuariosPage.jsx` & `UsuarioFormPage.jsx`
-4. **Analítica & Cierre**:
-   - `frontend/src/pages/CierreCajaPage.jsx`
-   - `frontend/src/pages/ReportesPage.jsx`
-   - `frontend/src/pages/ConfiguracionPage.jsx`
-   - `frontend/src/pages/LoginPage.jsx`
+| Área | Decisión |
+| :--- | :--- |
+| Sidebar (botones de navegación) | **Revertidos** al look clásico: iconos Bootstrap, raíl de acento, sin chip redondeado. Se conservan header, footer y topbar nuevos. |
+| Sidebar (colapso) | El colapso **mantiene los iconos visibles** (72px). |
+| Sidebar (footer) | Nombre de la tienda a la izquierda de la versión. |
+| POS (layout) | **Revertido** a single-column; el carrito vuelve a su posición original. |
+| POS (resultados) | Los resultados **cubren el carrito en el eje z** en lugar de empujarlo. |
+| POS (vista) | Por defecto **lista** (no tarjetas), preferencia por terminal. |
+| Botones (toda la app) | **Más redondez** (16px) — el nuevo lenguaje, no el antiguo. |
+| Dashboard | **Conservado al completo**. |
+| Módulos legacy | Conservan posiciones/layout/flujo; adoptan el lenguaje nuevo (tablas, botones, encabezados, etc.) solo a nivel CSS. |
+| Iconos | Material Symbols en pantallas rediseñadas; Bootstrap en sidebar y legacy. |
 
 ---
 
-## 5. Comandos de Verificación & Build
+## 5. Hoja de Ruta Restante
+
+Con la adaptación CSS ya aplicada a toda la app, queda pendiente (opcional, por prioridad):
+
+1. **Auditoría de accesibilidad & QA final**: foco visible, `prefers-reduced-motion`, contraste y navegación por teclado.
+2. **Pulido fino** (micro-interacciones y animaciones de modales).
+3. **Migración Tailwind pantalla por pantalla** (profundizar el lenguaje en módulos legacy, opcional).
+4. **Merge a `main` & Release Mayor (v2.0.0)**.
+
+---
+
+## 6. Comandos de Verificación & Build
 
 ```bash
-# Entrar al frontend
 cd frontend
-
-# Verificar linting (ESLint)
-npm run lint
-
-# Compilar para producción (Vite + Tailwind v4)
-npm run build
-
-# Servidor de desarrollo
-npm run dev
+npm run lint       # ESLint
+npm run build      # Vite + Tailwind v4
+npm run dev        # servidor de desarrollo
 ```
 
 ---
 
-*Documento generado y archivado en la rama `feat/redesign`.*
+*Documento de referencia del sistema de diseño de BazPOS v2.0 — sincronizado con `staging`.*
