@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum, Value
+from django.db.models import Sum, Value, F
 from django.db.models.functions import Coalesce
 from decimal import Decimal
 from django.contrib.auth.models import User
@@ -27,10 +27,16 @@ class StockProductoUbicacion(models.Model):
     producto = models.ForeignKey("Producto", on_delete=models.CASCADE, related_name="stocks_ubicacion")
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.SET_NULL, null=True, blank=True)
     cantidad = models.IntegerField(default=0)
+    ubicacion_key = models.GeneratedField(
+        expression=Coalesce(F("ubicacion_id"), Value(0)),
+        output_field=models.IntegerField(),
+        db_persist=True,
+        editable=False,
+    )
 
     class Meta:
         db_table = "stock_producto_ubicacion"
-        unique_together = ("producto", "ubicacion")
+        unique_together = ("producto", "ubicacion_key")
 
     def __str__(self):
         ubicacion_nombre = self.ubicacion.nombre if self.ubicacion else "Sin ubicación"

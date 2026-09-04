@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.db import IntegrityError
 from django.db.models import Sum
 from django.test import TestCase
 from django.utils import timezone
@@ -490,6 +491,39 @@ class VentaStockActionsTest(BaseTest):
         )
         self.assertEqual(stock1.cantidad, 9)
         self.assertEqual(stock2.cantidad, 4)
+
+    def test_deducir_stock_sin_ubicacion(self):
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=None, cantidad=5
+        )
+        venta_id = self._crear_venta()
+        resp = auth_client(self.vendedor).post(
+            f"/api/ventas/{venta_id}/deducir-stock/",
+            {
+                "deducciones": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": None,
+                        "cantidad": 2,
+                    }
+                ]
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=None
+        )
+        self.assertEqual(stock.cantidad, 3)
+
+    def test_stock_sin_ubicacion_no_permite_duplicados(self):
+        StockProductoUbicacion.objects.create(
+            producto=self.producto, ubicacion=None, cantidad=5
+        )
+        with self.assertRaises(IntegrityError):
+            StockProductoUbicacion.objects.create(
+                producto=self.producto, ubicacion=None, cantidad=3
+            )
 
     def test_deducir_stock_over_deduction(self):
         venta_id = self._crear_venta()

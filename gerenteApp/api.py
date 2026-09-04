@@ -17,7 +17,7 @@ from gerenteApp.serializers import (
     UserSerializer,
 )
 from vendedorApp.pagination import DefaultPagination
-from vendedorApp.models import Pedido, PedidoDetalle, Producto, Ubicacion
+from vendedorApp.models import Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion
 from vendedorApp.serializers import UbicacionSerializer
 from vendedorApp.stock_utils import descontar_stock_producto, resolver_producto_por_identidad
 from bazpos.permissions import ROLE_BODEGUERO, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_VENDEDOR, RoleActionPermission
@@ -336,6 +336,21 @@ class UbicacionViewSet(viewsets.ModelViewSet):
         "partial_update": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
+
+    def destroy(self, request, *args, **kwargs):
+        ubicacion = self.get_object()
+        with transaction.atomic():
+            filas = StockProductoUbicacion.objects.select_for_update().filter(ubicacion=ubicacion)
+            for fila in filas:
+                sin_ubicacion, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
+                    producto=fila.producto,
+                    ubicacion=None,
+                    defaults={"cantidad": 0},
+                )
+                sin_ubicacion.cantidad += fila.cantidad
+                sin_ubicacion.save(update_fields=["cantidad"])
+            filas.delete()
+        return super().destroy(request, *args, **kwargs)
 
 
 class StoreConfigViewSet(viewsets.ModelViewSet):
