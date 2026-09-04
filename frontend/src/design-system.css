@@ -377,8 +377,8 @@ input[type="number"] {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-body);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   margin: 0 0 0.75rem;
   color: var(--text-primary);
   letter-spacing: -0.01em;
@@ -671,9 +671,9 @@ textarea.form-control, textarea.input {
 
 .card-header h6, .card-header .card-title {
   margin: 0;
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -721,9 +721,12 @@ textarea.form-control, textarea.input {
 .table-sm tbody td { padding: 0.55rem 0.75rem; font-size: 0.82rem; }
 
 .table-bordered thead th,
-.table-bordered tbody td { border: 1px solid var(--border-default); }
+.table-bordered tbody td {
+  border: none;
+  border-bottom: 1px solid var(--border-default);
+}
 
-.table-bordered thead th { border-bottom-width: 2px; }
+.table-bordered tbody tr:last-child td { border-bottom: none; }
 
 .table-borderless thead th,
 .table-borderless tbody td { border: none; }
@@ -1436,7 +1439,7 @@ textarea.form-control, textarea.input {
 .auth-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius);
+  border-radius: var(--radius-xl);
   padding: 2rem;
   box-shadow: var(--shadow);
 }
@@ -1447,13 +1450,13 @@ textarea.form-control, textarea.input {
   height: 3px;
   background: linear-gradient(90deg, var(--accent), var(--purple));
   margin: -2rem -2rem 1.75rem -2rem;
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 .auth-card h2 {
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 1.5rem;
   text-align: center;
   color: var(--text-primary);
@@ -1500,8 +1503,11 @@ textarea.form-control, textarea.input {
 /* ====== EMPTY STATE ====== */
 .empty-state {
   text-align: center;
-  padding: 3rem 1rem;
+  padding: 2.5rem 1.5rem;
   color: var(--text-muted);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
 }
 
 .empty-state-icon {
