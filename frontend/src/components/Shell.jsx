@@ -10,30 +10,30 @@ import PageLoader from "./PageLoader";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
-const desktopMediaQuery = "(min-width: 769px)";
+const desktopMediaQuery = "(min-width: 1024px)";
 
 const vendedorLinks = [
-  { to: "/", label: "Dashboard", icon: "bi-grid-1x2-fill", end: true },
-  { to: "/ventas", label: "VENTAS", icon: "bi-cart-fill", className: "nav-link--ventas", end: true },
-  { to: "/ventas/pedidos", label: "Pedidos", icon: "bi-bag-check" },
-  { to: "/ventas/historial", label: "Historial", icon: "bi-clock-history" },
-  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
-  { to: "/configuracion", label: "Configuración", icon: "bi-gear" },
+  { to: "/", label: "Dashboard", icon: "dashboard", end: true },
+  { to: "/ventas", label: "Ventas", icon: "point_of_sale", end: true, highlight: true },
+  { to: "/ventas/pedidos", label: "Pedidos", icon: "receipt_long" },
+  { to: "/ventas/historial", label: "Historial", icon: "history" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "inventory_2" },
+  { to: "/configuracion", label: "Configuración", icon: "settings" },
 ];
 
 const gerenteLinks = [
-  { to: "/productos", label: "Productos", icon: "bi-box-seam" },
-  { to: "/proveedores", label: "Proveedores", icon: "bi-truck" },
-  { to: "/pedidos-proveedores", label: "Pedidos Prov.", icon: "bi-receipt-cutoff" },
-  { to: "/usuarios", label: "Usuarios", icon: "bi-people" },
-  { to: "/facturas", label: "Facturas", icon: "bi-file-earmark-text" },
-  { to: "/reportes", label: "Reportes", icon: "bi-graph-up" },
-  { to: "/cierre-caja", label: "Cierre de caja", icon: "bi-cash-coin" },
+  { to: "/productos", label: "Productos", icon: "category" },
+  { to: "/proveedores", label: "Proveedores", icon: "local_shipping" },
+  { to: "/pedidos-proveedores", label: "Pedidos Prov.", icon: "shopping_bag" },
+  { to: "/usuarios", label: "Usuarios", icon: "group" },
+  { to: "/facturas", label: "Facturas", icon: "receipt" },
+  { to: "/reportes", label: "Reportes", icon: "analytics" },
+  { to: "/cierre-caja", label: "Cierre de Caja", icon: "account_balance_wallet" },
 ];
 
 const bodegueroLinks = [
-  { to: "/ventas/inventario", label: "Inventario", icon: "bi-boxes" },
-  { to: "/ubicaciones", label: "Ubicaciones", icon: "bi-geo-alt" },
+  { to: "/ventas/inventario", label: "Inventario", icon: "inventory_2" },
+  { to: "/ubicaciones", label: "Ubicaciones", icon: "warehouse" },
 ];
 
 export default function Shell() {
@@ -52,6 +52,7 @@ export default function Shell() {
   const filteredGerenteLinks = showSupplierOrders
     ? gerenteLinks
     : gerenteLinks.filter((link) => link.label !== "Pedidos Prov.");
+
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -68,7 +69,6 @@ export default function Shell() {
   const [changelogModal, setChangelogModal] = useState(null);
   const unseenChangelog = getUnseenChangelog();
   const storeName = useStoreName();
-  const sidebarHidden = isDesktop && sidebarCollapsed;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(desktopMediaQuery);
@@ -156,158 +156,354 @@ export default function Shell() {
     );
   }
 
+  const roleName = showGerente ? "Gerente" : showBodeguero ? "Bodeguero" : "Vendedor";
+  const sidebarHidden = isDesktop && sidebarCollapsed;
+
   return (
     <TitleContext.Provider value={setTitle}>
-      <div id="wrapper" className={`${sidebarOpen ? "sidebar-open" : ""}${sidebarHidden ? " sidebar-collapsed" : ""}`}>
+      <div className="flex h-screen overflow-hidden bg-bg-base text-text-accent font-body antialiased">
+        {/* Mobile Backdrop */}
+        {sidebarOpen && !isDesktop && (
+          <div
+            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs transition-opacity"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* SIDEBAR */}
         <aside
-          id="sidebar-navigation"
-          className={`sidebar${sidebarOpen ? " open" : ""}`}
+          className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-bg-surface border-r border-border-default transition-all duration-200 ease-in-out ${
+            isDesktop
+              ? sidebarCollapsed
+                ? "w-[72px]"
+                : "w-[250px]"
+              : sidebarOpen
+              ? "translate-x-0 w-[260px] shadow-2xl"
+              : "-translate-x-full w-[260px]"
+          }`}
           inert={sidebarHidden ? "" : undefined}
         >
-          <NavLink className="sidebar-brand" to="/" onClick={handleNav}>{storeName}</NavLink>
-
-          <ul className="sidebar-nav">
-            {filteredVendedorLinks.map((link) => (
-              <li className="nav-item" key={link.to}>
-                <NavLink
-                  className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`}
-                  to={link.to}
-                  end={link.end}
-                  onClick={handleNav}
-                >
-                  {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
-                  <span>{link.label}</span>
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-
-          {showBodeguero && (
-            <>
-              <hr className="sidebar-divider" />
-              <div className="sidebar-heading">Bodeguero</div>
-              <ul className="sidebar-nav">
-                {bodegueroLinks.map((link) => (
-                  <li className="nav-item" key={link.to}>
-                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
-                      {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
-                      <span>{link.label}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          {showGerente && (
-            <>
-              <hr className="sidebar-divider" />
-              <div className="sidebar-heading">Gerente</div>
-              <ul className="sidebar-nav">
-                {filteredGerenteLinks.map((link) => (
-                  <li className="nav-item" key={link.to}>
-                    <NavLink className={({ isActive }) => `nav-link${isActive ? " active" : ""}${link.className ? ` ${link.className}` : ""}`} to={link.to} onClick={handleNav}>
-                      {link.icon && <i className={`sidebar-icon bi ${link.icon}`} />}
-                      <span>{link.label}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <div className="sidebar-version">
-            <button
-              type="button"
-              className="sidebar-changelog-btn"
-              onClick={openChangelog}
-              title="Ver novedades"
+          {/* Brand / Logo Header */}
+          <div className="h-[60px] px-4 border-b border-border-default flex items-center justify-between">
+            <NavLink
+              to="/"
+              onClick={handleNav}
+              className="flex items-center gap-3 overflow-hidden text-decoration-none group"
             >
-              <i className="bi bi-megaphone" />
-              <span>Novedades</span>
-              {unseenChangelog.length > 0 && <span className="changelog-dot" aria-label="Hay novedades nuevas" />}
-            </button>
+              <div className="w-9 h-9 rounded-xl bg-primary-container/20 border border-primary/30 flex items-center justify-center shrink-0 text-accent group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-xl">storefront</span>
+              </div>
+              {(!isDesktop || !sidebarCollapsed) && (
+                <div className="min-w-0">
+                  <h1 className="font-display font-bold text-sm tracking-wide text-text-accent truncate">
+                    {storeName || "BazPos"}
+                  </h1>
+                  <span className="text-[10px] font-mono text-text-muted flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+                    Terminal Activo
+                  </span>
+                </div>
+              )}
+            </NavLink>
+
+            {!isDesktop && (
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-text-muted hover:text-text-accent p-1"
+                aria-label="Cerrar menú"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Nav Links List */}
+          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            {/* Main Links */}
             <div>
-              {storeName} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+              {(!isDesktop || !sidebarCollapsed) && (
+                <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted font-label-caps">
+                  Operaciones
+                </div>
+              )}
+              <ul className="space-y-1">
+                {filteredVendedorLinks.map((link) => (
+                  <li key={link.to}>
+                    <NavLink
+                      to={link.to}
+                      end={link.end}
+                      onClick={handleNav}
+                      title={sidebarCollapsed ? link.label : undefined}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
+                          isActive
+                            ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
+                            : link.highlight
+                            ? "text-accent hover:bg-surface-variant hover:text-accent font-extrabold"
+                            : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
+                        } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                      }
+                    >
+                      <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                      {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Bodeguero Links */}
+            {showBodeguero && (
+              <div>
+                {(!isDesktop || !sidebarCollapsed) && (
+                  <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted font-label-caps border-t border-border-default/60 pt-3">
+                    Bodega
+                  </div>
+                )}
+                <ul className="space-y-1">
+                  {bodegueroLinks.map((link) => (
+                    <li key={link.to}>
+                      <NavLink
+                        to={link.to}
+                        onClick={handleNav}
+                        title={sidebarCollapsed ? link.label : undefined}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
+                            isActive
+                              ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
+                              : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
+                          } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                        }
+                      >
+                        <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                        {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Gerente Links */}
+            {showGerente && (
+              <div>
+                {(!isDesktop || !sidebarCollapsed) && (
+                  <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted font-label-caps border-t border-border-default/60 pt-3">
+                    Administración
+                  </div>
+                )}
+                <ul className="space-y-1">
+                  {filteredGerenteLinks.map((link) => (
+                    <li key={link.to}>
+                      <NavLink
+                        to={link.to}
+                        onClick={handleNav}
+                        title={sidebarCollapsed ? link.label : undefined}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 ${
+                            isActive
+                              ? "bg-secondary-container/30 text-accent border border-primary/30 shadow-xs"
+                              : "text-text-secondary hover:text-text-accent hover:bg-surface-variant"
+                          } ${sidebarCollapsed && isDesktop ? "justify-center px-0" : ""}`
+                        }
+                      >
+                        <span className="material-symbols-outlined text-lg shrink-0">{link.icon}</span>
+                        {(!isDesktop || !sidebarCollapsed) && <span className="truncate">{link.label}</span>}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar Footer */}
+          <div className="p-3 border-t border-border-default bg-surface-container-low space-y-2">
+            {/* Quick POS Button */}
+            {(!isDesktop || !sidebarCollapsed) ? (
+              <button
+                onClick={() => { navigate("/ventas"); handleNav(); }}
+                className="w-full py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-base">add_shopping_cart</span>
+                Nueva Venta
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/ventas")}
+                title="Nueva Venta"
+                className="w-full h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm hover:bg-primary-container"
+              >
+                <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+              </button>
+            )}
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between pt-1 text-xs text-text-muted">
+              {(!isDesktop || !sidebarCollapsed) ? (
+                <>
+                  <button
+                    onClick={openChangelog}
+                    className="hover:text-accent transition-colors flex items-center gap-1.5 text-[11px] relative"
+                    title="Novedades del sistema"
+                  >
+                    <span className="material-symbols-outlined text-sm">campaign</span>
+                    <span>v{import.meta.env.APP_VERSION}</span>
+                    {unseenChangelog.length > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setShowLogoutModal(true)}
+                    className="hover:text-danger transition-colors p-1"
+                    title="Cerrar sesión"
+                  >
+                    <span className="material-symbols-outlined text-base">logout</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowLogoutModal(true)}
+                  className="w-full flex justify-center text-text-muted hover:text-danger p-1"
+                  title="Cerrar sesión"
+                >
+                  <span className="material-symbols-outlined text-base">logout</span>
+                </button>
+              )}
             </div>
           </div>
         </aside>
 
-        <div className="sidebar-overlay" onClick={handleNav} />
-
-        <div className="content-wrapper">
-          <nav className="topbar">
-            <div className="topbar-left">
+        {/* MAIN WRAPPER (TopBar + Content Area) */}
+        <div
+          className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-in-out ${
+            isDesktop ? (sidebarCollapsed ? "ml-[72px]" : "ml-[250px]") : "ml-0"
+          }`}
+        >
+          {/* TOPBAR */}
+          <header className="h-[60px] sticky top-0 z-30 bg-bg-surface/80 backdrop-blur-md border-b border-border-default flex items-center justify-between px-4 sm:px-6 shadow-xs">
+            {/* Left Title & Mobile Menu Toggle */}
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                className={`hamburger${sidebarOpen ? " open" : ""}`}
                 onClick={handleToggleSidebar}
-                aria-controls="sidebar-navigation"
-                aria-expanded={isDesktop ? !sidebarHidden : sidebarOpen}
-                aria-label={isDesktop
-                  ? (sidebarHidden ? "Mostrar barra lateral" : "Ocultar barra lateral")
-                  : (sidebarOpen ? "Cerrar menú" : "Abrir menú")}
-                title={isDesktop
-                  ? (sidebarHidden ? "Mostrar barra lateral" : "Ocultar barra lateral")
-                  : undefined}
+                className="p-1.5 rounded-lg text-text-secondary hover:text-text-accent hover:bg-surface-variant transition-colors"
+                aria-label={isDesktop ? (sidebarCollapsed ? "Expandir menú" : "Colapsar menú") : "Abrir menú"}
+                title={isDesktop ? (sidebarCollapsed ? "Expandir menú" : "Colapsar menú") : undefined}
               >
-                <span />
-                <span />
-                <span />
+                <span className="material-symbols-outlined text-xl">
+                  {isDesktop ? (sidebarCollapsed ? "menu_open" : "menu") : "menu"}
+                </span>
               </button>
-              <span className="topbar-title">{title}</span>
+              <h2 className="font-display font-bold text-base sm:text-lg text-text-accent tracking-tight truncate">
+                {title}
+              </h2>
             </div>
-            <div className="btn-group">
+
+            {/* Right Quick Controls & Profile */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Novedades Button */}
               <button
                 type="button"
-                className="btn btn-sm btn-outline"
+                onClick={openChangelog}
+                className="relative p-2 rounded-full text-text-secondary hover:text-accent hover:bg-surface-variant transition-colors"
+                title="Novedades"
+              >
+                <span className="material-symbols-outlined text-xl">notifications</span>
+                {unseenChangelog.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger ring-2 ring-bg-surface" />
+                )}
+              </button>
+
+              {/* Dark/Light Theme Toggle */}
+              <button
+                type="button"
                 onClick={handleToggleTheme}
+                className="p-2 rounded-full text-text-secondary hover:text-accent hover:bg-surface-variant transition-colors"
                 title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
               >
-                {theme === "dark" ? "☀" : "☾"}
+                <span className="material-symbols-outlined text-xl">
+                  {theme === "dark" ? "light_mode" : "dark_mode"}
+                </span>
               </button>
+
+              <div className="h-5 w-px bg-border-default mx-1 hidden sm:block" />
+
+              {/* User Profile Pill */}
+              <div className="flex items-center gap-2 pl-1 sm:pl-2">
+                <div className="w-8 h-8 rounded-full bg-secondary-container/40 border border-border-default flex items-center justify-center text-accent font-mono text-xs font-bold">
+                  {user?.first_name ? user.first_name[0].toUpperCase() : user?.username ? user.username[0].toUpperCase() : "U"}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-xs font-bold text-text-accent leading-none">
+                    {user?.first_name || user?.username}
+                  </div>
+                  <div className="text-[10px] text-text-muted mt-0.5 leading-none">
+                    {roleName}
+                  </div>
+                </div>
+              </div>
+
+              {/* Logout Button */}
               <button
                 type="button"
-                className="btn btn-sm btn-danger"
                 onClick={() => setShowLogoutModal(true)}
+                className="p-2 rounded-full text-text-muted hover:text-danger hover:bg-danger/10 transition-colors ml-1"
+                title="Cerrar sesión"
               >
-                Salir
+                <span className="material-symbols-outlined text-xl">logout</span>
               </button>
             </div>
-          </nav>
+          </header>
 
-          <main className="content-area">
-            <div className="container-fluid" key={location.pathname}>
-              <div className="page-transition">
-                <Suspense fallback={<PageLoader />}>
-                  <Outlet />
-                </Suspense>
-              </div>
+          {/* SCROLLABLE MAIN CONTENT */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background">
+            <div className="max-w-container-max mx-auto" key={location.pathname}>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
             </div>
           </main>
         </div>
       </div>
 
+      {/* Logout Confirmation Dialog */}
       {showLogoutModal && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="modal-dialog" style={{ maxWidth: 400 }}>
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Cerrar sesión</h5>
-                <button type="button" className="modal-close" onClick={() => setShowLogoutModal(false)}>&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-danger/10 text-danger flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-xl">logout</span>
               </div>
-              <div className="modal-body text-center py-4">
-                <p className="mb-0 text-secondary">¿Estás seguro de que deseas cerrar sesión?</p>
+              <div>
+                <h4 className="font-display font-bold text-sm text-text-accent">Cerrar Sesión</h4>
+                <p className="text-xs text-text-secondary mt-0.5">¿Estás seguro de que deseas salir del sistema?</p>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowLogoutModal(false)}>Cancelar</button>
-                <button type="button" className="btn btn-danger" onClick={handleLogout}>Cerrar sesión</button>
-              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-border-default">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-text-secondary hover:text-text-accent hover:bg-surface-variant transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-danger text-white hover:bg-danger/80 transition-colors shadow-xs"
+              >
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Changelog Modal */}
       {changelogModal && (
         <ChangelogModal
           entries={changelogModal.entries}
