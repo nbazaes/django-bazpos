@@ -4,47 +4,28 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
-## [2.0.0] - 2026-09-03
+## [2.0.0] - 2026-09-04
 
 ### Agregado
 
-- Configuración completa de la tienda desde un solo lugar: moneda, zona horaria, impuesto, redondeo de precios y totales, costo de envío y margen por defecto, ubicación por defecto, medios de pago y documentos.
-- Selector de tema con 6 esquemas de color (claro/oscuro), disponible para todos los usuarios en Configuración.
-- Medios de pago y documentos editables y activables según el negocio; el cierre de caja se adapta automáticamente a ellos.
-- Datos de demostración con perfiles: retail genérico (sin OEM) o autopartes.
-- Los campos de autopartes (OEM, marca, código de proveedor) y módulos opcionales se activan según el perfil del negocio.
-- Ventas más robustas ante cortes de conexión: si se cae la señal al confirmar, el sistema reintenta solo (hasta 4 veces con espera progresiva) y, si la respuesta se pierde, permite verificar si la venta quedó registrada antes de repetir. Cada venta lleva una clave única que evita duplicados y números de comprobante repetidos.
-
-### Cambiado
-
-- El nombre de la tienda y el idioma/región (locale) se configuran en la instalación (`.env`), no desde la interfaz.
-- El impuesto y el redondeo se calculan siempre con la configuración de la tienda, en ventas, pedidos, facturas y precios de productos, para que los montos cuadren entre pantallas.
-- El descuento de costo en pedidos (antes fijo para Stellantis) ahora es una regla configurable por línea de pedido.
-- El RUT de proveedor se renombra a «ID tributario» y pasa a ser opcional según el perfil.
-
-### Eliminado
-
-- El código y los flujos atados a una sola tienda o un solo proveedor; el sistema ahora es un POS retail genérico y configurable.
-
-### Corregido
-
-- Al anular o devolver una venta con varios productos, si un producto o ubicación fallaba a mitad del proceso, el stock podía quedar restaurado parcialmente sin registrar la anulación o devolución. Ahora se valida todo antes de aplicar cualquier cambio.
-- Al vender un producto que ya no existe, se mostraba un error de servidor; ahora se informa con un mensaje claro.
-
-## [1.27.0] - 2026-09-03
-
-### Agregado
-
+- Nuevo diseño para el Shell, POS y Dashboard, con navegación por roles, tema claro/oscuro y esquemas de color personalizables.
+- Ventas más resistentes a cortes de conexión: carrito persistente, reintentos automáticos y aviso para verificar la venta cuando se pierde la respuesta.
 - Seis esquemas de color, con variantes clara y oscura, y selector de tema en Configuración que se aplica al instante.
 - Configuración disponible para todos los roles; los datos de la tienda quedan restringidos a Gerente y Encargado.
 
 ### Cambiado
 
+- El POS ahora muestra resultados sobre el carrito, permite elegir vista de lista o tabla y entrega más información del producto, como marca y código OEM.
+- Encargados y gerentes pueden ajustar stock, precio y costo directamente desde la tabla de resultados.
+- Configuración más flexible para moneda, idioma, formatos, medios de pago, documentos, despacho y márgenes; los valores se reflejan en toda la aplicación.
 - La deducción de stock ahora permite combinar existencias de distintas ubicaciones y valida que no se descuente más de lo disponible.
+- La búsqueda, los pedidos y los productos se adaptan al tipo de negocio configurado, mostrando solo los campos y opciones relevantes.
 
 ### Corregido
 
-- El stock se descuenta de forma segura al crear una venta y al reasignar ubicaciones.
+- Corregido el descuento de stock sin ubicación, evitando duplicados y conservando correctamente las cantidades al eliminar una ubicación.
+- Mejorada la deducción de stock por ubicación, incluyendo repartos mixtos y validaciones para impedir descuentos superiores al stock disponible.
+- Corregidos detalles visuales de modales, mensajes, foco de teclado, casillas de selección, tablas y estados vacíos.
 
 ### Eliminado
 
