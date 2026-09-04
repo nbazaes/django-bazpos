@@ -780,7 +780,7 @@ export default function VentaPage() {
                   <span className="material-symbols-outlined text-lg">search</span>
                 </div>
                 <input
-                  className="w-full pl-10 pr-9 py-2.5 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full pl-10 pr-14 py-2.5 bg-bg-input border border-border-default rounded-lg text-sm text-text-primary placeholder:text-text-muted transition-all focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder={searchPlaceholder}
                   value={oem}
                   onChange={(e) => setOem(e.target.value)}
@@ -789,10 +789,11 @@ export default function VentaPage() {
                   <button
                     type="button"
                     onClick={() => { setOem(""); setProductosEncontrados([]); setHayMasProductos(false); setError(""); }}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-primary text-sm"
+                    className="absolute inset-y-0 right-0 my-auto flex items-center justify-center mr-1.5 w-9 h-9 rounded-full bg-bg-elevated border border-border-default text-text-secondary hover:text-text-primary hover:bg-surface-variant hover:border-border-light transition-colors"
                     title="Limpiar búsqueda"
+                    aria-label="Limpiar búsqueda"
                   >
-                    &times;
+                    <span className="material-symbols-outlined text-2xl leading-none">close</span>
                   </button>
                 )}
               </div>
@@ -873,6 +874,8 @@ export default function VentaPage() {
                       </div>
                       <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
                         <span>{i.codigo_producto}</span>
+                        {showPartsFields && i.oem && <span>OEM: {i.oem}</span>}
+                        {showPartsFields && i.marca && <span>· {i.marca}</span>}
                         <span>· {fmtMoney(i.precio)} c/u</span>
                       </div>
                     </div>
@@ -1125,16 +1128,35 @@ export default function VentaPage() {
                             <td className="py-2 px-3 font-bold text-text-primary">{p.nombre}</td>
                             {showPartsFields && <td className="py-2 px-3">{p.marca || "—"}</td>}
                             <td className="py-2 px-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${tieneStock ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
-                                {p.stock_actual}
-                              </span>
+                              {esGerente ? (
+                                <button
+                                  onClick={() => setQuickStockProducto(p)}
+                                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-bold text-[10px] bg-surface-variant text-text-secondary hover:text-text-primary hover:bg-bg-input transition-colors"
+                                  title="Ajustar stock"
+                                >
+                                  <span className="material-symbols-outlined text-[12px]">edit_note</span>
+                                  {p.stock_actual}
+                                </button>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${tieneStock ? "bg-success/10 text-success" : "bg-danger/10 text-danger"}`}>
+                                  {p.stock_actual}
+                                </span>
+                              )}
                             </td>
                             <td className="py-2 px-3 font-mono font-bold text-right text-accent">
                               {fmtMoney(mod?.precio ?? p.precio)}
                             </td>
                             {esGerente && (
                               <td className="py-2 px-3 font-mono text-right text-text-muted">
-                                {p.precio_costo != null ? fmtMoney(mod?.precioCosto ?? p.precio_costo) : "—"}
+                                {p.precio_costo != null ? (
+                                  <button
+                                    onClick={() => setQuickPrecioCostoProducto(p)}
+                                    className="hover:text-accent transition-colors"
+                                    title="Editar costo y margen"
+                                  >
+                                    {fmtMoney(mod?.precioCosto ?? p.precio_costo)}
+                                  </button>
+                                ) : "—"}
                               </td>
                             )}
                             <td className="py-2 px-3 text-right">
