@@ -332,6 +332,56 @@ class VentaApiTest(BaseTest):
         self.assertEqual(dup.status_code, 400)
         self.assertIn("ya fue convertida", str(dup.data))
 
+    def test_create_venta_producto_no_existe(self):
+        payload = {
+            "productos": [{"producto_id": 999999, "cantidad": 1, "precio": 1000}],
+            "total": 1000,
+        }
+        resp = auth_client(self.vendedor).post("/api/ventas/", payload, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_venta_idempotente_misma_clave(self):
+        client = auth_client(self.vendedor)
+        payload = self._payload(idempotencia_key="clave-unica-1234")
+        r1 = client.post("/api/ventas/", payload, format="json")
+        r2 = client.post("/api/ventas/", payload, format="json")
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r2.status_code, 201)
+        self.assertEqual(r1.data["id"], r2.data["id"])
+        self.assertEqual(Venta.objects.count(), 1)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 10 - 2)
+
+    def test_venta_claves_distintas_generan_ventas_distintas(self):
+        client = auth_client(self.vendedor)
+        r1 = client.post(
+            "/api/ventas/", self._payload(idempotencia_key="clave-a"), format="json"
+        )
+        r2 = client.post(
+            "/api/ventas/", self._payload(idempotencia_key="clave-b"), format="json"
+        )
+        self.assertNotEqual(r1.data["id"], r2.data["id"])
+        self.assertEqual(Venta.objects.count(), 2)
+
+    def test_por_clave_devuelve_venta(self):
+        clave = "clave-por-clave-1"
+        client = auth_client(self.vendedor)
+        r = client.post(
+            "/api/ventas/", self._payload(idempotencia_key=clave), format="json"
+        )
+        self.assertEqual(r.status_code, 201)
+        resp = client.get(f"/api/ventas/por-clave/{clave}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["id"], r.data["id"])
+
+    def test_por_clave_desconocida_404(self):
+        resp = auth_client(self.vendedor).get(
+            "/api/ventas/por-clave/clave-inexistente/"
+        )
+        self.assertEqual(resp.status_code, 404)
+
 
 class VentaStockActionsTest(BaseTest):
     @classmethod
@@ -878,6 +928,116 @@ class AnularDevolverTest(BaseTest):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
+
+    def _crear_venta_2_productos(self):
+        producto2 = Producto.objects.create(
+            nombre="Producto D",
+            codigo_producto="PD001",
+            oem="OEM-D",
+            descripcion="Desc D",
+            precio_costo=4000,
+            stock_minimo=2,
+            stock_maximo=50,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=self.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=producto2, ubicacion=self.ubicacion, cantidad=5
+        )
+        resp = auth_client(self.vendedor).post(
+            "/api/ventas/",
+            {
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 1,
+                        "precio": self.producto.precio,
+                    },
+                    {
+                        "producto_id": producto2.producto_id,
+                        "cantidad": 1,
+                        "precio": producto2.precio,
+                    },
+                ],
+                "total": self.producto.precio + producto2.precio,
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        return resp.data["id"], producto2
+
+    def test_anular_error_ubicacion_no_restaura_parcialmente(self):
+        venta_id, producto2 = self._crear_venta_2_productos()
+        stock1 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        stock2 = StockProductoUbicacion.objects.get(
+            producto=producto2, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock1.cantidad, 9)
+        self.assertEqual(stock2.cantidad, 4)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta_id}/anular/",
+            {
+                "motivo": "Error",
+                "restauraciones": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": self.ubicacion.id,
+                        "cantidad": 1,
+                    },
+                    {
+                        "producto_id": producto2.producto_id,
+                        "ubicacion_id": 999999,
+                        "cantidad": 1,
+                    },
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        stock1.refresh_from_db()
+        stock2.refresh_from_db()
+        self.assertEqual(stock1.cantidad, 9)
+        self.assertEqual(stock2.cantidad, 4)
+        self.assertFalse(Anulacion.objects.filter(venta_id=venta_id).exists())
+        self.assertNotEqual(
+            Venta.objects.get(id=venta_id).estado, Venta.Estado.CANCELADA
+        )
+
+    def test_devolver_error_tardio_no_parcial(self):
+        venta_id, producto2 = self._crear_venta_2_productos()
+        stock1 = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock1.cantidad, 9)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta_id}/devolver/",
+            {
+                "motivo": "Devolución",
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 1,
+                        "reponer_stock": True,
+                        "ubicacion_id": self.ubicacion.id,
+                    },
+                    {
+                        "producto_id": producto2.producto_id,
+                        "cantidad": 1,
+                        "reponer_stock": True,
+                        "ubicacion_id": 999999,
+                    },
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(Devolucion.objects.filter(venta_id=venta_id).exists())
+        stock1.refresh_from_db()
+        self.assertEqual(stock1.cantidad, 9)
 
 
 class PedidoApiTest(BaseTest):

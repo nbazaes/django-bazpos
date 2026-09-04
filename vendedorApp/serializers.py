@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
@@ -326,6 +326,13 @@ class RegistrarVentaSerializer(serializers.Serializer):
         allow_null=True,
     )
     pagos = PagoVentaInputSerializer(many=True, required=False)
+    idempotencia_key = serializers.CharField(
+        max_length=36,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        default=None,
+    )
 
     def validate_venta_origen(self, value):
         if value is None:
@@ -395,6 +402,22 @@ class RegistrarVentaSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        idempotencia_key = validated_data.get("idempotencia_key") or None
+        if idempotencia_key:
+            existente = Venta.objects.filter(idempotencia_key=idempotencia_key).first()
+            if existente:
+                return existente
+            try:
+                with transaction.atomic():
+                    return self._crear_venta(validated_data, idempotencia_key)
+            except IntegrityError:
+                existente = Venta.objects.filter(idempotencia_key=idempotencia_key).first()
+                if existente:
+                    return existente
+                raise
+        return self._crear_venta(validated_data, idempotencia_key)
+
+    def _crear_venta(self, validated_data, idempotencia_key=None):
         request = self.context["request"]
         productos = validated_data["productos"]
         total = validated_data["total"]
@@ -406,7 +429,12 @@ class RegistrarVentaSerializer(serializers.Serializer):
 
         items_data = []
         for item in productos:
-            producto = Producto.objects.select_for_update().get(producto_id=item["producto_id"])
+            try:
+                producto = Producto.objects.select_for_update().get(producto_id=item["producto_id"])
+            except Producto.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"productos": f"Producto {item['producto_id']} no encontrado"}
+                )
             cantidad = item["cantidad"]
             subtotal = item["precio"]
 
@@ -432,6 +460,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
             venta_origen_id=validated_data.get("venta_origen"),
             cliente_nombre=validated_data.get("cliente_nombre", "") or "",
             documento=validated_data.get("documento"),
+            idempotencia_key=idempotencia_key,
         )
 
         if tipo_documento == Venta.TipoDocumento.VENTA:

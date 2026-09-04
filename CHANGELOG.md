@@ -13,6 +13,7 @@ Entries are shown to users in the app via the "Ver novedades" modal on each new 
 - Medios de pago y documentos editables y activables según el negocio; el cierre de caja se adapta automáticamente a ellos.
 - Datos de demostración con perfiles: retail genérico (sin OEM) o autopartes.
 - Los campos de autopartes (OEM, marca, código de proveedor) y módulos opcionales se activan según el perfil del negocio.
+- Ventas más robustas ante cortes de conexión: si se cae la señal al confirmar, el sistema reintenta solo (hasta 4 veces con espera progresiva) y, si la respuesta se pierde, permite verificar si la venta quedó registrada antes de repetir. Cada venta lleva una clave única que evita duplicados y números de comprobante repetidos.
 
 ### Cambiado
 
@@ -24,6 +25,11 @@ Entries are shown to users in the app via the "Ver novedades" modal on each new 
 ### Eliminado
 
 - El código y los flujos atados a una sola tienda o un solo proveedor; el sistema ahora es un POS retail genérico y configurable.
+
+### Corregido
+
+- Al anular o devolver una venta con varios productos, si un producto o ubicación fallaba a mitad del proceso, el stock podía quedar restaurado parcialmente sin registrar la anulación o devolución. Ahora se valida todo antes de aplicar cualquier cambio.
+- Al vender un producto que ya no existe, se mostraba un error de servidor; ahora se informa con un mensaje claro.
 
 ## [1.27.0] - 2026-09-03
 

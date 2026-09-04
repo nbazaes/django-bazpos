@@ -843,6 +843,15 @@ class ProductoViewSet(viewsets.ModelViewSet):
         motivo = data["motivo"]
         fecha = data.get("fecha", timezone.now().date())
 
+        for item in data["ajustes"]:
+            if item["ubicacion_id"] is None:
+                continue
+            if not Ubicacion.objects.filter(id=item["ubicacion_id"]).exists():
+                return Response(
+                    {"error": f"Ubicación {item['ubicacion_id']} no encontrada"},
+                    status=404,
+                )
+
         with transaction.atomic():
             for item in data["ajustes"]:
                 ubicacion_id = item["ubicacion_id"]
@@ -870,17 +879,9 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
                     continue
 
-                try:
-                    ubicacion = Ubicacion.objects.get(id=ubicacion_id)
-                except Ubicacion.DoesNotExist:
-                    return Response(
-                        {"error": f"Ubicación {ubicacion_id} no encontrada"},
-                        status=404,
-                    )
-
                 stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
                     producto=producto,
-                    ubicacion=ubicacion,
+                    ubicacion_id=ubicacion_id,
                     defaults={"cantidad": 0},
                 )
 
@@ -894,7 +895,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
                 AjusteStock.objects.create(
                     producto=producto,
-                    ubicacion=ubicacion,
+                    ubicacion_id=ubicacion_id,
                     usuario=request.user,
                     cantidad_anterior=cantidad_anterior,
                     cantidad_nueva=cantidad_nueva,
@@ -1002,6 +1003,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         "anular": [ROLE_ENCARGADO, ROLE_GERENTE],
         "devolver": [ROLE_ENCARGADO, ROLE_GERENTE],
         "documento": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
+        "por_clave": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
     }
 
     def get_queryset(self):
@@ -1040,6 +1042,15 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         venta = serializer.save()
         output = VentaSerializer(venta, context={"request": request})
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="por-clave/(?P<key>[^/.]+)")
+    def por_clave(self, request, key=None):
+        try:
+            venta = Venta.objects.get(idempotencia_key=key)
+        except Venta.DoesNotExist:
+            return Response({"detalle": "No se encontró una venta para esta clave"}, status=404)
+        output = VentaSerializer(venta, context={"request": request})
+        return Response(output.data)
 
     @action(detail=False, methods=["post"], url_path="validar-stock")
     def validar_stock(self, request):
@@ -1230,36 +1241,36 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         }
 
         restauradas_productos = set()
+        for item in data["restauraciones"]:
+            pid = item["producto_id"]
+            if pid not in detalles_map:
+                return Response(
+                    {"error": f"Producto {pid} no está en esta venta"},
+                    status=400,
+                )
+            restauradas_productos.add(pid)
+            if not Ubicacion.objects.filter(id=item["ubicacion_id"]).exists():
+                return Response(
+                    {"error": f"Ubicación {item['ubicacion_id']} no encontrada"},
+                    status=404,
+                )
+
+        for pid in detalles_map:
+            if pid not in restauradas_productos:
+                return Response(
+                    {"error": f"Falta especificar restauración para producto {pid}"},
+                    status=400,
+                )
+
         with transaction.atomic():
             for item in data["restauraciones"]:
-                pid = item["producto_id"]
-                if pid not in detalles_map:
-                    return Response(
-                        {"error": f"Producto {pid} no está en esta venta"},
-                        status=400,
-                    )
-                restauradas_productos.add(pid)
-                try:
-                    ubicacion = Ubicacion.objects.get(id=item["ubicacion_id"])
-                except Ubicacion.DoesNotExist:
-                    return Response(
-                        {"error": f"Ubicación {item['ubicacion_id']} no encontrada"},
-                        status=404,
-                    )
                 stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
-                    producto_id=pid,
-                    ubicacion=ubicacion,
+                    producto_id=item["producto_id"],
+                    ubicacion_id=item["ubicacion_id"],
                     defaults={"cantidad": 0},
                 )
                 stock.cantidad += item["cantidad"]
                 stock.save()
-
-            for pid in detalles_map:
-                if pid not in restauradas_productos:
-                    return Response(
-                        {"error": f"Falta especificar restauración para producto {pid}"},
-                        status=400,
-                    )
 
             anulacion = Anulacion.objects.create(
                 venta=venta,
@@ -1293,6 +1304,61 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         ).values("producto_id").annotate(total=Sum("cantidad")):
             devueltos[dd["producto_id"]] = dd["total"]
 
+        monto_devuelto = 0
+        items_validados = []
+        for item in data["productos"]:
+            pid = item["producto_id"]
+            cantidad = item["cantidad"]
+            reponer = item["reponer_stock"]
+
+            if pid not in detalles_map:
+                return Response(
+                    {"error": f"Producto {pid} no está en esta venta"},
+                    status=400,
+                )
+
+            vendido = detalles_map[pid]
+            ya_devuelto = devueltos.get(pid, 0)
+            disponible = vendido - ya_devuelto
+            if cantidad > disponible:
+                return Response(
+                    {"error": f"Solo {disponible} de producto {pid} están disponibles para devolver"},
+                    status=400,
+                )
+
+            dv = detalles_venta[pid]
+            price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
+            monto_item = item.get("monto_devuelto")
+            if monto_item is None:
+                monto_item = cantidad * price
+            else:
+                max_monto = cantidad * price
+                if monto_item > max_monto:
+                    return Response(
+                        {"error": f"El monto a devolver del producto {pid} "
+                                  f"no puede superar su valor (${max_monto})"},
+                        status=400,
+                    )
+            monto_devuelto += monto_item
+
+            ubicacion = None
+            if reponer:
+                ubicacion_id = item.get("ubicacion_id")
+                if not ubicacion_id:
+                    return Response(
+                        {"error": f"Debe especificar ubicación para reponer stock del producto {pid}"},
+                        status=400,
+                    )
+                try:
+                    ubicacion = Ubicacion.objects.get(id=ubicacion_id)
+                except Ubicacion.DoesNotExist:
+                    return Response(
+                        {"error": f"Ubicación {ubicacion_id} no encontrada"},
+                        status=404,
+                    )
+
+            items_validados.append((item, dv, ubicacion, monto_item))
+
         with transaction.atomic():
             devolucion = Devolucion.objects.create(
                 venta=venta,
@@ -1300,57 +1366,12 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 motivo=data["motivo"],
             )
 
-            monto_devuelto = 0
-
-            for item in data["productos"]:
+            for item, dv, ubicacion, monto_item in items_validados:
                 pid = item["producto_id"]
                 cantidad = item["cantidad"]
                 reponer = item["reponer_stock"]
 
-                if pid not in detalles_map:
-                    return Response(
-                        {"error": f"Producto {pid} no está en esta venta"},
-                        status=400,
-                    )
-
-                vendido = detalles_map[pid]
-                ya_devuelto = devueltos.get(pid, 0)
-                disponible = vendido - ya_devuelto
-                if cantidad > disponible:
-                    return Response(
-                        {"error": f"Solo {disponible} de producto {pid} están disponibles para devolver"},
-                        status=400,
-                    )
-
-                dv = detalles_venta[pid]
-                price = dv.precio_descontado if dv.precio_descontado > 0 else dv.precio_unitario
-                monto_item = item.get("monto_devuelto")
-                if monto_item is None:
-                    monto_item = cantidad * price
-                else:
-                    max_monto = cantidad * price
-                    if monto_item > max_monto:
-                        return Response(
-                            {"error": f"El monto a devolver del producto {pid} "
-                                      f"no puede superar su valor (${max_monto})"},
-                            status=400,
-                        )
-                monto_devuelto += monto_item
-
                 if reponer:
-                    ubicacion_id = item.get("ubicacion_id")
-                    if not ubicacion_id:
-                        return Response(
-                            {"error": f"Debe especificar ubicación para reponer stock del producto {pid}"},
-                            status=400,
-                        )
-                    try:
-                        ubicacion = Ubicacion.objects.get(id=ubicacion_id)
-                    except Ubicacion.DoesNotExist:
-                        return Response(
-                            {"error": f"Ubicación {ubicacion_id} no encontrada"},
-                            status=404,
-                        )
                     stock, _ = StockProductoUbicacion.objects.select_for_update().get_or_create(
                         producto_id=pid,
                         ubicacion=ubicacion,
@@ -1362,7 +1383,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
                 DetalleDevolucion.objects.create(
                     devolucion=devolucion,
                     producto_id=pid,
-                    nombre=detalles_venta[pid].producto.nombre,
+                    nombre=dv.producto.nombre,
                     precio_unitario=monto_item,
                     cantidad=cantidad,
                     reponer_stock=reponer,

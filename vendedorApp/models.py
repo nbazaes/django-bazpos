@@ -158,6 +158,13 @@ class Venta(models.Model):
         db_index=True,
     )
     deduccion_original = models.JSONField(default=dict, blank=True)
+    idempotencia_key = models.CharField(
+        max_length=36,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Clave de idempotencia",
+    )
 
     class Meta:
         db_table = 'ventas'

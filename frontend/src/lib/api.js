@@ -1,23 +1,50 @@
 import { API_BASE } from "./config";
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "./auth";
 
-function redirectToLogin() {
-  clearTokens();
-  window.location.href = "/login";
+const DEFAULT_TIMEOUT_MS = 25000;
+const DOWNLOAD_TIMEOUT_MS = 120000;
+
+export class ApiError extends Error {
+  constructor(message, { status = null, kind = "http", retryable = false } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.kind = kind;
+    this.retryable = retryable;
+  }
 }
 
-async function rawRequest(path, { method = "GET", body, headers = {} } = {}) {
+function redirectToLogin() {
+  clearTokens();
+  if (window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+async function rawRequest(path, { method = "GET", body, headers = {}, timeout = DEFAULT_TIMEOUT_MS } = {}) {
   const token = getAccessToken();
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
-  });
-  return response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new ApiError("La solicitud tardó demasiado. Revisa tu conexión.", { kind: "timeout", retryable: true });
+    }
+    throw new ApiError("Sin conexión con el servidor. Verifica tu internet.", { kind: "network", retryable: true });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 let refreshPromise = null;
@@ -56,7 +83,7 @@ export async function apiRequest(path, options = {}) {
 
   if (response.status === 401) {
     redirectToLogin();
-    throw new Error("Sesion expirada");
+    throw new ApiError("Sesion expirada", { status: 401 });
   }
 
   if (!response.ok) {
@@ -67,7 +94,8 @@ export async function apiRequest(path, options = {}) {
     } catch {
       // noop
     }
-    throw new Error(message);
+    const retryable = response.status >= 500 || response.status === 429;
+    throw new ApiError(message, { status: response.status, retryable });
   }
 
   if (response.status === 204) return null;
@@ -85,10 +113,10 @@ export function buildQuery(params = {}) {
 }
 
 export async function downloadFile(path) {
-  let response = await rawRequest(path);
+  let response = await rawRequest(path, { timeout: DOWNLOAD_TIMEOUT_MS });
   if (response.status === 401 && getRefreshToken()) {
     const refreshed = await refreshAccessToken();
-    if (refreshed) response = await rawRequest(path);
+    if (refreshed) response = await rawRequest(path, { timeout: DOWNLOAD_TIMEOUT_MS });
   }
   if (!response.ok) {
     let message = `HTTP ${response.status}`;
@@ -98,7 +126,8 @@ export async function downloadFile(path) {
     } catch {
       // noop
     }
-    throw new Error(message);
+    const retryable = response.status >= 500 || response.status === 429;
+    throw new ApiError(message, { status: response.status, retryable });
   }
   return response.blob();
 }
