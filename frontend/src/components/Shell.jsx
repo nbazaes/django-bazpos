@@ -461,8 +461,8 @@ export default function Shell() {
 
       {/* Logout Confirmation Dialog */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm fade-animate">
-          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4 modal-animate">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-bg-surface border border-border-default rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-danger/10 text-danger flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined text-xl">logout</span>
