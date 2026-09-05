@@ -42,6 +42,7 @@ export const router = createBrowserRouter([
           { path: "ventas/pedidos", element: <PedidosCrearPage /> },
           { path: "ventas/historial", element: <PedidosPage /> },
           { path: "ventas/inventario", element: <InventarioPage /> },
+          { path: "configuracion", element: <ConfiguracionPage /> },
           {
             element: <BodegueroGuard />,
             children: [
@@ -64,7 +65,6 @@ export const router = createBrowserRouter([
               { path: "facturas/crear", element: <FacturaFormPage /> },
               { path: "facturas/:id/editar", element: <FacturaFormPage /> },
               { path: "pedidos-proveedores", element: <PedidosProveedoresPage /> },
-              { path: "configuracion", element: <ConfiguracionPage /> },
               { path: "reportes", element: <ReportesPage /> },
               { path: "cierre-caja", element: <CierreCajaPage /> },
             ],
