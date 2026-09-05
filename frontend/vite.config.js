@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 import fs from 'fs'
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'))
@@ -45,7 +44,7 @@ function parseChangelog(markdown) {
 const changelog = parseChangelog(findChangelog())
 
 export default defineConfig({
-  plugins: [tailwindcss(), react()],
+  plugins: [react()],
   define: {
     'import.meta.env.APP_VERSION': JSON.stringify(pkg.version),
     'import.meta.env.CHANGELOG': JSON.stringify(changelog),

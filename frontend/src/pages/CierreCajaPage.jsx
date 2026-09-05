@@ -3,10 +3,10 @@ import PageCard from "../components/PageCard";
 import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
-import { useStoreName, formatMoney, getLocale } from "../lib/storeConfig";
+import { useStoreName } from "../lib/storeName";
 import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
 
-const fmtMoney = (n) => formatMoney(n);
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;
 
 function fmtFecha(iso) {
   if (!iso) return "—";
@@ -17,7 +17,7 @@ function fmtFecha(iso) {
 function fmtFechaHora(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString(getLocale());
+  return d.toLocaleString("es-CL");
 }
 
 export default function CierreCajaPage() {
@@ -50,24 +50,21 @@ export default function CierreCajaPage() {
 
   const pagos = data?.pagos || {};
   const documentos = data?.documentos || {};
-  const pagosLabels = data?.pagos_labels || {};
-  const documentosLabels = data?.documentos_labels || {};
-  const pagosList = data?.pagos_list || Object.keys(pagos);
-  const documentosList = data?.documentos_list || Object.keys(documentos);
 
-  const filasPago = pagosList.map((code) => [
-    pagosLabels[code] || code,
-    code,
-    `Ventas ${pagosLabels[code] || code}`,
-    pagos[code] ?? 0,
-  ]);
+  const filasPago = [
+    ["Efectivo", "EF", "Ventas en efectivo", pagos.efectivo],
+    ["Tarjeta", "TJ", "Ventas con tarjeta", pagos.tarjeta],
+    ["Transferencia", "TR", "Ventas por transferencia", pagos.transferencia],
+    ["Cheque", "CH", "Ventas con cheque", pagos.cheque],
+    ["Sin clasificar", "SIN", "Ventas sin clasificar", pagos.sin_clasificar],
+  ];
 
-  const filasDoc = documentosList.map((code) => [
-    documentosLabels[code] || code,
-    code,
-    `Ventas ${documentosLabels[code] || code}`,
-    documentos[code] ?? 0,
-  ]);
+  const filasDoc = [
+    ["Boleta", "BO", "Ventas con boleta", documentos.boleta],
+    ["Factura", "FA", "Ventas con factura", documentos.factura],
+    ["Otros", "OT", "Ventas con otros documentos", documentos.otros],
+    ["Sin clasificar", "SIN", "Ventas sin clasificar", documentos.sin_clasificar],
+  ];
 
   const abrirDetalle = (tipo, clave, titulo, valor) => {
     if (valor > 0) setDetalle({ tipo, clave, titulo });

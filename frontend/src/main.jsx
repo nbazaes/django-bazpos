@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { initTheme } from './lib/theme'
-import { initStoreConfig } from './lib/storeConfig'
+import { initStoreName } from './lib/storeName'
 import { ToastProvider } from './lib/toast'
 import { router } from './router'
 import 'bootstrap-icons/font/bootstrap-icons.css'
@@ -12,7 +12,7 @@ import './styles.css'
 import './design-system.css'
 
 initTheme()
-initStoreConfig()
+initStoreName()
 
 const queryClient = new QueryClient({
   defaultOptions: {

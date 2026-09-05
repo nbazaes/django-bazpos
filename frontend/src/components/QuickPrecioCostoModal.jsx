@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useUpdateProducto } from "../lib/queries";
-import { calcularPrecioVenta, formatMoney } from "../lib/storeConfig";
 
 function autoFill(value, fallback) {
   if (value === undefined || value === null || value === "") return fallback;
@@ -8,7 +7,10 @@ function autoFill(value, fallback) {
 }
 
 function roundPrecio(precioCosto, margen) {
-  return calcularPrecioVenta(precioCosto, margen);
+  const costo = Number(precioCosto) || 0;
+  const margin = Number(margen) || 0;
+  const total = costo * (1 + margin / 100) * 1.19;
+  return Math.round(total / 100) * 100;
 }
 
 export default function QuickPrecioCostoModal({ producto, initialPrecioCosto, initialMargenUtilidad, onClose }) {
@@ -107,7 +109,7 @@ export default function QuickPrecioCostoModal({ producto, initialPrecioCosto, in
                 <input
                   type="text"
                   className="form-control"
-                  value={formatMoney(precioCalculado)}
+                  value={`$${precioCalculado.toLocaleString("es-CL")}`}
                   disabled
                   style={{ background: "var(--bg-input)", fontWeight: 700 }}
                 />

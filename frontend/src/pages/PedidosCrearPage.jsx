@@ -4,28 +4,22 @@ import PedidosHistorial from "../components/PedidosHistorial";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { getStoreName, getStoreConfig, fetchStoreConfig, applyTax, roundPrice, formatMoney } from "../lib/storeConfig";
+import { getStoreName } from "../lib/storeName";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 import { useToast } from "../lib/useToast";
 
-const COST_MODIFIER_LABELS = { stellantis: "Stellantis (descuento 20%)" };
-const COST_MODIFIER_FACTORS = { stellantis: 0.8 };
-
-function aplicarModificadores(costo, costModifiers) {
-  return (costModifiers || []).reduce((acc, key) => acc * (COST_MODIFIER_FACTORS[key] ?? 1), costo);
-}
-
-function calcularItemSubtotal(precioCosto, porcentajeUtilidad, costModifiers = []) {
+function calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis = false) {
   const costo = Number(precioCosto) || 0;
   const pct = Number(porcentajeUtilidad) || 0;
-  const costoBase = aplicarModificadores(costo, costModifiers);
+  const costoBase = stellantis ? costo * 0.8 : costo;
   const base = costoBase * (1 + pct / 100);
-  return applyTax(base);
+  return Math.round(base * 1.19);
 }
 
-function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, costModifiers = []) {
-  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, costModifiers);
-  const conEnvio = sumarEnvio ? subtotal + Number(getStoreConfig().default_shipping_cost || 0) : subtotal;
-  return roundPrice(conEnvio);
+function calcularItemTotal(precioCosto, porcentajeUtilidad, sumarEnvio = true, stellantis = false) {
+  const subtotal = calcularItemSubtotal(precioCosto, porcentajeUtilidad, stellantis);
+  const conEnvio = sumarEnvio ? subtotal + 4500 : subtotal;
+  return Math.ceil(conEnvio / 100) * 100;
 }
 
 const productoVacio = {
@@ -37,8 +31,22 @@ const productoVacio = {
   precio_costo: "",
   porcentaje_utilidad: "",
   sumar_envio: true,
-  cost_modifiers: [],
+  stellantis: false,
 };
+
+const METODO_PAGO_OPCIONES = [
+  { value: "EF", label: "Efectivo" },
+  { value: "TJ", label: "Tarjeta" },
+  { value: "TR", label: "Transferencia" },
+  { value: "CH", label: "Cheque" },
+];
+
+const DOCUMENTO_OPCIONES = [
+  { value: "SB", label: "Sin boletear" },
+  { value: "BO", label: "Boleteado" },
+  { value: "FA", label: "Facturado" },
+  { value: "OT", label: "Otros" },
+];
 
 export default function PedidosCrearPage() {
   const [tab, setTab] = useState("nuevo");
@@ -51,30 +59,6 @@ export default function PedidosCrearPage() {
   }, []);
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
-
-  const config = getStoreConfig();
-  const paymentMethods = config.effective_payment_methods || [];
-  const documentTypes = config.effective_document_types || [];
-  const METODO_PAGO_OPCIONES = paymentMethods.map((m) => ({ value: m.code, label: m.label }));
-  const DOCUMENTO_OPCIONES = [
-    { value: "SB", label: "Sin boletear" },
-    ...documentTypes.map((d) => ({ value: d.code, label: d.label })),
-  ];
-  const showOrderPricingRules = config.feature_flags?.order_pricing_rules === true;
-  const showPartsFields = config.feature_flags?.product_oem_fields === true;
-  const showShippingToggle = config.feature_flags?.order_shipping_toggle === true;
-  const shippingCost = Number(config.default_shipping_cost || 0);
-  const shippingLabel = shippingCost > 0 ? `(+${formatMoney(shippingCost)})` : "";
-
-  function toggleCostModifier(key) {
-    setProducto((prev) => {
-      const has = (prev.cost_modifiers || []).includes(key);
-      return {
-        ...prev,
-        cost_modifiers: has ? prev.cost_modifiers.filter((k) => k !== key) : [...(prev.cost_modifiers || []), key],
-      };
-    });
-  }
 
   const [cliente, setCliente] = useState({ nombre: "", telefono: "" });
   const [producto, setProducto] = useState({ ...productoVacio });
@@ -102,13 +86,13 @@ export default function PedidosCrearPage() {
       producto.precio_costo,
       producto.porcentaje_utilidad,
       producto.sumar_envio,
-      producto.cost_modifiers,
+      producto.stellantis,
     );
-  }, [producto.precio_costo, producto.porcentaje_utilidad, producto.sumar_envio, producto.cost_modifiers]);
+  }, [producto.precio_costo, producto.porcentaje_utilidad, producto.sumar_envio, producto.stellantis]);
 
   const totales = useMemo(() => {
     const subtotal = items.reduce((sum, it) => {
-      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.cost_modifiers);
+      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.stellantis);
     }, 0);
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
     return { subtotal, total };
@@ -179,7 +163,7 @@ export default function PedidosCrearPage() {
       producto.precio_costo,
       producto.porcentaje_utilidad,
       producto.sumar_envio,
-      producto.cost_modifiers,
+      producto.stellantis,
     );
     setItems((prev) => [
       ...prev,
@@ -230,7 +214,7 @@ export default function PedidosCrearPage() {
         precio_costo: it.precio_costo,
         porcentaje_utilidad: it.porcentaje_utilidad,
         sumar_envio: it.sumar_envio,
-        cost_modifiers: it.cost_modifiers,
+        stellantis: it.stellantis,
       })),
       es_cotizacion: esCotizacion,
     };
@@ -411,9 +395,7 @@ export default function PedidosCrearPage() {
                       onClick={() => seleccionarProductoExistente(p)}
                     >
                       <div className="font-weight-bold">{p.codigo_producto} — {p.nombre}</div>
-                      {showPartsFields
-                        ? <div className="text-xs text-muted">OEM: {p.oem} | Costo: ${p.precio_costo}</div>
-                        : <div className="text-xs text-muted">Costo: ${p.precio_costo}</div>}
+                      <div className="text-xs text-muted">OEM: {p.oem} | Costo: ${p.precio_costo}</div>
                     </button>
                   ))}
                 </div>
@@ -421,20 +403,18 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="row">
-              {showPartsFields && (
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label>Código proveedor</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={producto.codigo_proveedor}
-                      onChange={(e) => handleProductoChange("codigo_proveedor", e.target.value)}
-                      placeholder="Código proveedor"
-                    />
-                  </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label>Código proveedor</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={producto.codigo_proveedor}
+                    onChange={(e) => handleProductoChange("codigo_proveedor", e.target.value)}
+                    placeholder="Código proveedor"
+                  />
                 </div>
-              )}
+              </div>
               <div className="col-md-6">
                 <div className="form-group">
                   <label>Proveedor</label>
@@ -453,21 +433,19 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="row">
-              {showPartsFields && (
-                <div className="col-md-6">
-                  <div className="form-group">
-                    <label>OEM</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={producto.oem}
-                      onChange={(e) => handleProductoChange("oem", e.target.value)}
-                      placeholder="OEM"
-                    />
-                  </div>
+              <div className="col-md-6">
+                <div className="form-group">
+                  <label>OEM</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={producto.oem}
+                    onChange={(e) => handleProductoChange("oem", e.target.value)}
+                    placeholder="OEM"
+                  />
                 </div>
-              )}
-              <div className={showPartsFields ? "col-md-6" : "col-md-12"}>
+              </div>
+              <div className="col-md-6">
                 <div className="form-group">
                   <label>Nombre</label>
                   <input
@@ -512,32 +490,28 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 mt-3 mb-3">
-              {showShippingToggle && (
-                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={producto.sumar_envio}
-                    onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
-                  />
-                  <span>Sumar envío {shippingLabel}</span>
-                </label>
-              )}
-              {showOrderPricingRules && (
-                <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={(producto.cost_modifiers || []).includes("stellantis")}
-                    onChange={() => toggleCostModifier("stellantis")}
-                  />
-                  <span>{COST_MODIFIER_LABELS.stellantis}</span>
-                </label>
-              )}
+              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={producto.sumar_envio}
+                  onChange={(e) => handleProductoChange("sumar_envio", e.target.checked)}
+                />
+                <span>Sumar envío (+$4.500)</span>
+              </label>
+              <label className="flex items-center gap-2" style={{ cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={producto.stellantis}
+                  onChange={(e) => handleProductoChange("stellantis", e.target.checked)}
+                />
+                <span>Pedido Stellantis</span>
+              </label>
             </div>
 
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
               <div className="text-right">
-                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.cost_modifiers)}</div>
-                {producto.sumar_envio && shippingCost > 0 && <div className="text-secondary">Envío +{formatMoney(shippingCost)}</div>}
+                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis)}</div>
+                {producto.sumar_envio && <div className="text-secondary">Envío +$4.500</div>}
                 <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
               </div>
               <button
@@ -555,9 +529,9 @@ export default function PedidosCrearPage() {
           <table className="table table-sm table-bordered">
             <thead>
               <tr>
-                {showPartsFields && <th>Cód. Prov.</th>}
+                <th>Cód. Prov.</th>
                 <th>Proveedor</th>
-                {showPartsFields && <th>OEM</th>}
+                <th>OEM</th>
                 <th>Nombre</th>
                 <th>Precio costo</th>
                 <th>% Utilidad</th>
@@ -568,9 +542,9 @@ export default function PedidosCrearPage() {
             <tbody>
               {items.map((it, idx) => (
                 <tr key={idx}>
-                  {showPartsFields && <td>{it.codigo_proveedor}</td>}
+                  <td>{it.codigo_proveedor}</td>
                   <td>{proveedores.find((p) => p.proveedor_id === it.proveedor_id)?.nombre || "—"}</td>
-                  {showPartsFields && <td>{it.oem}</td>}
+                  <td>{it.oem}</td>
                   <td>{it.nombre}</td>
                   <td>${it.precio_costo}</td>
                   <td>{it.porcentaje_utilidad}%</td>
@@ -584,7 +558,7 @@ export default function PedidosCrearPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={showPartsFields ? 8 : 6} className="text-center text-muted">No hay productos agregados</td>
+                  <td colSpan="8" className="text-center text-muted">No hay productos agregados</td>
                 </tr>
               )}
             </tbody>

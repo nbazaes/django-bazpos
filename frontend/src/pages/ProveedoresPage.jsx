@@ -6,13 +6,11 @@ import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useDeleteProveedor, useProveedores } from "../lib/queries";
-import { getStoreConfig } from "../lib/storeConfig";
 
 export default function ProveedoresPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Proveedores");
-  const taxLabel = getStoreConfig().feature_flags?.supplier_rut_field === true ? "RUT" : "ID tributario";
 
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
@@ -54,7 +52,7 @@ export default function ProveedoresPage() {
         rows={rows}
         columns={[
           { key: "proveedor_id", label: "ID" },
-          { key: "tax_id", label: taxLabel },
+          { key: "rut", label: "RUT" },
           { key: "nombre", label: "Nombre" },
           { key: "telefono", label: "Teléfono" },
         ]}

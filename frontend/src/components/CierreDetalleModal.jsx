@@ -1,8 +1,7 @@
 import { useCierreDetalle } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
-import { formatMoney } from "../lib/storeConfig";
 
-const fmtMoney = (n) => formatMoney(n);
+const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;
 
 const COLUMNS = {
   pago: ["Venta", "Fecha", "Cliente", "Documento", "Monto", "Vendedor"],

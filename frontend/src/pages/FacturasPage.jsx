@@ -6,8 +6,8 @@ import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
-import { useDeleteFactura, useFactura, useFacturas } from "../lib/queries";
-import { applyTax, getTaxPercent } from "../lib/storeConfig";
+import { useDeleteFactura, useFactura, useFacturas, useImpuesto } from "../lib/queries";
+import { applyTax } from "../lib/tax";
 
 function imprimirEtiquetas(factura) {
   const labels = [];
@@ -68,9 +68,10 @@ export default function FacturasPage() {
   const params = { page, page_size: pageSize };
   const { data } = useFacturas(params);
   const deleteMutation = useDeleteFactura();
+  const { data: impuestoData } = useImpuesto();
   const { data: detalle } = useFactura(detalleId);
 
-  const taxPercent = getTaxPercent();
+  const taxPercent = impuestoData?.tax_percent ?? 0;
   const rows = data?.results ?? [];
   const count = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));

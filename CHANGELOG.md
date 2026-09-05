@@ -4,6 +4,17 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.1.0] - 2026-09-05
+
+### Cambiado
+
+- Vuelve la interfaz clásica (diseño previo al rediseño) manteniendo el motor del backend actual: configuración de tienda unificada, ventas resilientes ante cortes de conexión, deducción de stock por ubicaciones y las correcciones de inventario.
+- Se restaura el flujo y la apariencia anteriores en venta, caja, pedidos, proveedores, facturas, reportes y configuración.
+
+### Corregido
+
+- Restaurado el cálculo de IVA en el formulario de facturas (`/facturas/impuesto/`).
+
 ## [2.0.0] - 2026-09-04
 
 ### Agregado

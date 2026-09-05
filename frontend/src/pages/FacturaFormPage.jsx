@@ -9,14 +9,16 @@ import {
   useCheckFacturaExiste,
   useCreateFactura,
   useFactura,
+  useImpuesto,
   useProveedores,
   useReconciliarFacturaPedidos,
   useUpdateFactura,
   useUbicaciones,
 } from "../lib/queries";
-import { calcularPrecioVenta, getStoreConfig, fetchStoreConfig, getTaxPercent } from "../lib/storeConfig";
+import { calcularPrecioVenta } from "../lib/tax";
 import { useDebounce } from "../lib/hooks";
 import { apiRequest } from "../lib/api";
+import { getStoreConfig, fetchStoreConfig } from "../lib/store";
 
 function todayLocal() {
   const now = new Date();
@@ -74,6 +76,7 @@ export default function FacturaFormPage() {
 
   const { data: proveedoresData } = useProveedores({ page_size: 200 });
   const { data: facturaData } = useFactura(id);
+  const { data: impuestoData } = useImpuesto();
   const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
   const checkMutation = useCheckFacturaExiste();
   const createMutation = useCreateFactura();
@@ -167,7 +170,7 @@ export default function FacturaFormPage() {
   }
 
   const proveedores = useMemo(() => proveedoresData?.results ?? [], [proveedoresData?.results]);
-  const taxPercent = getTaxPercent();
+  const taxPercent = impuestoData?.tax_percent ?? 0;
   const totalFactura = items.reduce((sum, it) => sum + Number(it.precio || 0) * Number(it.cantidad || 0), 0);
   const totalFacturaConIva = Math.round(totalFactura * (1 + taxPercent / 100));
 

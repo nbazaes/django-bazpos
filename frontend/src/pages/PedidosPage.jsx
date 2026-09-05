@@ -19,7 +19,7 @@ import {
 import { getAccessToken, getUser, isGerente } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
 import { API_BASE } from "../lib/config";
-import { getStoreConfig } from "../lib/storeConfig";
+import { getStoreConfig } from "../lib/store";
 
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");

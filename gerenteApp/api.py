@@ -92,6 +92,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
         "destroy": [ROLE_ENCARGADO, ROLE_GERENTE],
         "buscar_producto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "crear_producto_rapido": [ROLE_ENCARGADO, ROLE_GERENTE],
+        "impuesto": [ROLE_ENCARGADO, ROLE_GERENTE],
         "check_exists": [ROLE_ENCARGADO, ROLE_GERENTE],
         "reconciliar_pedidos": [ROLE_ENCARGADO, ROLE_GERENTE],
     }
@@ -229,6 +230,10 @@ class FacturaViewSet(viewsets.ModelViewSet):
             out = FacturaDetalleSerializer(factura, context={"request": request})
             return Response({"exists": True, **out.data})
         return Response({"exists": False})
+
+    @action(detail=False, methods=["get"], url_path="impuesto")
+    def impuesto(self, request):
+        return Response({"tax_percent": float(StoreConfig.current_percent())})
 
     @action(detail=False, methods=["get"], url_path="buscar-producto")
     def buscar_producto(self, request):

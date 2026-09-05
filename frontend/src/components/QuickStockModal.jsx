@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import StepperInput from "./StepperInput";
 import { useAjustarStock, useUbicaciones } from "../lib/queries";
-import { getStoreConfig } from "../lib/storeConfig";
+import { getStoreConfig } from "../lib/store";
 
 function todayInputValue() {
   const d = new Date();

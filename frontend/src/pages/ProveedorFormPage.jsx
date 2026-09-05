@@ -7,10 +7,9 @@ import {
   useProveedor,
   useUpdateProveedor,
 } from "../lib/queries";
-import { getStoreConfig } from "../lib/storeConfig";
 
 const initialState = {
-  tax_id: "",
+  rut: "",
   nombre: "",
   persona_contacto: "",
   telefono: "",
@@ -22,9 +21,6 @@ export default function ProveedorFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   usePageTitle(id ? "Editar proveedor" : "Crear proveedor");
-  const showRutField = getStoreConfig().feature_flags?.supplier_rut_field === true;
-  const taxLabel = showRutField ? "RUT" : "ID tributario";
-  const taxRequired = showRutField;
 
   const [data, setData] = useState(initialState);
   const [error, setError] = useState("");
@@ -58,7 +54,7 @@ export default function ProveedorFormPage() {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={submit}>
         <div className="row">
-          <div className="col-md-6 form-group"><label>{taxLabel}</label><input className="form-control" value={data.tax_id || ""} onChange={(e) => setData({ ...data, tax_id: e.target.value })} required={taxRequired} /></div>
+          <div className="col-md-6 form-group"><label>RUT</label><input className="form-control" value={data.rut} onChange={(e) => setData({ ...data, rut: e.target.value })} required /></div>
           <div className="col-md-6 form-group"><label>Nombre</label><input className="form-control" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} required /></div>
           <div className="col-md-6 form-group"><label>Contacto</label><input className="form-control" value={data.persona_contacto || ""} onChange={(e) => setData({ ...data, persona_contacto: e.target.value })} /></div>
           <div className="col-md-6 form-group"><label>Teléfono</label><input className="form-control" value={data.telefono || ""} onChange={(e) => setData({ ...data, telefono: e.target.value })} /></div>
