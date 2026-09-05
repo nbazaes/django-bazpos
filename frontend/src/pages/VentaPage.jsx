@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
 import { usePageTitle } from "../lib/usePageTitle";
-import { apiRequest } from "../lib/api";
+import { apiRequest, ApiError } from "../lib/api";
 import { getTaxPercent } from "../lib/tax";
 import { getStoreName } from "../lib/storeName";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
@@ -13,6 +13,14 @@ import QuickStockModal from "../components/QuickStockModal";
 import QuickPrecioCostoModal from "../components/QuickPrecioCostoModal";
 
 const VENTA_STORAGE_KEY = "bazpos_venta_pending";
+const ESPERAS_REINTENTO = [1000, 2000, 4000];
+
+function generarClaveIdempotencia() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function readStoredVenta() {
   try {
@@ -23,12 +31,13 @@ function readStoredVenta() {
         carro: Array.isArray(parsed.carro) ? parsed.carro : [],
         descuentoPorcentaje: parsed.descuentoPorcentaje != null ? parsed.descuentoPorcentaje : 0,
         oem: parsed.oem || "",
+        idempotenciaKey: parsed.idempotenciaKey || null,
       };
     }
   } catch {
     localStorage.removeItem(VENTA_STORAGE_KEY);
   }
-  return { carro: [], descuentoPorcentaje: 0, oem: "" };
+  return { carro: [], descuentoPorcentaje: 0, oem: "", idempotenciaKey: null };
 }
 
 function roundTotal(amount) {
@@ -66,6 +75,11 @@ export default function VentaPage() {
   const processingRef = useRef(false);
   const savingRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
+  const idempotenciaRef = useRef(readStoredVenta().idempotenciaKey || null);
+  const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
+  const [retryInfo, setRetryInfo] = useState(null);
+  const [pendienteVerificacion, setPendienteVerificacion] = useState(null);
+  const [verificando, setVerificando] = useState(false);
   const deducirRef = useRef(false);
   const [isDeducing, setIsDeducing] = useState(false);
   const [mostrarSinStock, setMostrarSinStock] = useState(false);
@@ -132,11 +146,23 @@ export default function VentaPage() {
         carro,
         descuentoPorcentaje,
         oem,
+        idempotenciaKey: idempotenciaRef.current || null,
       }));
     } else {
       localStorage.removeItem(VENTA_STORAGE_KEY);
     }
   }, [carro, descuentoPorcentaje, oem]);
+
+  useEffect(() => {
+    const irOnline = () => setIsOffline(false);
+    const irOffline = () => setIsOffline(true);
+    window.addEventListener("online", irOnline);
+    window.addEventListener("offline", irOffline);
+    return () => {
+      window.removeEventListener("online", irOnline);
+      window.removeEventListener("offline", irOffline);
+    };
+  }, []);
 
   const buscarProducto = useCallback(async (texto) => {
     if (!texto.trim()) {
@@ -420,66 +446,137 @@ export default function VentaPage() {
     setHayMasProductos(false);
     setError("");
     setCodigoBarra("");
+    idempotenciaRef.current = null;
     localStorage.removeItem(VENTA_STORAGE_KEY);
     if (cotizacionOrigenId) {
       setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
     }
   }
 
+  function onVentaRegistrada(result, tipoDocumento) {
+    fetchStoreConfig();
+    const documento = buildDocumento(tipoDocumento);
+    setLastDocumento({ ...documento, ventaId: result.id, estado: result.estado_display, tipoDisplay: result.tipo_documento_display });
+    setCarro([]);
+    setDescuentoPorcentaje(0);
+    setOem("");
+    setProductosEncontrados([]);
+    setHayMasProductos(false);
+    localStorage.removeItem(VENTA_STORAGE_KEY);
+    idempotenciaRef.current = null;
+    setShowConfirmVenta(false);
+    setClienteNombre("");
+    setOcultarTotales(false);
+    setMedioPago("");
+    setDocumentoFiscal("");
+    setEsMixto(false);
+    setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
+    setPendienteVerificacion(null);
+    setShowPreview(true);
+    setShowVentaSuccess(true);
+    if (cotizacionOrigenId) {
+      setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+    }
+    setTimeout(() => setShowVentaSuccess(false), 1300);
+  }
+
   async function guardar(tipoDocumento = "VE") {
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
+    setRetryInfo(null);
+    setPendienteVerificacion(null);
+    if (!idempotenciaRef.current) {
+      idempotenciaRef.current = generarClaveIdempotencia();
+    }
+    const clave = idempotenciaRef.current;
+    localStorage.setItem(VENTA_STORAGE_KEY, JSON.stringify({
+      carro,
+      descuentoPorcentaje,
+      oem,
+      idempotenciaKey: clave,
+    }));
     try {
       const subtotal = subtotalCarro;
       const discounted = Math.round(subtotal * (1 - discount / 100));
       const total = discount > 0 ? roundTotal(discounted) : subtotal;
-      await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
       const pagos = esMixto
         ? Object.entries(pagosMixtos)
             .filter(([, monto]) => Number(monto) > 0)
             .map(([metodo_pago, monto]) => ({ metodo_pago, monto: Number(monto) }))
         : [{ metodo_pago: medioPago, monto: total }];
-      const result = await apiRequest("/ventas/", {
-        method: "POST",
-        body: {
-          total,
-          descuento_porcentaje: discount,
-          monto_subtotal: subtotal,
-          tipo_documento: tipoDocumento,
-          productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
-          ...(tipoDocumento === "VE" ? { pagos, documento: documentoFiscal } : {}),
-          ...(clienteNombre.trim() ? { cliente_nombre: clienteNombre.trim() } : {}),
-          ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
-        },
-      });
-      await fetchStoreConfig();
-      const documento = buildDocumento(tipoDocumento);
-      setLastDocumento({ ...documento, ventaId: result.id, estado: result.estado_display, tipoDisplay: result.tipo_documento_display });
-      setCarro([]);
-      setDescuentoPorcentaje(0);
-      setOem("");
-      setProductosEncontrados([]);
-      setHayMasProductos(false);
-      localStorage.removeItem(VENTA_STORAGE_KEY);
-      setShowConfirmVenta(false);
-      setClienteNombre("");
-      setOcultarTotales(false);
-      setMedioPago("");
-      setDocumentoFiscal("");
-      setEsMixto(false);
-      setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 });
-      setShowPreview(true);
-      setShowVentaSuccess(true);
-      if (cotizacionOrigenId) {
-        setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
+      const body = {
+        total,
+        descuento_porcentaje: discount,
+        monto_subtotal: subtotal,
+        tipo_documento: tipoDocumento,
+        productos: carro.map((item) => ({ producto_id: item.producto_id, cantidad: item.cantidad, precio: item.precio * item.cantidad })),
+        idempotencia_key: clave,
+        ...(tipoDocumento === "VE" ? { pagos, documento: documentoFiscal } : {}),
+        ...(clienteNombre.trim() ? { cliente_nombre: clienteNombre.trim() } : {}),
+        ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
+      };
+
+      const maxIntentos = 4;
+      let ultimoError = null;
+
+      for (let intento = 1; intento <= maxIntentos; intento++) {
+        try {
+          await apiRequest("/ventas/validar-stock/", { method: "POST", body: { productos: carro } });
+          const result = await apiRequest("/ventas/", { method: "POST", body });
+          onVentaRegistrada(result, tipoDocumento);
+          return;
+        } catch (err) {
+          ultimoError = err;
+          const esReintentable = err instanceof ApiError && err.retryable;
+          if (!esReintentable) throw err;
+
+          let registrada = null;
+          try {
+            registrada = await apiRequest(`/ventas/por-clave/${clave}/`);
+          } catch {
+            // no se pudo verificar; se reintenta igual (la idempotencia respalda)
+          }
+          if (registrada) {
+            onVentaRegistrada(registrada, tipoDocumento);
+            return;
+          }
+
+          if (intento < maxIntentos) {
+            setRetryInfo({ intento, total: maxIntentos - 1 });
+            await new Promise((r) => setTimeout(r, ESPERAS_REINTENTO[intento - 1]));
+          }
+        }
       }
-      setTimeout(() => setShowVentaSuccess(false), 1300);
+
+      throw ultimoError || new ApiError("No se pudo guardar la venta.", { retryable: true });
     } catch (err) {
       setError(err.message);
+      if (err instanceof ApiError && err.retryable) {
+        setPendienteVerificacion({ clave, tipo: tipoDocumento });
+      }
     } finally {
       savingRef.current = false;
       setIsSaving(false);
+      setRetryInfo(null);
+    }
+  }
+
+  async function verificarVentaPendiente() {
+    if (!pendienteVerificacion || verificando) return;
+    setVerificando(true);
+    try {
+      const result = await apiRequest(`/ventas/por-clave/${pendienteVerificacion.clave}/`);
+      onVentaRegistrada(result, pendienteVerificacion.tipo);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setError("La venta no se registró en el servidor. Revisa la conexión y reintenta guardar.");
+        setPendienteVerificacion(null);
+      } else {
+        setError(err.message || "No se pudo verificar la venta. Intenta de nuevo.");
+      }
+    } finally {
+      setVerificando(false);
     }
   }
 
@@ -492,6 +589,24 @@ export default function VentaPage() {
 
   return (
     <>
+      {isOffline && (
+        <div className="alert alert-warning" role="status">
+          Sin conexión: la venta se reintentará automáticamente cuando vuelva la señal. El carrito queda guardado.
+        </div>
+      )}
+      {retryInfo && (
+        <div className="alert alert-info" role="status">
+          Reintentando venta… (intento {retryInfo.intento} de {retryInfo.total}). No cierres esta página.
+        </div>
+      )}
+      {pendienteVerificacion && !isSaving && (
+        <div className="alert alert-warning" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>No pudimos confirmar la venta. Puede que se haya registrado sin respuesta.</span>
+          <button className="btn btn-sm btn-primary" onClick={verificarVentaPendiente} disabled={verificando}>
+            {verificando ? "Verificando…" : "Verificar venta"}
+          </button>
+        </div>
+      )}
       {error && (
         <div className="alert alert-danger" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>{error}</span>
@@ -1081,7 +1196,7 @@ export default function VentaPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>Cancelar</button>
                 <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}>
-                  {isSaving ? "Guardando..." : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
+                  {isSaving ? (retryInfo ? `Reintentando… (${retryInfo.intento}/${retryInfo.total})` : "Guardando...") : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
               </div>
             </div>
