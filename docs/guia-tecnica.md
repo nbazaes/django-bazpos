@@ -324,7 +324,7 @@ Convenciones: todos los montos se almacenan como **`IntegerField`** en pesos chi
   - `precio_final = ceil_a_100(con_iva)`.
 - **Descuento en venta:** redondeo del total a los $1.000 más cercanos; el descuento se distribuye proporcionalmente entre líneas (`_distribute_discount` en `serializers.py`), guardando `precio_descontado` por línea.
 - **Impuestos:** `monto_total` ya incluye IVA (19% por defecto en `store_config.tax_percent`). El neto se obtiene dividiendo por `(1 + IVA/100)`.
-- **Total del día (cierre):** `total_final = total_vendido − devoluciones − anulaciones`.
+- **Total del día (cierre):** `total_final = total_vendido − devoluciones`. `total_anulaciones` es solo informativo (la venta anulada queda con `estado=CA` y ya no se cuenta en `total_vendido`; no se descuenta dos veces).
 
 ---
 
@@ -399,8 +399,8 @@ Mapeo de `role_action_map` de cada ViewSet. `V=Vendedor, B=Bodeguero, E=Encargad
   "restauraciones": [{"producto_id": 1, "ubicacion_id": 2, "cantidad": 2}]
 }
 ```
-**Reglas:** Rechaza ventas ya anuladas, cotizaciones y ventas con anulación existente. Exige una restauración por cada producto del detalle. Deja `estado=CA` y crea `Anulacion`.
-**Respuestas:** `201 Created` · `400` ya anulada / cotización / restauración faltante · `404` ubicación o producto no encontrado.
+**Reglas:** Rechaza ventas de días anteriores (solo se puede anular el mismo día de la venta, para no descuadrar cierres históricos), ventas ya anuladas, cotizaciones y ventas con anulación existente. Exige una restauración por cada producto del detalle. Deja `estado=CA` y crea `Anulacion`.
+**Respuestas:** `201 Created` · `400` venta de otro día / ya anulada / cotización / restauración faltante · `404` ubicación o producto no encontrado.
 
 #### `POST` `/api/ventas/{id}/devolver/`
 **Descripción:** Devuelve dinero (total o parcial) de una venta completada.
@@ -516,7 +516,7 @@ Mapeo de `role_action_map` de cada ViewSet. `V=Vendedor, B=Bodeguero, E=Encargad
 #### `GET` `/api/dashboard/stats/`
 **Descripción:** Indicadores del día para el Dashboard.
 **Roles:** Todos.
-**Respuestas:** `es_gerente`, `ventas_dia` (total, total_vendido, devoluciones, anulaciones, cantidad, desglose por vendedor), `stock` (total_productos, sin_stock, bajo_minimo con `oem_productos`, productos_en_pedido).
+**Respuestas:** `es_gerente`, `ventas_dia` (total = vendido − devoluciones, total_vendido, devoluciones, cantidad, desglose por vendedor; las anulaciones no intervienen: la venta anulada desaparece del día), `stock` (total_productos, sin_stock, bajo_minimo con `oem_productos`, productos_en_pedido).
 
 #### `GET` `/api/reportes/stats/?mes=&anio=`
 **Descripción:** Reportes del mes (gráfico diario, top 10 productos, stock crítico, ventas por vendedor).

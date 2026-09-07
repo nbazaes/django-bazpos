@@ -318,7 +318,7 @@
 
 **Objetivo:** Cancelar una venta **confirmada** (estado CO) reponiendo el stock.
 
-**Requisitos previos:** Rol Gerente o Encargado. La venta debe estar en estado **CO** (confirmada) y ser de tipo **Venta**.
+**Requisitos previos:** Rol Gerente o Encargado. La venta debe estar en estado **CO** (confirmada), ser de tipo **Venta** y **ser del día actual** (no se puede anular una venta de días anteriores).
 
 **Paso a paso:**
 
@@ -328,7 +328,7 @@
 4. En **[Motivo de anulación]**, describa el motivo. **Es obligatorio.**
 5. Haga clic en **Confirmar anulación**.
 
-**Resultado esperado:** La venta queda anulada, el stock se repone en las ubicaciones indicadas y el monto se descuenta de los totales del día.
+**Resultado esperado:** La venta queda anulada y el stock se repone en las ubicaciones indicadas. La venta desaparece de los totales del día (como si no se hubiera hecho); el registro de la anulación queda como referencia en el cierre de caja.
 
 🛑 **Peligro / Acción Crítica:** La anulación es **irreversible** y queda registrada con su motivo. Úsela solo cuando corresponda y verifique las ubicaciones antes de confirmar.
 
@@ -355,13 +355,14 @@
 
 1. En el menú, vaya a **Cierre de caja** (o use el botón **Cierre de caja** del Dashboard).
 2. Seleccione la **[Fecha]** a cerrar.
-3. Revise las tarjetas: **Total vendido**, **Devoluciones**, **Anulaciones** y **Total del día**.
+3. Revise las tarjetas: **Total vendido**, **Devoluciones**, **Anulaciones** y **Total del día**. Las **Anulaciones** son solo referencia: la venta anulada no se cuenta como venta ni descuenta del total.
 4. Verifique el detalle por **Medio de pago** (Efectivo, Tarjeta, Transferencia, Cheque) y por **Documento** (Boleta, Factura, Otros).
-5. Haga clic en **Guardar cierre de caja**.
+5. Revise la sección **Anulaciones del día** (aparece solo si hubo anulaciones): detalle de cada anulación con su motivo y vendedor. No afecta los totales.
+6. Haga clic en **Guardar cierre de caja**.
 
 **Resultado esperado:** El cierre queda archivado con fecha, hora, usuario y totales. Si ya existe un cierre para esa fecha, el sistema muestra el aviso **✓ Cierre guardado el ... por ...** y el historial de cierres de la fecha.
 
-🛑 **Peligro / Acción Crítica:** Si el arqueo físico no cuadra con el **Total del día**, no guarde el cierre aún; revise ventas, devoluciones y anulaciones del día antes de confirmar.
+🛑 **Peligro / Acción Crítica:** Si el arqueo físico no cuadra con el **Total del día**, no guarde el cierre aún; revise las ventas y devoluciones del día antes de confirmar. Las anulaciones no afectan el total del día y solo pueden registrarse el mismo día de la venta.
 
 ### 4.9 Reportes (SOP-GER-09)
 
@@ -401,7 +402,7 @@
 
 **Disponible para todos los roles**, la pantalla inicial muestra:
 
-- **Total ventas hoy** (vendido, menos devoluciones y anulaciones), **Cantidad ventas** y **Total productos**.
+- **Total ventas hoy** (vendido, menos devoluciones; las ventas anuladas no se cuentan), **Cantidad ventas** y **Total productos**.
 - **Ventas por vendedor** (si es Gerente) o **Mis ventas de hoy** (Vendedor).
 - **Productos bajo stock mínimo:** tabla con el stock crítico. Acciones por producto:
   - **Recordar mañana:** oculta la alerta solo por el resto del día.

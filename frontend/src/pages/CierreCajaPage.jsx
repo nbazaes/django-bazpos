@@ -4,7 +4,13 @@ import CierreDetalleModal from "../components/CierreDetalleModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useToast } from "../lib/useToast";
 import { useStoreName } from "../lib/storeName";
-import { useCierreCaja, useCierreCajaHistorial, useGuardarCierre } from "../lib/queries";
+import { formatDateTime } from "../lib/format";
+import {
+  useCierreCaja,
+  useCierreCajaHistorial,
+  useCierreDetalle,
+  useGuardarCierre,
+} from "../lib/queries";
 
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString("es-CL")}`;
 
@@ -18,6 +24,60 @@ function fmtFechaHora(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString("es-CL");
+}
+
+function AnulacionesDelDia({ fecha }) {
+  const { data } = useCierreDetalle(fecha, "anulacion", "", true);
+  if (!data || data.length === 0) return null;
+  const total = data.reduce((acc, r) => acc + Number(r.monto || 0), 0);
+  return (
+    <div className="mt-4">
+      <PageCard title="Anulaciones del día">
+        <p className="text-muted small mb-2">
+          Informativo: las anulaciones no afectan el total del día (la venta
+          anulada no se cuenta como venta).
+        </p>
+        <div className="table-responsive">
+          <table className="table table-sm">
+            <thead>
+              <tr>
+                <th>Nº</th>
+                <th>Venta</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Motivo</th>
+                <th>Monto</th>
+                <th className="hide-mobile">Vendedor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((r) => (
+                <tr key={r.id}>
+                  <td className="text-center">{r.id}</td>
+                  <td className="text-center">{r.venta_id}</td>
+                  <td className="text-nowrap">{formatDateTime(r.fecha)}</td>
+                  <td>{r.cliente || "—"}</td>
+                  <td>{r.motivo || "—"}</td>
+                  <td>{fmtMoney(r.monto)}</td>
+                  <td className="hide-mobile">{r.usuario || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={5}>
+                  <strong>Total ({data.length} registros)</strong>
+                </td>
+                <td colSpan={2} className="hide-mobile">
+                  <strong>{fmtMoney(total)}</strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </PageCard>
+    </div>
+  );
 }
 
 export default function CierreCajaPage() {
@@ -230,6 +290,8 @@ export default function CierreCajaPage() {
               </PageCard>
             </div>
           </div>
+
+          {data.total_anulaciones > 0 && <AnulacionesDelDia fecha={fecha} />}
         </>
       )}
 

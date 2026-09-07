@@ -180,9 +180,6 @@ export default function DashboardPage() {
                   data.ventas_dia.devoluciones
                     ? `- ${fmtMoney(data.ventas_dia.devoluciones)} devoluciones`
                     : null,
-                  data.ventas_dia.anulaciones
-                    ? `- ${fmtMoney(data.ventas_dia.anulaciones)} anulaciones`
-                    : null,
                 ].filter(Boolean)}
               />
             </div>
@@ -219,9 +216,6 @@ export default function DashboardPage() {
                               {fmtMoney(row.total_vendido)} vendido
                               {row.devoluciones
                                 ? <> · - {fmtMoney(row.devoluciones)} dev.</>
-                                : null}
-                              {row.anulaciones
-                                ? <> · - {fmtMoney(row.anulaciones)} anul.</>
                                 : null}
                             </div>
                           </td>

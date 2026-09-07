@@ -805,6 +805,33 @@ class AnularDevolverTest(BaseTest):
         resp = client.post(f"/api/ventas/{venta_id}/anular/", payload, format="json")
         self.assertEqual(resp.status_code, 400)
 
+    def test_anular_bloquea_venta_de_otro_dia(self):
+        venta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=9000,
+            monto_subtotal=9000,
+            estado=Venta.Estado.COMPLETADA,
+            fecha_venta=timezone.now() - timedelta(days=1),
+        )
+        resp = auth_client(self.gerente).post(
+            f"/api/ventas/{venta.id}/anular/",
+            {
+                "motivo": "Error de caja",
+                "restauraciones": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "ubicacion_id": self.ubicacion.id,
+                        "cantidad": 2,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        venta.refresh_from_db()
+        self.assertEqual(venta.estado, Venta.Estado.COMPLETADA)
+        self.assertFalse(Anulacion.objects.filter(venta=venta).exists())
+
     def test_anular_requiere_todos_los_productos(self):
         venta_id = self._crear_venta()
         resp = auth_client(self.gerente).post(
@@ -2109,6 +2136,29 @@ class DashboardTest(BaseTest):
         self.assertEqual(resp.data["ventas_dia"]["total"], 12000)
         self.assertEqual(resp.data["ventas_dia"]["devoluciones"], 3000)
 
+    def test_dashboard_anulacion_no_aparece(self):
+        venta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=9000,
+            monto_subtotal=9000,
+            estado=Venta.Estado.COMPLETADA,
+        )
+        Anulacion.objects.create(venta=venta, usuario=self.vendedor, motivo="Test")
+        venta.estado = Venta.Estado.CANCELADA
+        venta.save()
+        self._crear_venta(monto=10000, usuario=self.vendedor2)
+
+        resp = auth_client(self.gerente).get("/api/dashboard/stats/")
+        ventas_dia = resp.data["ventas_dia"]
+        self.assertEqual(ventas_dia["total"], 10000)
+        self.assertEqual(ventas_dia["total_vendido"], 10000)
+        self.assertNotIn("anulaciones", ventas_dia)
+        por_vendedor = {row["vendedor"]: row for row in ventas_dia["desglose"]}
+        self.assertNotIn("Ana Perez", por_vendedor)
+        fila = por_vendedor["Luis Rojas"]
+        self.assertEqual(fila["total"], 10000)
+        self.assertNotIn("anulaciones", fila)
+
     def test_dashboard_bajo_minimo(self):
         resp = auth_client(self.gerente).get("/api/dashboard/stats/")
         self.assertEqual(resp.status_code, 200)
@@ -2238,7 +2288,7 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["pagos"]["CH"], 15000)
         self.assertEqual(stats["documentos"]["OT"], 30000)
 
-    def test_get_cierre_resta_devoluciones_y_anulaciones(self):
+    def test_cierre_anulaciones_solo_informativas(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
         venta_anulada = Venta.objects.create(
             usuario=self.vendedor,
@@ -2268,7 +2318,7 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["total_vendido"], 30000)
         self.assertEqual(stats["total_devoluciones"], 3000)
         self.assertEqual(stats["total_anulaciones"], 9000)
-        self.assertEqual(stats["total_final"], 18000)
+        self.assertEqual(stats["total_final"], 27000)
 
     def test_post_cierre_append_only(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "TR", "monto": 18000}], documento="OT")

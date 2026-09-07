@@ -78,21 +78,15 @@ class DashboardStatsView(APIView):
         )
 
         devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=hoy)
-        anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=hoy)
 
         def _nombre(row):
             nombre = f"{row.get('usuario__first_name', '')} {row.get('usuario__last_name', '')}".strip()
             return nombre if nombre else row.get("usuario__username", "")
 
         if es_gerente:
-            total_vendido = (
-                ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
-            ) + (
-                anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
-            )
+            total_vendido = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
             monto_devuelto = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
-            monto_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
-            total_dia = total_vendido - monto_devuelto - monto_anulaciones
+            total_dia = total_vendido - monto_devuelto
             cant_ventas_dia = ventas_hoy.count()
 
             ventas_por_vendedor = (
@@ -103,10 +97,6 @@ class DashboardStatsView(APIView):
                 r["usuario_id"]: r["total"]
                 for r in devoluciones_hoy.values("usuario_id").annotate(total=Sum("monto_devuelto"))
             }
-            anulados_por_usuario = {
-                r["usuario_id"]: r["total"]
-                for r in anulaciones_hoy.values("usuario_id").annotate(total=Sum("venta__monto_total"))
-            }
 
             filas = {}
             for row in ventas_por_vendedor:
@@ -115,7 +105,6 @@ class DashboardStatsView(APIView):
                     "vendedor": _nombre(row),
                     "total_vendido": row["total"],
                     "devoluciones": devueltos_por_usuario.get(uid, 0),
-                    "anulaciones": anulados_por_usuario.get(uid, 0),
                     "cantidad": row["cantidad"],
                 }
             for row in devoluciones_hoy.values(
@@ -127,41 +116,20 @@ class DashboardStatsView(APIView):
                         "vendedor": _nombre(row),
                         "total_vendido": 0,
                         "devoluciones": devueltos_por_usuario.get(uid, 0),
-                        "anulaciones": 0,
-                        "cantidad": 0,
-                    }
-            for row in anulaciones_hoy.values(
-                "usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username"
-            ).distinct():
-                uid = row["usuario_id"]
-                if uid not in filas:
-                    filas[uid] = {
-                        "vendedor": _nombre(row),
-                        "total_vendido": 0,
-                        "devoluciones": 0,
-                        "anulaciones": anulados_por_usuario.get(uid, 0),
                         "cantidad": 0,
                     }
 
             desglose = []
             for uid, fila in filas.items():
-                fila["total"] = (
-                    fila["total_vendido"] - fila["devoluciones"] - fila["anulaciones"]
-                )
+                fila["total"] = fila["total_vendido"] - fila["devoluciones"]
                 desglose.append(fila)
             desglose.sort(key=lambda d: d["total"], reverse=True)
         else:
             ventas_propias = ventas_hoy.filter(usuario=user)
-            anulaciones_propias = anulaciones_hoy.filter(usuario=user)
             devoluciones_propias = devoluciones_hoy.filter(usuario=user)
-            total_vendido = (
-                ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
-            ) + (
-                anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
-            )
+            total_vendido = ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
             monto_devuelto = devoluciones_propias.aggregate(total=Sum("monto_devuelto"))["total"] or 0
-            monto_anulaciones = anulaciones_propias.aggregate(total=Sum("venta__monto_total"))["total"] or 0
-            total_dia = total_vendido - monto_devuelto - monto_anulaciones
+            total_dia = total_vendido - monto_devuelto
             cant_ventas_dia = ventas_propias.count()
             nombre = f"{user.first_name} {user.last_name}".strip()
             desglose = [
@@ -170,7 +138,6 @@ class DashboardStatsView(APIView):
                     "total": total_dia,
                     "total_vendido": total_vendido,
                     "devoluciones": monto_devuelto,
-                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                 }
             ]
@@ -248,7 +215,6 @@ class DashboardStatsView(APIView):
                     "total": total_dia,
                     "total_vendido": total_vendido,
                     "devoluciones": monto_devuelto,
-                    "anulaciones": monto_anulaciones,
                     "cantidad": cant_ventas_dia,
                     "desglose": desglose,
                 },
@@ -394,8 +360,10 @@ def calcular_cierre(fecha):
 
     total_vendido = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
     total_devoluciones = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
+    # Informativo: la venta anulada ya queda excluida del total_vendido
+    # (estado CANCELADA) y no debe descontarse de nuevo del total_final.
     total_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
-    total_final = total_vendido - total_devoluciones - total_anulaciones
+    total_final = total_vendido - total_devoluciones
     cantidad_ventas = ventas_hoy.count()
 
     # ── Desglose por medio de pago ──
@@ -1253,6 +1221,15 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     @action(detail=True, methods=["post"], url_path="anular")
     def anular(self, request, pk=None):
         venta = self.get_object()
+
+        # Regla de negocio: solo se puede anular una venta del día de hoy.
+        # Evita descuadres con los cierres de caja históricos (la venta ya
+        # contada en el cierre de un día anterior quedaría mal reflejada).
+        if venta.fecha_venta.date() != timezone.now().date():
+            return Response(
+                {"error": "Solo se pueden anular ventas del día actual"},
+                status=400,
+            )
 
         if venta.estado == Venta.Estado.CANCELADA:
             return Response({"error": "Esta venta ya fue anulada"}, status=400)
