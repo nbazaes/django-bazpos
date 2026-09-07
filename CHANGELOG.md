@@ -4,6 +4,17 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.2.0] - 2026-09-07
+
+### Agregado
+
+- Nueva configuración de tienda para moneda, impuestos, redondeo, despacho, margen, medios de pago y documentos, con permisos según el rol.
+
+### Corregido
+
+- Se bloquean las anulaciones fuera del día y las anulaciones informativas se reflejan correctamente en el dashboard y el cierre de caja.
+- El margen predeterminado de nuevos productos ahora usa la configuración de la tienda.
+
 ## [2.1.0] - 2026-09-05
 
 ### Cambiado
