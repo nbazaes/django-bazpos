@@ -120,6 +120,23 @@ export default function CierreCajaPage() {
       {isLoading && <div className="text-center text-muted mt-5">Cargando...</div>}
       {error && <div className="alert alert-danger">{error.message}</div>}
 
+      {data?.cruce_dia?.total > 0 && (
+        <div className="alert alert-warning no-print" role="alert">
+          <strong>Cruce de día local:</strong> {data.cruce_dia.total} documento(s) de este
+          cierre se registraron después del cambio de día (20:00-21:00 local según época
+          del año) y pertenecen al día local anterior. Verificar contra el cierre del día
+          previo.
+          <ul className="mb-0 mt-2">
+            {data.cruce_dia.detalle.map((r) => (
+              <li key={`${r.tipo}-${r.id}`}>
+                {r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1)} #{r.id} —{" "}
+                {fmtFechaHora(r.fecha_local)} (hora local)
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {data && (
         <>
           <div className="row mb-4">

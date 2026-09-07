@@ -6,6 +6,7 @@ from rest_framework import serializers
 
 from gerenteApp.models import PrecioHistorico, StoreConfig
 from vendedorApp.stock_utils import resolver_producto_por_identidad
+from vendedorApp.timezone_guard import log_cruce
 from vendedorApp.models import (
     AjusteStock,
     Anulacion,
@@ -516,6 +517,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
         if venta.deduccion_original:
             venta.save(update_fields=["deduccion_original"])
 
+        log_cruce(venta, actor=request.user)
         return venta
 
 
@@ -951,6 +953,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             )
             pedido.venta = venta
             pedido.save(update_fields=["venta"])
+            log_cruce(venta, actor=request.user)
 
         return pedido
 

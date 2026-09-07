@@ -1,6 +1,9 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
+from django.core.management import call_command
 from django.db import IntegrityError
 from django.db.models import Sum
 from django.test import TestCase
@@ -26,6 +29,7 @@ from vendedorApp.models import (
     Venta,
 )
 from vendedorApp.serializers import _distribute_discount, _round_total
+from vendedorApp.timezone_guard import cruce_de_dia
 
 
 class BaseTest(TestCase):
@@ -2873,3 +2877,184 @@ class CatalogoPublicoApiTest(BaseTest):
         resp = self.client.get("/api/publico/catalogo/oems/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["oems"], ["OEM-FILTRO", "OEM-FRENO"])
+
+
+class CruceDiaTest(BaseTest):
+    """Failsafe del cambio de hora: un registro creado después del cambio de
+    día local (20:00 invierno / 21:00 verano) cae en el día UTC siguiente y
+    queda atribuido al día equivocado en cierres/reportes. El failsafe debe
+    detectarlo sin alterar datos ni bloquear la operación."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.tz_santiago = ZoneInfo("America/Santiago")
+        cls.producto = Producto.objects.create(
+            nombre="Producto Cruce",
+            codigo_producto="PX001",
+            oem="OEM-X",
+            descripcion="Desc X",
+            precio_costo=5000,
+            stock_minimo=2,
+            stock_maximo=50,
+            margen_utilidad=Decimal("30.00"),
+            proveedor=cls.proveedor,
+        )
+        StockProductoUbicacion.objects.create(
+            producto=cls.producto, ubicacion=cls.ubicacion, cantidad=100
+        )
+
+    def _fecha_base(self):
+        """Fecha pasada (hace 30 días) para que quepa en la ventana --days."""
+        return timezone.localdate() - timedelta(days=30)
+
+    def _instante_peligro(self):
+        # 21:30 local cruza el día UTC en cualquier época del año:
+        # invierno (UTC-4) → 01:30 UTC del día siguiente; verano (UTC-3) → 00:30.
+        base = self._fecha_base()
+        return datetime(base.year, base.month, base.day, 21, 30, tzinfo=self.tz_santiago)
+
+    def _normalizar_fechas_setup(self):
+        # Registros heredados del setUp (fecha = ahora): se fijan a mediodía
+        # local para que nunca crucen el día, independiente de cuándo corran
+        # los tests.
+        base = self._fecha_base()
+        seguro = datetime(base.year, base.month, base.day, 12, 0, tzinfo=self.tz_santiago)
+        Venta.objects.update(fecha_venta=seguro)
+        Devolucion.objects.update(fecha_devolucion=seguro)
+        Anulacion.objects.update(fecha_anulacion=seguro)
+
+    def _payload_venta(self):
+        return {
+            "productos": [
+                {
+                    "producto_id": self.producto.producto_id,
+                    "cantidad": 1,
+                    "precio": self.producto.precio,
+                }
+            ],
+            "total": self.producto.precio,
+            "monto_subtotal": self.producto.precio,
+        }
+
+    def _patch_fecha_default(self, instante):
+        """Parchea el default de `fecha_venta` al instante indicado.
+
+        Se patchea `_get_default` y no `default`: Django lo resuelve como
+        cached_property en el field al primer uso, por lo que cambiar
+        `default` no tendría efecto si otro test ya creó una venta antes.
+        """
+        field = Venta._meta.get_field("fecha_venta")
+        return patch.object(field, "_get_default", lambda: instante)
+
+    def test_cruce_de_dia_fronteras(self):
+        # Invierno (UTC-4): la frontera local es a las 20:00
+        self.assertFalse(cruce_de_dia(datetime(2026, 6, 15, 19, 30, tzinfo=self.tz_santiago)))
+        self.assertTrue(cruce_de_dia(datetime(2026, 6, 15, 20, 30, tzinfo=self.tz_santiago)))
+        # Verano (UTC-3): la frontera local es a las 21:00
+        self.assertFalse(cruce_de_dia(datetime(2026, 9, 10, 20, 30, tzinfo=self.tz_santiago)))
+        self.assertTrue(cruce_de_dia(datetime(2026, 9, 10, 21, 30, tzinfo=self.tz_santiago)))
+
+    def test_cruce_de_dia_rechaza_naive(self):
+        self.assertFalse(cruce_de_dia(None))
+        self.assertFalse(cruce_de_dia(datetime(2026, 6, 15, 21, 30)))
+        # date puro (p.ej. Factura.fecha, DateField): ya es fecha de negocio
+        self.assertFalse(cruce_de_dia(date(2026, 6, 15)))
+
+    def test_venta_tardia_registra_advertencia(self):
+        instante = self._instante_peligro()
+        with self._patch_fecha_default(instante):
+            with self.assertLogs("vendedorApp.timezone_guard", level="WARNING") as logs:
+                resp = auth_client(self.vendedor).post(
+                    "/api/ventas/", self._payload_venta(), format="json"
+                )
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(any("CRUCE DE DIA" in line for line in logs.output))
+
+    def test_venta_horario_normal_sin_advertencia(self):
+        base = self._fecha_base()
+        instante = datetime(base.year, base.month, base.day, 15, 0, tzinfo=self.tz_santiago)
+        with self._patch_fecha_default(instante):
+            with self.assertNoLogs("vendedorApp.timezone_guard", level="WARNING"):
+                resp = auth_client(self.vendedor).post(
+                    "/api/ventas/", self._payload_venta(), format="json"
+                )
+        self.assertEqual(resp.status_code, 201)
+
+    def test_cierre_reporta_cruce_dia(self):
+        instante = self._instante_peligro()
+        fecha_utc = instante.astimezone(dt_timezone.utc).date()
+
+        venta = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=10000,
+            monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.VENTA,
+            fecha_venta=instante,
+        )
+        venta_dev = Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=5000,
+            monto_subtotal=5000,
+            estado=Venta.Estado.COMPLETADA,
+            fecha_venta=instante,
+        )
+        devolucion = Devolucion.objects.create(
+            venta=venta_dev, usuario=self.vendedor, motivo="Test", monto_devuelto=1000
+        )
+        # fecha_devolucion es auto_now_add: se retrodata vía update
+        Devolucion.objects.filter(pk=devolucion.pk).update(fecha_devolucion=instante)
+
+        resp = auth_client(self.gerente).get(
+            f"/api/cierre-caja/?fecha={fecha_utc.isoformat()}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        cruce = resp.data["cruce_dia"]
+        # Ambas ventas (la directa y la de la devolución) cruzan el día UTC
+        self.assertEqual(cruce["ventas"], 2)
+        self.assertEqual(cruce["devoluciones"], 1)
+        self.assertEqual(cruce["anulaciones"], 0)
+        self.assertEqual(cruce["total"], 3)
+        tipos = {(r["tipo"], r["id"]) for r in cruce["detalle"]}
+        self.assertIn(("venta", venta.pk), tipos)
+        self.assertIn(("venta", venta_dev.pk), tipos)
+        self.assertIn(("devolucion", devolucion.pk), tipos)
+        detalle_venta = next(r for r in cruce["detalle"] if r["tipo"] == "venta")
+        self.assertTrue(detalle_venta["fecha_local"].startswith(instante.date().isoformat()))
+        self.assertEqual(detalle_venta["monto"], 10000)
+
+    def test_cierre_normal_sin_cruce(self):
+        self._normalizar_fechas_setup()
+        base = self._fecha_base()
+        fecha = base
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=10000,
+            monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA,
+            tipo_documento=Venta.TipoDocumento.VENTA,
+            fecha_venta=datetime(base.year, base.month, base.day, 12, 0, tzinfo=self.tz_santiago),
+        )
+        resp = auth_client(self.gerente).get(f"/api/cierre-caja/?fecha={fecha.isoformat()}")
+        self.assertEqual(resp.status_code, 200)
+        cruce = resp.data["cruce_dia"]
+        self.assertEqual(cruce["total"], 0)
+        self.assertEqual(cruce["detalle"], [])
+
+    def test_audit_cruce_fecha_detecta_y_sale_1(self):
+        self._normalizar_fechas_setup()
+        Venta.objects.create(
+            usuario=self.vendedor,
+            monto_total=10000,
+            monto_subtotal=10000,
+            estado=Venta.Estado.COMPLETADA,
+            fecha_venta=self._instante_peligro(),
+        )
+        with self.assertRaises(SystemExit) as cm:
+            call_command("audit_cruce_fecha", "--days", "365")
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_audit_cruce_fecha_limpio_no_sale(self):
+        self._normalizar_fechas_setup()
+        call_command("audit_cruce_fecha", "--days", "365")

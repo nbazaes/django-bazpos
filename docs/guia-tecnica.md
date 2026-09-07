@@ -777,6 +777,16 @@ git commit -m "changelog X.Y.Z"
 
 `npm run changelog` regenera la entrada sin cambiar versión. La redacción la hace un LLM (opcional; fallback a lista de subjects) configurable vía `BAZPOS_LLM_API_KEY`, `BAZPOS_LLM_BASE_URL` y `BAZPOS_LLM_MODEL` (OpenRouter).
 
+### 7.6 Convención de fechas y failsafe de cambio de hora
+
+El backend opera en UTC (`TIME_ZONE = "UTC"`, `USE_TZ = True`): el "día de negocio" de cierres de caja, dashboard y reportes es la **fecha UTC**. Como la tienda no registra ventas después de las 18:00 local y la frontera UTC cae a las 20:00 (invierno) / 21:00 (verano) hora de Santiago, ambos días coinciden en horario hábil. El cambio de hora no afecta la operación (no hay jobs nocturnos ni medianoches locales en el código).
+
+Como failsafe, `vendedorApp/timezone_guard.py` detecta cualquier registro de dinero (Venta, Devolución, Anulación) creado en la ventana de peligro — definida como "fecha UTC ≠ fecha local Santiago", así que se adapta sola al DST:
+
+- Al crearse, emite un `WARNING` (`CRUCE DE DIA: ...`) en los logs del contenedor, sin bloquear ni alterar el dato.
+- El cierre de caja expone `cruce_dia` en `GET/POST /api/cierre-caja/` (total + detalle) y la interfaz muestra un aviso cuando el cierre contiene documentos que pertenecen al día local anterior.
+- `python manage.py audit_cruce_fecha [--days N] [--include-inventario]` audita el histórico (exit code 1 si encuentra cruces; útil para cron/monitoreo).
+
 ---
 
 ## 8. Decisiones de arquitectura (explicación breve)

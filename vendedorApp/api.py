@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from vendedorApp.models import AjusteStock, Anulacion, CierreCaja, DetalleVenta, Devolucion, DetalleDevolucion, ItemPedidoProveedor, PagoVenta, Pedido, PedidoDetalle, PedidoProveedorDia, Producto, StockHistorico, StockProductoUbicacion, Ubicacion, Venta
+from vendedorApp.timezone_guard import cruce_rows, log_cruce
 from vendedorApp.serializers import (
     AgregarItemPedidoProveedorSerializer,
     AjustarStockInputSerializer,
@@ -460,6 +461,34 @@ def calcular_cierre(fecha):
     documentos_labels = {d["code"]: d["label"] for d in document_types}
     documentos_labels["SIN"] = "Sin clasificar"
 
+    # ── Failsafe: registros que cruzan el cambio de día local ──
+    # Registros del día UTC cuyo día local (America/Santiago) es el anterior:
+    # se registraron en la ventana de peligro (post 20:00/21:00 local) y el
+    # cierre de caja local del día anterior no los contempla.
+    detalle_cruce = cruce_rows(
+        [
+            ("venta", v.id, v.fecha_venta, v.monto_total)
+            for v in _ventas_cierre(fecha).only("id", "fecha_venta", "monto_total")
+        ]
+        + [
+            ("devolucion", d.id, d.fecha_devolucion, d.monto_devuelto)
+            for d in devoluciones_hoy.only("id", "fecha_devolucion", "monto_devuelto")
+        ]
+        + [
+            ("anulacion", a.id, a.fecha_anulacion, a.venta.monto_total)
+            for a in anulaciones_hoy.select_related("venta").only(
+                "id", "fecha_anulacion", "venta__monto_total"
+            )
+        ]
+    )
+    cruce_dia = {
+        "total": len(detalle_cruce),
+        "ventas": sum(1 for r in detalle_cruce if r["tipo"] == "venta"),
+        "devoluciones": sum(1 for r in detalle_cruce if r["tipo"] == "devolucion"),
+        "anulaciones": sum(1 for r in detalle_cruce if r["tipo"] == "anulacion"),
+        "detalle": detalle_cruce,
+    }
+
     return {
         "fecha": str(fecha),
         "total_vendido": total_vendido,
@@ -467,6 +496,7 @@ def calcular_cierre(fecha):
         "total_anulaciones": total_anulaciones,
         "total_final": total_final,
         "cantidad_ventas": cantidad_ventas,
+        "cruce_dia": cruce_dia,
         "pagos": pagos,
         "pagos_labels": pagos_labels,
         "pagos_list": [m["code"] for m in payment_methods] + ["SIN"],
@@ -1279,6 +1309,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
             )
             venta.estado = Venta.Estado.CANCELADA
             venta.save()
+            log_cruce(anulacion, actor=request.user)
 
         return Response(AnulacionSerializer(anulacion).data, status=status.HTTP_201_CREATED)
 
@@ -1391,6 +1422,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
             devolucion.monto_devuelto = monto_devuelto
             devolucion.save(update_fields=["monto_devuelto"])
+            log_cruce(devolucion, actor=request.user)
 
         return Response(DevolucionSerializer(devolucion).data, status=status.HTTP_201_CREATED)
 
@@ -1731,6 +1763,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                 motivo=data["motivo"],
                 monto_devuelto=monto_devuelto,
             )
+            log_cruce(devolucion, actor=request.user)
 
             for pedido_detalle, monto, reponer, ubicacion_id in lineas:
                 if reponer and pedido.stock_descontado and pedido_detalle.producto:
