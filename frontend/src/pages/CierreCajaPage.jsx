@@ -110,21 +110,25 @@ export default function CierreCajaPage() {
 
   const pagos = data?.pagos || {};
   const documentos = data?.documentos || {};
+  const pagosLabels = data?.pagos_labels || {};
+  const documentosLabels = data?.documentos_labels || {};
 
-  const filasPago = [
-    ["Efectivo", "EF", "Ventas en efectivo", pagos.efectivo],
-    ["Tarjeta", "TJ", "Ventas con tarjeta", pagos.tarjeta],
-    ["Transferencia", "TR", "Ventas por transferencia", pagos.transferencia],
-    ["Cheque", "CH", "Ventas con cheque", pagos.cheque],
-    ["Sin clasificar", "SIN", "Ventas sin clasificar", pagos.sin_clasificar],
-  ];
+  // El backend agrupa por código ("EF", "SIN", ...) y envía los labels
+  // correspondientes; usarlos hace que aparezcan también los métodos y
+  // documentos personalizados de la Configuración de la tienda.
+  const filasPago = Object.entries(pagosLabels).map(([code, label]) => [
+    label,
+    code,
+    label,
+    pagos[code] ?? 0,
+  ]);
 
-  const filasDoc = [
-    ["Boleta", "BO", "Ventas con boleta", documentos.boleta],
-    ["Factura", "FA", "Ventas con factura", documentos.factura],
-    ["Otros", "OT", "Ventas con otros documentos", documentos.otros],
-    ["Sin clasificar", "SIN", "Ventas sin clasificar", documentos.sin_clasificar],
-  ];
+  const filasDoc = Object.entries(documentosLabels).map(([code, label]) => [
+    label,
+    code,
+    label,
+    documentos[code] ?? 0,
+  ]);
 
   const abrirDetalle = (tipo, clave, titulo, valor) => {
     if (valor > 0) setDetalle({ tipo, clave, titulo });
