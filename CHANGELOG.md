@@ -4,6 +4,12 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.2.1] - 2026-09-07
+
+### Corregido
+
+- El detalle del cierre de caja ya muestra correctamente los pagos y documentos, incluso cuando el total es $0.
+
 ## [2.2.0] - 2026-09-07
 
 ### Agregado
