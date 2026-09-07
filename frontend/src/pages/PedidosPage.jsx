@@ -21,6 +21,12 @@ import { formatDateTime } from "../lib/format";
 import { API_BASE } from "../lib/config";
 import { getStoreConfig } from "../lib/store";
 
+// Espeja la regla del backend: solo se anulan ventas del día actual
+// (día de negocio UTC, mismo criterio fecha_venta__date del cierre de caja).
+const esVentaDeHoy = (iso) =>
+  Boolean(iso) &&
+  new Date(iso).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+
 export default function PedidosPage() {
   usePageTitle("Historial de ventas");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -372,7 +378,9 @@ export default function PedidosPage() {
                         )}
                         {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
                           <>
-                            <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
+                            {esVentaDeHoy(v.fecha_venta) && (
+                              <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
+                            )}
                             <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
                           </>
                         )}
