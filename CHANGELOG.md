@@ -4,6 +4,13 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.2.2] - 2026-09-07
+
+### Corregido
+
+- Mejorado el contraste de botones, contornos y etiquetas para cumplir accesibilidad en todos los temas.
+- El botón Anular ya no aparece para ventas de días anteriores y se bloquean esas anulaciones.
+
 ## [2.2.1] - 2026-09-07
 
 ### Corregido
