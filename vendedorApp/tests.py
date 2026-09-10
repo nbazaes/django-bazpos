@@ -720,7 +720,39 @@ class VentaStockActionsTest(BaseTest):
         resp = auth_client(self.vendedor).get(f"/api/ventas/{venta_id}/documento/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"].split(";")[0], "text/html")
-        self.assertIn("COMPROBANTE DE VENTA", resp.content.decode())
+        content = resp.content.decode()
+        self.assertIn("COMPROBANTE DE VENTA", content)
+        self.assertIn("Cant.", content)
+        self.assertIn("Descripción", content)
+        self.assertIn("P. Unit.", content)
+        self.assertIn("Total", content)
+        self.assertIn(f"${self.producto.precio}", content)
+
+    def test_documento_html_cotizacion(self):
+        resp_co = auth_client(self.vendedor).post(
+            "/api/ventas/",
+            {
+                "productos": [
+                    {
+                        "producto_id": self.producto.producto_id,
+                        "cantidad": 3,
+                        "precio": self.producto.precio,
+                    }
+                ],
+                "total": self.producto.precio * 3,
+                "tipo_documento": "CO",
+            },
+            format="json",
+        )
+        cotizacion_id = resp_co.data["id"]
+        resp = auth_client(self.vendedor).get(f"/api/ventas/{cotizacion_id}/documento/")
+        self.assertEqual(resp.status_code, 200)
+        content = resp.content.decode()
+        self.assertIn("COTIZACION", content)
+        self.assertIn("Cant.", content)
+        self.assertIn("P. Unit.", content)
+        self.assertIn("Total", content)
+        self.assertIn(f"${self.producto.precio}", content)
 
 
 class AnularDevolverTest(BaseTest):

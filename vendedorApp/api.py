@@ -1415,13 +1415,32 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
 
         detalles = venta.detalleventa_set.select_related("producto").all()
 
-        items_html = ""
+        rows_html = ""
         for d in detalles:
             if es_cotizacion:
-                label = f'{d.cantidad} x {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+                desc = f'{d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
             else:
-                label = f'{d.cantidad} x {d.producto.codigo_producto} - {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
-            items_html += f'\n<div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;"><span>{label}</span><span>${d.subtotal}</span></div>'
+                desc = f'{d.producto.codigo_producto} - {d.producto.marca + " - " if d.producto.marca else ""}{d.producto.nombre}'
+            rows_html += f"""
+<tr>
+  <td style="padding: 3px 2px; text-align: left; vertical-align: top;">{d.cantidad}</td>
+  <td style="padding: 3px 2px; text-align: left; vertical-align: top;">{desc}</td>
+  <td style="padding: 3px 2px; text-align: right; vertical-align: top; white-space: nowrap;">${d.precio_unitario}</td>
+  <td style="padding: 3px 2px; text-align: right; vertical-align: top; white-space: nowrap;">${d.subtotal}</td>
+</tr>"""
+
+        items_html = f"""<table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.8rem;">
+  <thead>
+    <tr style="border-bottom: 1px dashed #999;">
+      <th style="padding: 3px 2px; text-align: left; width: 10%;">Cant.</th>
+      <th style="padding: 3px 2px; text-align: left;">Descripción</th>
+      <th style="padding: 3px 2px; text-align: right; width: 22%;">P. Unit.</th>
+      <th style="padding: 3px 2px; text-align: right; width: 22%;">Total</th>
+    </tr>
+  </thead>
+  <tbody>{rows_html}
+  </tbody>
+</table>"""
 
         titulo = "COTIZACION" if es_cotizacion else "COMPROBANTE DE VENTA"
 

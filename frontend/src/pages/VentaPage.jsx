@@ -327,14 +327,16 @@ export default function VentaPage() {
     const esCotizacion = documento.tipo_documento === "CO";
 
     const rows = documento.items.map((item) => {
-      const label = esCotizacion
-        ? `${item.cantidad} x ${item.marca ? item.marca + " - " : ""}${item.nombre}`
-        : `${item.cantidad} x ${item.codigo_producto} - ${item.marca ? item.marca + " - " : ""}${item.nombre}`;
+      const desc = esCotizacion
+        ? `${item.marca ? item.marca + " - " : ""}${item.nombre}`
+        : `${item.codigo_producto} - ${item.marca ? item.marca + " - " : ""}${item.nombre}`;
       return `
-        <div style="display:flex;justify-content:space-between;color:#333;margin-bottom:2px;">
-          <span>${label}</span>
-          <span>$${item.subtotal}</span>
-        </div>
+        <tr>
+          <td style="padding: 3px 2px; text-align: left; vertical-align: top;">${item.cantidad}</td>
+          <td style="padding: 3px 2px; text-align: left; vertical-align: top;">${desc}</td>
+          <td style="padding: 3px 2px; text-align: right; vertical-align: top; white-space: nowrap;">$${item.precio}</td>
+          <td style="padding: 3px 2px; text-align: right; vertical-align: top; white-space: nowrap;">$${item.subtotal}</td>
+        </tr>
       `;
     }).join("");
 
@@ -373,7 +375,19 @@ export default function VentaPage() {
           <p class="doc-number">#${documento.ventaId}</p>
           <p class="date">${documento.fecha}</p>
           <hr />
-          ${rows}
+          <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.8rem;">
+            <thead>
+              <tr style="border-bottom: 1px dashed #999;">
+                <th style="padding: 3px 2px; text-align: left; width: 10%;">Cant.</th>
+                <th style="padding: 3px 2px; text-align: left;">Descripción</th>
+                <th style="padding: 3px 2px; text-align: right; width: 22%;">P. Unit.</th>
+                <th style="padding: 3px 2px; text-align: right; width: 22%;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
           ${documento.ocultarTotales ? "" : `
           <hr />
           <div class="totals-row"><span>Subtotal</span><span>$${documento.subtotal_original}</span></div>
@@ -1231,12 +1245,32 @@ export default function VentaPage() {
                   <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>#{lastDocumento.ventaId}</div>
                   <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>{lastDocumento.fecha}</div>
                   <hr />
-                  {lastDocumento.items.map((item) => (
-                    <div key={`${item.producto_id}-${item.cantidad}`} className="flex justify-between" style={{ color: "#333" }}>
-                      <span>{item.cantidad} x {item.codigo_producto} - {item.marca ? item.marca + " - " : ""}{item.nombre}</span>
-                      <span>${item.subtotal}</span>
-                    </div>
-                  ))}
+                  <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: "0.8rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px dashed #999", color: "#1a1a1a" }}>
+                        <th style={{ padding: "3px 2px", textAlign: "left", width: "10%" }}>Cant.</th>
+                        <th style={{ padding: "3px 2px", textAlign: "left" }}>Descripción</th>
+                        <th style={{ padding: "3px 2px", textAlign: "right", width: "22%" }}>P. Unit.</th>
+                        <th style={{ padding: "3px 2px", textAlign: "right", width: "22%" }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lastDocumento.items.map((item) => {
+                        const esCotiz = lastDocumento.tipo_documento === "CO";
+                        const desc = esCotiz
+                          ? `${item.marca ? item.marca + " - " : ""}${item.nombre}`
+                          : `${item.codigo_producto} - ${item.marca ? item.marca + " - " : ""}${item.nombre}`;
+                        return (
+                          <tr key={`${item.producto_id}-${item.cantidad}`} style={{ color: "#333" }}>
+                            <td style={{ padding: "3px 2px", textAlign: "left", verticalAlign: "top" }}>{item.cantidad}</td>
+                            <td style={{ padding: "3px 2px", textAlign: "left", verticalAlign: "top" }}>{desc}</td>
+                            <td style={{ padding: "3px 2px", textAlign: "right", verticalAlign: "top", whiteSpace: "nowrap" }}>${item.precio}</td>
+                            <td style={{ padding: "3px 2px", textAlign: "right", verticalAlign: "top", whiteSpace: "nowrap" }}>${item.subtotal}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                   {!lastDocumento.ocultarTotales && (
                   <>
                   <hr />
