@@ -115,6 +115,7 @@ Router at `bazpos/api_urls.py`. Endpoints under `/api/`:
 - `router.jsx` is the source of truth for all routes and page structure.
 - `Shell.jsx` is the layout wrapper (sidebar + topbar + content area) with dark/light toggle and selectable color schemes (`data-scheme`, picker in Configuración for all roles).
 - Design uses a corporate purple palette with CSS custom properties (see `frontend/src/design-system.css`).
+- Modals & Forms: Reusable form components (`ProductoForm`, `AjusteStockModal`, etc.) can be rendered inside modals across pages. Table action columns prefer compact icon buttons (`.btn-sm.btn-icon` with descriptive `title` and `aria-label`) to prevent horizontal row clutter.
 
 ## Python Rules
 - No linting, typechecking, or test framework (pytest) configured. Tests use Django's `manage.py test` (TestCases in each app's `tests.py`).
