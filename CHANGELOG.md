@@ -4,6 +4,21 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.3.0] - 2026-09-10
+
+### Agregado
+
+- Ahora puedes modificar la cantidad de productos al hacer pedidos.
+- Los comprobantes de ventas y cotizaciones incluyen el precio unitario de cada producto.
+
+### Cambiado
+
+- El POS y el dashboard estrenan una interfaz más clara, con búsqueda, carrito, pagos mixtos y acciones rápidas mejor organizadas.
+
+### Corregido
+
+- Se corrigió el ingreso manual de decimales en el margen de utilidad y se aplica el margen predeterminado configurado por la tienda.
+
 ## [2.2.2] - 2026-09-07
 
 ### Corregido
