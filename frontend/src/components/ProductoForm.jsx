@@ -56,7 +56,16 @@ export default function ProductoForm({
     if (productoData && id) {
       let cancelled = false;
       Promise.resolve().then(() => {
-        if (!cancelled) setData({ ...productoData, proveedor: String(productoData.proveedor) });
+        if (!cancelled) {
+          setData({
+            ...productoData,
+            margen_utilidad:
+              productoData.margen_utilidad != null
+                ? Number(productoData.margen_utilidad)
+                : 30,
+            proveedor: String(productoData.proveedor),
+          });
+        }
       });
       return () => { cancelled = true; };
     } else if (!id && (initialCodigoProducto || initialProveedor)) {
@@ -167,6 +176,7 @@ export default function ProductoForm({
               onChange={(val) => setData({ ...data, margen_utilidad: val })}
               min={0}
               step={1}
+              allowDecimals
               style={{ width: "100%" }}
               inputStyle={{ width: "100%" }}
               decrementLabel="Disminuir margen de utilidad"

@@ -88,6 +88,7 @@ export default function StepperInput({
   min,
   max,
   step = 1,
+  allowDecimals = false,
   disabled = false,
   active = false,
   style = {},
@@ -104,26 +105,64 @@ export default function StepperInput({
     return bounded;
   };
 
+  const roundFloat = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
+
   const decrement = () => {
     if (disabled) return;
-    onChange(clamp(numericValue - step));
+    const next = allowDecimals
+      ? clamp(roundFloat(numericValue - step))
+      : clamp(numericValue - step);
+    onChange(next);
   };
 
   const increment = () => {
     if (disabled) return;
-    onChange(clamp(numericValue + step));
+    const next = allowDecimals
+      ? clamp(roundFloat(numericValue + step))
+      : clamp(numericValue + step);
+    onChange(next);
   };
 
   const handleChange = (e) => {
     if (disabled) return;
     const raw = e.target.value;
     if (raw === "") {
-      onChange(min !== undefined ? min : 0);
+      onChange(allowDecimals ? "" : (min !== undefined ? min : 0));
       return;
     }
-    const parsed = Number.isInteger(step) ? parseInt(raw, 10) : parseFloat(raw);
-    if (Number.isNaN(parsed)) return;
-    onChange(clamp(parsed));
+
+    if (allowDecimals) {
+      const normalized = raw.replace(",", ".");
+      if (normalized === "." || normalized === "-") {
+        onChange(normalized);
+        return;
+      }
+      const parsed = parseFloat(normalized);
+      if (Number.isNaN(parsed)) return;
+      if (max !== undefined && parsed > max) {
+        onChange(max);
+        return;
+      }
+      onChange(normalized);
+    } else {
+      const parsed = Number.isInteger(step) ? parseInt(raw, 10) : parseFloat(raw);
+      if (Number.isNaN(parsed)) return;
+      onChange(clamp(parsed));
+    }
+  };
+
+  const handleBlur = () => {
+    if (disabled) return;
+    if (allowDecimals) {
+      if (value === "" || value === "." || value === "-") {
+        onChange(min !== undefined ? min : 0);
+      } else {
+        const parsed = parseFloat(value);
+        if (!Number.isNaN(parsed)) {
+          onChange(clamp(roundFloat(parsed)));
+        }
+      }
+    }
   };
 
   return (
@@ -140,7 +179,7 @@ export default function StepperInput({
       </StepperButton>
       <input
         type="number"
-        inputMode={Number.isInteger(step) ? "numeric" : "decimal"}
+        inputMode={allowDecimals || !Number.isInteger(step) ? "decimal" : "numeric"}
         style={{
           width: inputStyle.width ?? 60,
           textAlign: "center",
@@ -157,9 +196,10 @@ export default function StepperInput({
         }}
         min={min}
         max={max}
-        step={step}
+        step={allowDecimals ? "any" : step}
         value={value}
         onChange={handleChange}
+        onBlur={handleBlur}
         disabled={disabled}
       />
       <StepperButton onClick={disabled || (max !== undefined && numericValue >= max) ? null : increment} active={active} label={incrementLabel}>
