@@ -5,8 +5,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
+import ProductoForm from "../components/ProductoForm";
+import AjusteStockModal from "../components/AjusteStockModal";
 import { usePageTitle } from "../lib/usePageTitle";
-import { getUser } from "../lib/auth";
+import { getUser, isBodeguero, isGerente } from "../lib/auth";
 import { apiRequest } from "../lib/api";
 import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
@@ -34,6 +36,8 @@ export default function DashboardPage() {
   const location = useLocation();
   const showToast = useToast();
   const user = getUser();
+  const esGerenteOEncargado = isGerente(user);
+  const puedeAjustar = isBodeguero(user);
   usePageTitle("Dashboard");
   const didToast = useRef(false);
   const { data, error } = useDashboardStats();
@@ -42,6 +46,8 @@ export default function DashboardPage() {
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   const [stockPage, setStockPage] = useState(1);
   const [stockPageSize, setStockPageSize] = useState(10);
+  const [editarProductoId, setEditarProductoId] = useState(null);
+  const [ajusteProducto, setAjusteProducto] = useState(null);
   const popoverRef = useRef(null);
 
   useEffect(() => {
@@ -257,7 +263,7 @@ export default function DashboardPage() {
                           <th className="hide-mobile">Proveedor</th>
                           <th>Stock actual</th>
                           <th>Stock mínimo</th>
-                          <th>Acciones</th>
+                          <th style={{ width: "1px" }}>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -310,12 +316,83 @@ export default function DashboardPage() {
                               <td>{p.codigo_producto}</td>
                               <td className="hide-mobile">{p.oem}</td>
                               <td className="hide-mobile">{p.proveedor_nombre}</td>
-                              <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
+                              <td>
+                                {puedeAjustar ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-link p-0"
+                                    style={{
+                                      color: "var(--danger)",
+                                      textDecoration: "none",
+                                      fontSize: "inherit",
+                                      fontWeight: 600,
+                                    }}
+                                    onClick={() => setAjusteProducto(p)}
+                                    title="Ajustar stock actual"
+                                  >
+                                    {p.stock_actual}
+                                  </button>
+                                ) : (
+                                  <span style={{ color: "var(--danger)" }}>
+                                    {p.stock_actual}
+                                  </span>
+                                )}
+                              </td>
                               <td>{p.stock_minimo}</td>
                               <td>
-                                <div className="btn-group flex-wrap">
+                                <div className="btn-group" role="group" aria-label="Acciones de producto">
                                   <button
-                                    className="btn btn-sm btn-outline"
+                                    type="button"
+                                    className={`btn btn-sm btn-icon ${yaAgregado ? "btn-outline" : "btn-primary"}`}
+                                    onClick={() => agregarPedidoMutation.mutate(p.producto_id)}
+                                    disabled={isAgregarPending || yaAgregado}
+                                    title={
+                                      yaAgregado
+                                        ? "En lista de pedidos"
+                                        : isAgregarPending
+                                          ? "Agregando a pedido..."
+                                          : "Agregar a lista de pedidos"
+                                    }
+                                    aria-label={yaAgregado ? "En lista de pedidos" : "Agregar a pedido"}
+                                  >
+                                    <i
+                                      className={`bi ${
+                                        yaAgregado
+                                          ? "bi-check2"
+                                          : isAgregarPending
+                                            ? "bi-hourglass-split"
+                                            : "bi-cart-plus"
+                                      }`}
+                                    />
+                                  </button>
+
+                                  {esGerenteOEncargado && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline btn-icon"
+                                      onClick={() => setEditarProductoId(p.producto_id)}
+                                      title="Editar información del producto"
+                                      aria-label="Editar producto"
+                                    >
+                                      <i className="bi bi-pencil" />
+                                    </button>
+                                  )}
+
+                                  {puedeAjustar && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline btn-icon"
+                                      onClick={() => setAjusteProducto(p)}
+                                      title="Ajustar stock actual"
+                                      aria-label="Ajustar stock"
+                                    >
+                                      <i className="bi bi-sliders" />
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline btn-icon"
                                     onClick={() =>
                                       ignorarMutation.mutate({
                                         productoId: p.producto_id,
@@ -323,14 +400,27 @@ export default function DashboardPage() {
                                       })
                                     }
                                     disabled={isIgnorarPending}
+                                    title={
+                                      isIgnorarPending &&
+                                      ignorarMutation.variables?.accion === "recordar_manana"
+                                        ? "Guardando..."
+                                        : "Recordar mañana (posponer alerta 1 día)"
+                                    }
+                                    aria-label="Recordar mañana"
                                   >
-                                    {isIgnorarPending &&
-                                    ignorarMutation.variables?.accion === "recordar_manana"
-                                      ? "Guardando..."
-                                      : "Recordar mañana"}
+                                    <i
+                                      className={`bi ${
+                                        isIgnorarPending &&
+                                        ignorarMutation.variables?.accion === "recordar_manana"
+                                          ? "bi-hourglass-split"
+                                          : "bi-clock-history"
+                                      }`}
+                                    />
                                   </button>
+
                                   <button
-                                    className="btn btn-sm btn-outline"
+                                    type="button"
+                                    className="btn btn-sm btn-outline btn-icon"
                                     onClick={() =>
                                       ignorarMutation.mutate({
                                         productoId: p.producto_id,
@@ -338,24 +428,22 @@ export default function DashboardPage() {
                                       })
                                     }
                                     disabled={isIgnorarPending}
-                                  >
-                                    {isIgnorarPending &&
-                                    ignorarMutation.variables?.accion === "ignorar_permanente"
-                                      ? "Guardando..."
-                                      : "Ignorar permanentemente"}
-                                  </button>
-                                  <button
-                                    className="btn btn-sm btn-outline"
-                                    onClick={() =>
-                                      agregarPedidoMutation.mutate(p.producto_id)
+                                    title={
+                                      isIgnorarPending &&
+                                      ignorarMutation.variables?.accion === "ignorar_permanente"
+                                        ? "Guardando..."
+                                        : "Ignorar permanentemente"
                                     }
-                                    disabled={isAgregarPending || yaAgregado}
+                                    aria-label="Ignorar permanentemente"
                                   >
-                                    {yaAgregado
-                                      ? "Agregado"
-                                      : isAgregarPending
-                                        ? "Agregando..."
-                                        : "Agregar a pedido"}
+                                    <i
+                                      className={`bi ${
+                                        isIgnorarPending &&
+                                        ignorarMutation.variables?.accion === "ignorar_permanente"
+                                          ? "bi-hourglass-split"
+                                          : "bi-bell-slash"
+                                      }`}
+                                    />
                                   </button>
                                 </div>
                               </td>
@@ -428,6 +516,41 @@ export default function DashboardPage() {
       )}
       {!data && !error && (
         <div className="text-center text-muted mt-5">Cargando...</div>
+      )}
+
+      {editarProductoId && (
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-xl" style={{ maxWidth: 1000 }}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Editar producto</h5>
+                <button
+                  type="button"
+                  className="modal-close"
+                  onClick={() => setEditarProductoId(null)}
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: "75vh", overflowY: "auto" }}>
+                <ProductoForm
+                  productoId={editarProductoId}
+                  onSaved={() => {
+                    setEditarProductoId(null);
+                    showToast("Producto actualizado exitosamente", "success");
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ajusteProducto && (
+        <AjusteStockModal
+          producto={ajusteProducto}
+          onClose={() => setAjusteProducto(null)}
+        />
       )}
     </>
   );

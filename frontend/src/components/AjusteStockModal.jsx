@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import StepperInput from "./StepperInput";
-import { useAjustarStock, useUbicaciones } from "../lib/queries";
+import { useAjustarStock, useProducto, useUbicaciones } from "../lib/queries";
 
 function todayInputValue() {
   const d = new Date();
@@ -10,9 +10,7 @@ function todayInputValue() {
   return `${year}-${month}-${day}`;
 }
 
-export default function AjusteStockModal({ producto, onClose }) {
-  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
-  const todasUbicaciones = ubicacionesData?.results ?? [];
+function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
   const mutation = useAjustarStock();
 
   const initialRows = useMemo(() => {
@@ -274,5 +272,46 @@ export default function AjusteStockModal({ producto, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AjusteStockModal({ producto, onClose }) {
+  const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
+  const todasUbicaciones = ubicacionesData?.results ?? [];
+
+  const shouldFetchDetails = !!producto?.producto_id && !producto?.ubicaciones_stock;
+  const { data: fullProducto, isFetching: isLoadingDetails } = useProducto(
+    shouldFetchDetails ? producto.producto_id : null
+  );
+
+  if (shouldFetchDetails && isLoadingDetails && !fullProducto) {
+    return (
+      <div className="modal" role="dialog" aria-modal="true">
+        <div className="modal-dialog" style={{ maxWidth: 600 }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Ajustar stock — {producto.nombre}</h5>
+              <button type="button" className="modal-close" onClick={onClose}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body text-center py-5 text-muted">
+              Cargando ubicaciones...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const effectiveProducto = fullProducto || producto;
+
+  return (
+    <AjusteStockModalContent
+      key={effectiveProducto?.producto_id}
+      producto={effectiveProducto}
+      onClose={onClose}
+      todasUbicaciones={todasUbicaciones}
+    />
   );
 }

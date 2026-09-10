@@ -106,7 +106,10 @@ export function useUpdateProducto() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }) => apiRequest(`/productos/${id}/`, { method: "PUT", body: data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
   });
 }
 
@@ -598,7 +601,10 @@ export function useAjustarStock() {
   return useMutation({
     mutationFn: ({ productoId, data }) =>
       apiRequest(`/productos/${productoId}/ajustar-stock/`, { method: "POST", body: data }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.productos.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.productos.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
   });
 }
 
