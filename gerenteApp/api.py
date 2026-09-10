@@ -213,7 +213,7 @@ class FacturaViewSet(viewsets.ModelViewSet):
                     continue
                 detalle.producto = producto
                 detalle.save(update_fields=["producto"])
-                descontar_stock_producto(producto)
+                descontar_stock_producto(producto, cantidad=detalle.cantidad)
                 aplicados.append(detalle_id)
         return Response({"aplicados": aplicados})
 

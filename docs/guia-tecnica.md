@@ -301,7 +301,8 @@ Convenciones: todos los montos se almacenan como **`IntegerField`** en pesos chi
 | | `nombre` | Char(200) | NOT NULL | — |
 | | `precio_costo` | Integer | NOT NULL | — |
 | | `porcentaje_utilidad` | Decimal(5,2) | NOT NULL | — |
-| | `precio_final` | Integer | NOT NULL | Con IVA + envío (redondeado a $100) |
+| | `cantidad` | PositiveInteger | default=1 | Cantidad solicitada |
+| | `precio_final` | Integer | NOT NULL | Con IVA + envío (redondeado a $100) × cantidad |
 | | `sumar_envio` | Boolean | default=True | — |
 | | `stellantis` | Boolean | default=False | Costo base al 80% |
 | `cierres_caja` | `fecha` | Date | `db_index` | — |

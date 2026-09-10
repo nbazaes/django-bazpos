@@ -270,6 +270,7 @@ export default function PedidosHistorial() {
       <tr>
         ${!esCotizacion ? `<td>${d.codigo_proveedor || "—"}</td><td>${d.oem || "—"}</td>` : ""}
         <td>${d.nombre}</td>
+        <td style="text-align:center;">${d.cantidad || 1}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
     `).join("");
@@ -328,7 +329,7 @@ export default function PedidosHistorial() {
         </div>
         <table>
           <thead>
-            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
@@ -535,7 +536,7 @@ export default function PedidosHistorial() {
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead>
-                      <tr><th>Cód. Prov.</th><th>Proveedor</th><th>OEM</th><th>Nombre</th><th>Precio costo</th><th>% Utilidad</th><th>Envío</th><th>Stellantis</th><th>Total</th></tr>
+                      <tr><th>Cód. Prov.</th><th>Proveedor</th><th>OEM</th><th>Nombre</th><th>Precio costo</th><th>% Utilidad</th><th>Cant.</th><th>Envío</th><th>Stellantis</th><th>Total</th></tr>
                     </thead>
                     <tbody>
                       {(detalleData.detalles || []).map((d) => (
@@ -546,6 +547,7 @@ export default function PedidosHistorial() {
                           <td>{d.nombre}</td>
                           <td>${d.precio_costo}</td>
                           <td>{d.porcentaje_utilidad}%</td>
+                          <td>{d.cantidad || 1}</td>
                           <td>{d.sumar_envio ? "Sí" : "No"}</td>
                           <td>{d.stellantis ? "Sí" : "No"}</td>
                           <td>${d.precio_final}</td>
@@ -640,7 +642,7 @@ export default function PedidosHistorial() {
               </div>
               <div className="modal-body">
                 <p className="mb-3">
-                  Seleccione las líneas a devolver y el monto que se reintegrará. Cada línea se devuelve completa (cantidad 1).
+                  Seleccione las líneas a devolver y el monto que se reintegrará. Cada línea se devuelve completa.
                 </p>
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
@@ -649,6 +651,7 @@ export default function PedidosHistorial() {
                         <th style={{ width: 40 }}>Sel.</th>
                         <th>Cód. Prov.</th>
                         <th>Producto</th>
+                        <th>Cant.</th>
                         <th>Precio</th>
                         <th>Monto a devolver</th>
                         {devolverData.stock_descontado && <th>Reponer</th>}
@@ -669,6 +672,7 @@ export default function PedidosHistorial() {
                                 {d.nombre}
                                 <div className="text-muted" style={{ fontSize: "0.8rem" }}>{d.oem || ""}</div>
                               </td>
+                              <td>{d.cantidad || 1}</td>
                               <td className="text-right">${d.precio_final}</td>
                               <td colSpan={devolverData.stock_descontado ? 3 : 1}>
                                 <span className="badge badge-secondary">
@@ -693,6 +697,7 @@ export default function PedidosHistorial() {
                               {d.nombre}
                               <div className="text-muted" style={{ fontSize: "0.8rem" }}>{d.oem || ""}</div>
                             </td>
+                            <td>{d.cantidad || 1}</td>
                             <td className="text-right">${d.precio_final}</td>
                             <td>
                               <input

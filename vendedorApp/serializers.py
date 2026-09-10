@@ -695,6 +695,7 @@ class PedidoDetalleSerializer(serializers.ModelSerializer):
             "nombre",
             "precio_costo",
             "porcentaje_utilidad",
+            "cantidad",
             "precio_final",
             "sumar_envio",
             "cost_modifiers",
@@ -804,6 +805,7 @@ class PedidoDetalleInputSerializer(serializers.Serializer):
     nombre = serializers.CharField(max_length=200)
     precio_costo = serializers.IntegerField(min_value=0)
     porcentaje_utilidad = serializers.DecimalField(max_digits=5, decimal_places=2, min_value=Decimal(0))
+    cantidad = serializers.IntegerField(min_value=1, default=1, required=False)
     sumar_envio = serializers.BooleanField(default=True)
     cost_modifiers = serializers.ListField(
         child=serializers.CharField(max_length=50),
@@ -857,6 +859,7 @@ class CrearPedidoSerializer(serializers.Serializer):
         monto_subtotal = 0
         monto_total = 0
         for item in items:
+            cantidad = item.get("cantidad", 1)
             base, item_total = self._calcular_item(
                 item["precio_costo"],
                 item["porcentaje_utilidad"],
@@ -864,8 +867,8 @@ class CrearPedidoSerializer(serializers.Serializer):
                 sumar_envio=item.get("sumar_envio", True),
                 cost_modifiers=item.get("cost_modifiers", []),
             )
-            monto_subtotal += base
-            monto_total += item_total
+            monto_subtotal += base * cantidad
+            monto_total += item_total * cantidad
 
         pedido = Pedido.objects.create(
             usuario=request.user,
@@ -881,6 +884,7 @@ class CrearPedidoSerializer(serializers.Serializer):
         )
 
         for item in items:
+            cantidad = item.get("cantidad", 1)
             base, item_total = self._calcular_item(
                 item["precio_costo"],
                 item["porcentaje_utilidad"],
@@ -901,7 +905,8 @@ class CrearPedidoSerializer(serializers.Serializer):
                 nombre=item["nombre"],
                 precio_costo=item["precio_costo"],
                 porcentaje_utilidad=item["porcentaje_utilidad"],
-                precio_final=item_total,
+                cantidad=cantidad,
+                precio_final=item_total * cantidad,
                 sumar_envio=item.get("sumar_envio", True),
                 cost_modifiers=item.get("cost_modifiers", []),
             )

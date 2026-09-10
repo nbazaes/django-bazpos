@@ -1248,6 +1248,96 @@ class PedidoApiTest(BaseTest):
         self.assertTrue(pedido.es_cotizacion)
         self.assertIsNone(pedido.venta)
 
+    def test_crear_pedido_con_cantidad(self):
+        payload = self._item()
+        payload["items"][0]["cantidad"] = 3
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", payload, format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        pedido = Pedido.objects.get(id=resp.data["id"])
+        detalle = pedido.detalles.first()
+        self.assertEqual(detalle.cantidad, 3)
+        self.assertEqual(detalle.precio_final, 60000)
+        self.assertEqual(pedido.monto_subtotal, 39000)
+        self.assertEqual(pedido.monto_total, 60000)
+
+    def test_marcar_retiro_descuenta_stock_multi_cantidad(self):
+        payload = self._item()
+        payload["items"][0]["cantidad"] = 4
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", payload, format="json"
+        )
+        self.assertEqual(resp.status_code, 201)
+        pedido_id = resp.data["id"]
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 10)
+
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {"persona_retiro": "Juan Perez"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        stock.refresh_from_db()
+        self.assertEqual(stock.cantidad, 6)
+
+    def test_devolver_pedido_restaura_stock_multi_cantidad(self):
+        payload = self._item()
+        payload["items"][0]["cantidad"] = 3
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", payload, format="json"
+        )
+        pedido_id = resp.data["id"]
+        auth_client(self.vendedor).post(
+            f"/api/pedidos/{pedido_id}/cambiar-estado/",
+            {"estado": "RE"},
+            format="json",
+        )
+        pedido = Pedido.objects.get(id=pedido_id)
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido_id)
+        stock = StockProductoUbicacion.objects.get(
+            producto=self.producto, ubicacion=self.ubicacion
+        )
+        self.assertEqual(stock.cantidad, 7)
+
+        resp = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido.id}/devolver/",
+            self._devolver_payload(detalle),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        devolucion = Devolucion.objects.get(id=resp.data["id"])
+        dd = DetalleDevolucion.objects.get(devolucion=devolucion)
+        self.assertEqual(dd.cantidad, 3)
+        stock.refresh_from_db()
+        self.assertEqual(stock.cantidad, 10)
+
+    def test_convertir_cotizacion_preserva_cantidad(self):
+        payload = self._item(es_cotizacion=True)
+        payload["items"][0]["cantidad"] = 2
+        resp = auth_client(self.vendedor).post(
+            "/api/pedidos/", payload, format="json"
+        )
+        cotizacion_id = resp.data["id"]
+        detalle = PedidoDetalle.objects.get(pedido_id=cotizacion_id)
+        self.assertEqual(detalle.cantidad, 2)
+        self.assertEqual(detalle.precio_final, 40000)
+
+        resp = auth_client(self.vendedor).post(
+            f"/api/pedidos/{cotizacion_id}/convertir-a-pedido/",
+            {"detalle_ids": [detalle.id]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        nuevo_pedido = Pedido.objects.get(id=resp.data["id"])
+        nuevo_detalle = nuevo_pedido.detalles.first()
+        self.assertEqual(nuevo_detalle.cantidad, 2)
+        self.assertEqual(nuevo_detalle.precio_final, 40000)
+        self.assertEqual(nuevo_pedido.monto_total, 40000)
+
     def test_crear_pedido_acepta_todos_los_medios_de_pago_y_documentos(self):
         for metodo_pago in ["EF", "TJ", "TR", "CH"]:
             payload = self._item()

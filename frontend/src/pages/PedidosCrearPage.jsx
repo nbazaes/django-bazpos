@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
 import PedidosHistorial from "../components/PedidosHistorial";
+import StepperInput from "../components/StepperInput";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
@@ -30,6 +31,7 @@ const productoVacio = {
   nombre: "",
   precio_costo: "",
   porcentaje_utilidad: "",
+  cantidad: 1,
   sumar_envio: true,
   stellantis: false,
 };
@@ -92,7 +94,8 @@ export default function PedidosCrearPage() {
 
   const totales = useMemo(() => {
     const subtotal = items.reduce((sum, it) => {
-      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.stellantis);
+      const cant = Number(it.cantidad) || 1;
+      return sum + calcularItemSubtotal(it.precio_costo, it.porcentaje_utilidad, it.stellantis) * cant;
     }, 0);
     const total = items.reduce((sum, it) => sum + it.precio_final, 0);
     return { subtotal, total };
@@ -159,7 +162,8 @@ export default function PedidosCrearPage() {
       addToast("Completa los datos del producto antes de agregar", "danger");
       return;
     }
-    const precioFinal = calcularItemTotal(
+    const qty = Math.max(1, parseInt(producto.cantidad, 10) || 1);
+    const precioUnitario = calcularItemTotal(
       producto.precio_costo,
       producto.porcentaje_utilidad,
       producto.sumar_envio,
@@ -172,10 +176,32 @@ export default function PedidosCrearPage() {
         proveedor_id: Number(producto.proveedor_id),
         precio_costo: Number(producto.precio_costo),
         porcentaje_utilidad: Number(producto.porcentaje_utilidad),
-        precio_final: precioFinal,
+        cantidad: qty,
+        precio_final: precioUnitario * qty,
       },
     ]);
     limpiarProducto();
+  }
+
+  function actualizarCantidadItem(index, nuevaCantidad) {
+    const qty = Math.max(1, parseInt(nuevaCantidad, 10) || 1);
+    setItems((prev) => {
+      const next = [...prev];
+      const it = next[index];
+      if (!it) return prev;
+      const precioUnitario = calcularItemTotal(
+        it.precio_costo,
+        it.porcentaje_utilidad,
+        it.sumar_envio,
+        it.stellantis,
+      );
+      next[index] = {
+        ...it,
+        cantidad: qty,
+        precio_final: precioUnitario * qty,
+      };
+      return next;
+    });
   }
 
   function eliminarItem(index) {
@@ -213,6 +239,7 @@ export default function PedidosCrearPage() {
         nombre: it.nombre,
         precio_costo: it.precio_costo,
         porcentaje_utilidad: it.porcentaje_utilidad,
+        cantidad: it.cantidad || 1,
         sumar_envio: it.sumar_envio,
         stellantis: it.stellantis,
       })),
@@ -243,6 +270,7 @@ export default function PedidosCrearPage() {
       <tr>
         ${!esCotizacion ? `<td>${d.codigo_proveedor || "—"}</td><td>${d.oem || "—"}</td>` : ""}
         <td>${d.nombre}</td>
+        <td style="text-align:center;">${d.cantidad || 1}</td>
         <td style="text-align:right;">$${d.precio_final}</td>
       </tr>
     `).join("");
@@ -299,7 +327,7 @@ export default function PedidosCrearPage() {
         </div>
         <table>
           <thead>
-            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:right;">Total</th></tr>
+            <tr>${!esCotizacion ? "<th>Cód. Prov.</th><th>OEM</th>" : ""}<th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Total</th></tr>
           </thead>
           <tbody>${filas}</tbody>
         </table>
@@ -460,7 +488,7 @@ export default function PedidosCrearPage() {
             </div>
 
             <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group">
                   <label>Precio costo</label>
                   <input
@@ -473,9 +501,9 @@ export default function PedidosCrearPage() {
                   />
                 </div>
               </div>
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group">
-                  <label>Porcentaje utilidad</label>
+                  <label>Porcentaje utilidad (%)</label>
                   <input
                     type="number"
                     className="form-control"
@@ -484,6 +512,19 @@ export default function PedidosCrearPage() {
                     placeholder="0"
                     min="0"
                     step="0.01"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group">
+                  <label>Cantidad</label>
+                  <StepperInput
+                    value={producto.cantidad || 1}
+                    onChange={(val) => handleProductoChange("cantidad", val)}
+                    min={1}
+                    max={9999}
+                    decrementLabel="Disminuir cantidad"
+                    incrementLabel="Aumentar cantidad"
                   />
                 </div>
               </div>
@@ -510,9 +551,15 @@ export default function PedidosCrearPage() {
 
             <div className="flex items-center justify-between flex-wrap gap-3 mt-3">
               <div className="text-right">
-                <div className="text-secondary">Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis)}</div>
-                {producto.sumar_envio && <div className="text-secondary">Envío +$4.500</div>}
-                <div className="text-lg font-bold mt-1">Total producto: ${itemTotalPreview}</div>
+                <div className="text-secondary">
+                  Subtotal: ${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis) * (Number(producto.cantidad) || 1)}
+                  {(Number(producto.cantidad) || 1) > 1 && ` ($${calcularItemSubtotal(producto.precio_costo, producto.porcentaje_utilidad, producto.stellantis)} c/u)`}
+                </div>
+                {producto.sumar_envio && <div className="text-secondary">Envío +$4.500 c/u</div>}
+                <div className="text-lg font-bold mt-1">
+                  Total producto: ${itemTotalPreview * (Number(producto.cantidad) || 1)}
+                  {(Number(producto.cantidad) || 1) > 1 && ` ($${itemTotalPreview} c/u)`}
+                </div>
               </div>
               <button
                 type="button"
@@ -535,6 +582,7 @@ export default function PedidosCrearPage() {
                 <th>Nombre</th>
                 <th>Precio costo</th>
                 <th>% Utilidad</th>
+                <th style={{ width: 130 }}>Cantidad</th>
                 <th>Total</th>
                 <th></th>
               </tr>
@@ -548,6 +596,17 @@ export default function PedidosCrearPage() {
                   <td>{it.nombre}</td>
                   <td>${it.precio_costo}</td>
                   <td>{it.porcentaje_utilidad}%</td>
+                  <td>
+                    <StepperInput
+                      value={it.cantidad || 1}
+                      onChange={(val) => actualizarCantidadItem(idx, val)}
+                      min={1}
+                      max={9999}
+                      inputStyle={{ width: 48, fontSize: "0.85rem" }}
+                      decrementLabel={`Disminuir cantidad de ${it.nombre}`}
+                      incrementLabel={`Aumentar cantidad de ${it.nombre}`}
+                    />
+                  </td>
                   <td>${it.precio_final}</td>
                   <td>
                     <button className="btn btn-sm btn-danger" onClick={() => eliminarItem(idx)} title="Eliminar">
@@ -558,7 +617,7 @@ export default function PedidosCrearPage() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="text-center text-muted">No hay productos agregados</td>
+                  <td colSpan="9" className="text-center text-muted">No hay productos agregados</td>
                 </tr>
               )}
             </tbody>

@@ -1629,7 +1629,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
             if detalle.producto_id != producto.producto_id:
                 detalle.producto = producto
                 detalle.save(update_fields=["producto"])
-            descontar_stock_producto(producto)
+            descontar_stock_producto(producto, cantidad=detalle.cantidad)
         pedido.stock_descontado = True
 
     @action(detail=True, methods=["post"], url_path="cambiar-estado")
@@ -1768,7 +1768,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                         ubicacion_id=ubicacion_id,
                         defaults={"cantidad": 0},
                     )
-                    stock.cantidad += 1
+                    stock.cantidad += pedido_detalle.cantidad
                     stock.save()
 
                 DetalleDevolucion.objects.create(
@@ -1777,7 +1777,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     pedido_detalle=pedido_detalle,
                     nombre=pedido_detalle.nombre,
                     precio_unitario=monto,
-                    cantidad=1,
+                    cantidad=pedido_detalle.cantidad,
                     reponer_stock=reponer,
                 )
 
@@ -1836,11 +1836,13 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                 sumar_envio=detalle.sumar_envio,
                 cost_modifiers=detalle.cost_modifiers,
             )
-            monto_subtotal += base
-            monto_total += item_total
+            monto_subtotal += base * detalle.cantidad
+            line_total = item_total * detalle.cantidad
+            monto_total += line_total
             nuevos_items.append({
                 "detalle": detalle,
-                "item_total": item_total,
+                "item_total": line_total,
+                "cantidad": detalle.cantidad,
             })
 
         with transaction.atomic():
@@ -1869,6 +1871,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
                     nombre=d.nombre,
                     precio_costo=d.precio_costo,
                     porcentaje_utilidad=d.porcentaje_utilidad,
+                    cantidad=item["cantidad"],
                     precio_final=item["item_total"],
                     sumar_envio=d.sumar_envio,
                     cost_modifiers=d.cost_modifiers,

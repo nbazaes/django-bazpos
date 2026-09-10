@@ -406,6 +406,27 @@ class FacturaUpsertTest(TestCase):
         stock = StockProductoUbicacion.objects.get(producto=self.producto)
         self.assertEqual(stock.cantidad, 4)
 
+    def test_reconciliar_pedidos_descuenta_multi_cantidad(self):
+        detalle = self._crear_pedido_retirado_custom()
+        detalle.cantidad = 3
+        detalle.save(update_fields=["cantidad"])
+        resp = auth_client(self.gerente).post(
+            "/api/facturas/", self._factura_payload(), format="json"
+        )
+        factura_id = resp.data["id"]
+        resp = auth_client(self.gerente).post(
+            f"/api/facturas/{factura_id}/reconciliar-pedidos/",
+            {"descontar": [detalle.id]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["aplicados"], [detalle.id])
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.producto_id, self.producto.producto_id)
+        stock = StockProductoUbicacion.objects.get(producto=self.producto)
+        # initial 5 in fixture - 3 = 2
+        self.assertEqual(stock.cantidad, 2)
+
     def test_reconciliar_pedidos_idempotente(self):
         detalle = self._crear_pedido_retirado_custom()
         resp = auth_client(self.gerente).post(

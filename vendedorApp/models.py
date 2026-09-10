@@ -414,6 +414,7 @@ class PedidoDetalle(models.Model):
     precio_costo = models.IntegerField()
     porcentaje_utilidad = models.DecimalField(max_digits=5, decimal_places=2)
     precio_final = models.IntegerField()
+    cantidad = models.PositiveIntegerField(default=1)
     sumar_envio = models.BooleanField(default=True)
     cost_modifiers = models.JSONField(default=list, blank=True)
 
@@ -421,7 +422,7 @@ class PedidoDetalle(models.Model):
         db_table = "pedido_detalles"
 
     def __str__(self):
-        return f"{self.nombre} x1"
+        return f"{self.nombre} x{self.cantidad}"
 
 
 class CierreCaja(models.Model):
