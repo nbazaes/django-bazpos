@@ -147,3 +147,10 @@ export async function login(username, password) {
 export async function me() {
   return apiRequest("/auth/me/");
 }
+
+export async function sendSupportTicket(ticketData) {
+  return apiRequest("/soporte/tickets/", {
+    method: "POST",
+    body: ticketData,
+  });
+}

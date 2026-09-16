@@ -6,7 +6,7 @@ from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
 from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
 from vendedorApp.publico_api import CatalogoPublicoViewSet
-from .api_views import MeView, StoreNameView
+from .api_views import MeView, StoreNameView, SupportTicketView
 
 router = DefaultRouter()
 router.register("productos", ProductoViewSet, basename="producto")
@@ -26,6 +26,7 @@ urlpatterns = [
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/me/", MeView.as_view(), name="auth_me"),
     path("store-name/", StoreNameView.as_view(), name="store_name"),
+    path("soporte/tickets/", SupportTicketView.as_view(), name="soporte_ticket_create"),
     path("dashboard/stats/", DashboardStatsView.as_view(), name="dashboard_stats"),
     path("reportes/stats/", ReportesStatsView.as_view(), name="reportes_stats"),
     path("reportes/custom/schema/", ReporteSchemaView.as_view(), name="reporte_custom_schema"),

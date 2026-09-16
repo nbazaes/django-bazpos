@@ -7,6 +7,7 @@ import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import ChatWidget from "./ChatWidget";
 import PageLoader from "./PageLoader";
+import SupportTicketModal from "./SupportTicketModal";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "bazpos_sidebar_collapsed";
@@ -50,6 +51,7 @@ export default function Shell() {
   const [theme, setTheme] = useState(() => getStoredTheme());
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -212,16 +214,27 @@ export default function Shell() {
           )}
 
           <div className="sidebar-version">
-            <button
-              type="button"
-              className="sidebar-changelog-btn"
-              onClick={openChangelog}
-              title="Ver novedades"
-            >
-              <i className="bi bi-megaphone" />
-              <span>Novedades</span>
-              {unseenChangelog.length > 0 && <span className="changelog-dot" aria-label="Hay novedades nuevas" />}
-            </button>
+            <div className="sidebar-version-actions">
+              <button
+                type="button"
+                className="sidebar-changelog-btn"
+                onClick={openChangelog}
+                title="Ver novedades"
+              >
+                <i className="bi bi-megaphone" />
+                <span>Novedades</span>
+                {unseenChangelog.length > 0 && <span className="changelog-dot" aria-label="Hay novedades nuevas" />}
+              </button>
+              <button
+                type="button"
+                className="sidebar-support-btn"
+                onClick={() => setShowSupportModal(true)}
+                title="Soporte o sugerencias"
+              >
+                <i className="bi bi-headset" />
+                <span>Soporte</span>
+              </button>
+            </div>
             <div>
               {storeName} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
             </div>
@@ -309,6 +322,10 @@ export default function Shell() {
           dismissable={changelogModal.dismissable}
           onClose={closeChangelog}
         />
+      )}
+
+      {showSupportModal && (
+        <SupportTicketModal onClose={() => setShowSupportModal(false)} />
       )}
 
       <ChatWidget />

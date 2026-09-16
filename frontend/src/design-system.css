@@ -999,16 +999,28 @@ textarea.form-control, textarea.input {
   font-size: 0.67rem;
   text-align: center;
   color: var(--text-muted);
-  opacity: 0.45;
+  opacity: 0.55;
   border-top: 1px solid var(--border-default);
+  transition: opacity var(--transition);
+}
+.sidebar-version:hover {
+  opacity: 1;
 }
 
-.sidebar-version .sidebar-changelog-btn {
-  display: inline-flex;
+.sidebar-version-actions {
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   margin-bottom: 0.4rem;
-  padding: 0.25rem 0.6rem;
+}
+
+.sidebar-version .sidebar-changelog-btn,
+.sidebar-version .sidebar-support-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
@@ -1019,7 +1031,9 @@ textarea.form-control, textarea.input {
   position: relative;
   opacity: 1;
 }
-.sidebar-version .sidebar-changelog-btn:hover {
+
+.sidebar-version .sidebar-changelog-btn:hover,
+.sidebar-version .sidebar-support-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -2507,4 +2521,104 @@ textarea.form-control, textarea.input {
   .scheme-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ====== SUPPORT TICKET MODAL ====== */
+.ticket-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@media (max-width: 576px) {
+  .ticket-type-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ticket-type-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.ticket-type-card i {
+  font-size: 1.3rem;
+  color: var(--text-secondary);
+  margin-top: 0.1rem;
+  flex-shrink: 0;
+}
+.ticket-type-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.ticket-type-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.ticket-type-card.active i {
+  color: var(--accent);
+}
+
+.priority-pill-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.priority-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.priority-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.priority-pill.prio-baja.active {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #16a34a;
+}
+.priority-pill.prio-media.active {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: #eab308;
+  color: #ca8a04;
+}
+.priority-pill.prio-alta.active {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: #f97316;
+  color: #ea580c;
+}
+.priority-pill.prio-urgente.active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+.ticket-context-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+}
+.ticket-context-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
