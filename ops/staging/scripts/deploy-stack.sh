@@ -56,6 +56,9 @@ MYSQL_USER=bazpos
 MYSQL_PASSWORD=${DB_PASS}
 APP_IMAGE=${APP_IMAGE}
 NGINX_IMAGE=${NGINX_IMAGE}
+RESEND_API_KEY=
+RESEND_FROM_EMAIL="BazPos <onboarding@resend.dev>"
+SUPPORT_EMAIL=soporte@bazpos.com
 EOF
   chmod 600 "${LOCAL_ENV}"
 else
