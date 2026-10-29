@@ -125,12 +125,13 @@ export default function VentaPage() {
           oem: d.producto_oem || "",
           nombre: d.producto_nombre,
           marca: d.producto_marca || "",
-          precio: d.precio_descontado > 0 ? d.precio_descontado : d.precio_unitario,
+          precio: d.subtotal / d.cantidad,
           cantidad: d.cantidad,
           stock_actual: 99999,
         }));
         if (items.length > 0) {
           setCarro(items);
+          setDescuentoPorcentaje(cot.descuento_porcentaje ?? 0);
         }
       } catch (err) {
         setError("No se pudo cargar la cotización: " + (err.message || "error desconocido"));
