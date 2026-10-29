@@ -168,6 +168,8 @@ class VentaSerializer(serializers.ModelSerializer):
     monto_descuento = serializers.SerializerMethodField()
     convertido = serializers.SerializerMethodField()
     venta_derivada_id = serializers.SerializerMethodField()
+    devoluciones_detalle = serializers.SerializerMethodField()
+    motivo_anulacion = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
@@ -196,6 +198,8 @@ class VentaSerializer(serializers.ModelSerializer):
             "productos_devueltos",
             "montos_devueltos",
             "monto_devuelto",
+            "devoluciones_detalle",
+            "motivo_anulacion",
         ]
 
     def get_pagos(self, obj):
@@ -236,6 +240,23 @@ class VentaSerializer(serializers.ModelSerializer):
                 if dd.producto_id is not None:
                     resultado[dd.producto_id] = resultado.get(dd.producto_id, 0) + dd.cantidad
         return resultado
+
+    def get_devoluciones_detalle(self, obj):
+        return [
+            {
+                "id": devolucion.id,
+                "motivo": devolucion.motivo,
+                "fecha_devolucion": devolucion.fecha_devolucion,
+                "detalles": DetalleDevolucionSerializer(devolucion.detalles.all(), many=True).data,
+            }
+            for devolucion in obj.devoluciones.all()
+        ]
+
+    def get_motivo_anulacion(self, obj):
+        try:
+            return obj.anulacion.motivo
+        except Anulacion.DoesNotExist:
+            return None
 
     def _venta_derivada(self, obj):
         return obj.ventas_derivadas.all().first()

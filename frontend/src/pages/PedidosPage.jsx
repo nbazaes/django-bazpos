@@ -446,6 +446,46 @@ export default function PedidosPage() {
                     )}
                   </div>
                 </div>
+                {(detalleVentaData.motivo_anulacion || detalleVentaData.devoluciones_detalle?.length > 0) && (
+                  <section className="mb-4" aria-label="Devoluciones y anulaciones">
+                    <h6 className="mb-3">Devoluciones y anulaciones</h6>
+                    {detalleVentaData.motivo_anulacion && (
+                      <div className="p-3 mb-2 rounded border" style={{ borderLeft: "4px solid var(--danger, #dc3545)" }}>
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <strong>Anulación</strong><span className="badge bg-danger">Venta anulada</span>
+                        </div>
+                        <div className="text-secondary" style={{ whiteSpace: "pre-wrap" }}>{detalleVentaData.motivo_anulacion}</div>
+                      </div>
+                    )}
+                    {(detalleVentaData.devoluciones_detalle || []).map((devolucion) => (
+                      <div className="p-3 mb-2 rounded border" key={devolucion.id}>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <strong>Devolución #{devolucion.id}</strong>
+                          <span className="badge bg-info">Devolución registrada</span>
+                        </div>
+                        <div className="mb-2">
+                          <span className="text-secondary">Motivo: </span>
+                          <span style={{ whiteSpace: "pre-wrap" }}>{devolucion.motivo || "Sin motivo indicado"}</span>
+                        </div>
+                        <div className="small text-secondary mb-1">Productos devueltos</div>
+                        <ul className="mb-0 ps-3">
+                          {(devolucion.detalles || []).map((item) => {
+                            const vendido = (detalleVentaData.detalles || []).find((detalle) => detalle.producto === item.producto)?.cantidad;
+                            const esParcial = vendido != null && item.cantidad < vendido;
+                            return (
+                              <li key={item.id}>
+                                <strong>{item.cantidad} ×</strong> {item.producto_nombre || "Producto sin nombre"}
+                                {vendido != null && <span className="text-secondary"> de {vendido} vendido{vendido === 1 ? "" : "s"}</span>}
+                                {esParcial && <span className="badge bg-warning text-dark ms-2">Parcial</span>}
+                                <span className="text-secondary"> · {item.reponer_stock ? "Stock repuesto" : "Sin reposición de stock"}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <div className="table-responsive">
                   <table className="table table-sm table-bordered">
                     <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>
