@@ -4,6 +4,18 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.4.0] - 2026-10-30
+
+### Agregado
+
+- Nuevo módulo de tickets de soporte y sugerencias.
+- Ahora puedes ver los motivos y productos devueltos en cada venta.
+
+### Corregido
+
+- El histórico de precios muestra correctamente la carga y los errores.
+- El descuento de una cotización se mantiene al convertirla en venta.
+
 ## [2.3.0] - 2026-09-10
 
 ### Agregado
