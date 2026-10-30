@@ -72,8 +72,8 @@ function getCommitsSince(since) {
     .filter(
       (c) =>
         c.subject &&
-        !/^version\s+\d+\.\d+\.\d+/i.test(c.subject) &&
-        !/^\d+\.\d+\.\d+$/i.test(c.subject) &&
+        !/^version\s+v?\d+\.\d+\.\d+/i.test(c.subject) &&
+        !/^v?\d+\.\d+\.\d+$/i.test(c.subject) &&
         (isUserFacingKey(c.subject) || !INTERNAL_PREFIXES.test(c.subject)),
     );
 }
@@ -212,7 +212,7 @@ async function main() {
   const version = versionArg || pkg.version;
 
   const versionCommits = git(
-    `git log --format='%H%x09%s' --grep='^version\\s\\+\\?[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+' --grep='^[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+$'`,
+    `git log --format='%H%x09%s' --extended-regexp --regexp-ignore-case --grep='^(version[[:space:]]+)?v?[0-9]+\\.[0-9]+\\.[0-9]+$'`,
   )
     .split("\n")
     .map((line) => {
