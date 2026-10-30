@@ -147,7 +147,6 @@ export function useHistorialPrecios(productoId, params = {}) {
     queryFn: () => apiRequest(`/productos/${productoId}/historial-precios/${buildQuery(params)}`),
     enabled: !!productoId,
     staleTime: 5 * 60_000,
-    placeholderData: placeholderData(),
   });
 }
 

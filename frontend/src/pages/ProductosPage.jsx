@@ -78,7 +78,13 @@ export default function ProductosPage() {
   const { data: ultimaFactura } = useUltimaFacturaProducto(detalleProductoId);
   const { data: productoDetalle } = useProducto(detalleProductoId);
   const historialParams = { page: historialPage, page_size: historialPageSize };
-  const { data: historialData } = useHistorialPrecios(detalleProductoId, historialParams);
+  const {
+    data: historialData,
+    isPending: historialPending,
+    isFetching: historialFetching,
+    isError: historialError,
+    refetch: refetchHistorial,
+  } = useHistorialPrecios(detalleProductoId, historialParams);
   const { data: facturaDetalle } = useFactura(facturaDetalleId);
 
   const historialRows = historialData?.results ?? [];
@@ -301,7 +307,27 @@ export default function ProductosPage() {
 
                 {tabActiva === "historial" && esGerenteOEncargado && (
                   <div>
-                    <div className="table-responsive">
+                    {historialError && (
+                      <div className="alert alert-danger" role="alert">
+                        <p className="mb-2">
+                          {historialData
+                            ? "No se pudo actualizar el histórico de precios. Se muestran los últimos datos disponibles."
+                            : "No se pudo cargar el histórico de precios."}
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => refetchHistorial()}
+                          disabled={historialFetching}
+                        >
+                          {historialFetching ? "Reintentando…" : "Reintentar"}
+                        </button>
+                      </div>
+                    )}
+                    {historialFetching && (
+                      <p role="status" className="text-muted">Cargando histórico de precios…</p>
+                    )}
+                    <div className="table-responsive" aria-busy={historialFetching}>
                       <table className="table table-sm table-bordered">
                         <thead>
                           <tr>
@@ -313,9 +339,11 @@ export default function ProductosPage() {
                         </thead>
                         <tbody>
                           {historialRows.length === 0 ? (
-                            <tr>
-                              <td colSpan={4} className="text-center text-muted">Sin registros</td>
-                            </tr>
+                            !historialPending && !historialError && !historialFetching && historialData ? (
+                              <tr>
+                                <td colSpan={4} className="text-center text-muted">Sin registros</td>
+                              </tr>
+                            ) : null
                           ) : (
                             historialRows.map((h) => (
                               <tr key={h.id}>
@@ -339,20 +367,27 @@ export default function ProductosPage() {
                         </tbody>
                       </table>
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
-                      <PageSizeSelector
-                        value={historialPageSize}
-                        onChange={(newSize) => { setHistorialPageSize(newSize); setHistorialPage(1); }}
-                        options={[10, 20, 50]}
-                      />
-                      <Pagination
-                        page={historialPage}
-                        totalPages={historialTotalPages}
-                        onPageChange={setHistorialPage}
-                        count={historialCount}
-                        pageSize={historialPageSize}
-                      />
-                    </div>
+                    {historialData && (
+                      <fieldset
+                        className="flex flex-wrap items-center justify-between gap-3 mt-3"
+                        disabled={historialFetching}
+                        style={{ border: 0, padding: 0, minWidth: 0 }}
+                        aria-label="Paginación del histórico de precios"
+                      >
+                        <PageSizeSelector
+                          value={historialPageSize}
+                          onChange={(newSize) => { setHistorialPageSize(newSize); setHistorialPage(1); }}
+                          options={[10, 20, 50]}
+                        />
+                        <Pagination
+                          page={historialPage}
+                          totalPages={historialTotalPages}
+                          onPageChange={setHistorialPage}
+                          count={historialCount}
+                          pageSize={historialPageSize}
+                        />
+                      </fieldset>
+                    )}
                   </div>
                 )}
               </div>
