@@ -58,12 +58,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/accounts/login"
+LOGOUT_REDIRECT_URL = "admin:login"
+# Empty uses the local React server in DEBUG, or the same origin in production.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "").strip()
 
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "bazpos.admin_apps.ConsoleAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

@@ -259,7 +259,7 @@ class DetalleDevolucion(models.Model):
         db_table = 'detalle_devoluciones'
 
     def __str__(self):
-        return f'{self.producto.nombre} x{self.cantidad}'
+        return f'{self.producto.nombre if self.producto else self.nombre} x{self.cantidad}'
 
 
 class AjusteStock(models.Model):

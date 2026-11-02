@@ -1,60 +1,12 @@
-from django.contrib import admin
-from gerenteApp.models import Proveedor, Factura, DetalleFactura, PrecioHistorico, StoreConfig
+from bazpos.admin_site import inline, register_models
+from . import models
 
-
-class SuperuserOnlyAdmin(admin.ModelAdmin):
-    def has_module_permission(self, request):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_view_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_add_permission(self, request):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-
-class DetalleFacturaInline(admin.TabularInline):
-    model = DetalleFactura
-    extra = 0
-    fields = ('producto', 'cantidad', 'costo_compra')
-
-    def has_add_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_change_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_active and request.user.is_superuser
-
-
-@admin.register(Proveedor)
-class ProveedorAdmin(SuperuserOnlyAdmin):
-    list_display = ('proveedor_id', 'tax_id', 'nombre', 'persona_contacto', 'telefono', 'correo', 'fecha_creacion')
-    search_fields = ('tax_id', 'nombre')
-
-
-@admin.register(Factura)
-class FacturaAdmin(SuperuserOnlyAdmin):
-    list_display = ('id', 'numero_factura', 'proveedor', 'fecha', 'monto_total')
-    list_filter = ('fecha', 'proveedor')
-    search_fields = ('id', 'numero_factura',)
-    inlines = [DetalleFacturaInline]
-
-
-@admin.register(PrecioHistorico)
-class PrecioHistoricoAdmin(SuperuserOnlyAdmin):
-    list_display = ('producto', 'fecha', 'precio_costo_anterior', 'precio_costo_nuevo', 'precio_venta_anterior', 'precio_venta_nuevo')
-    list_filter = ('fecha',)
-    readonly_fields = ('producto', 'precio_costo_anterior', 'precio_costo_nuevo', 'precio_venta_anterior', 'precio_venta_nuevo', 'fecha', 'factura')
-
-
-@admin.register(StoreConfig)
-class StoreConfigAdmin(SuperuserOnlyAdmin):
-    list_display = ("id", "nombre", "tax_percent", "currency_code", "timezone")
+register_models(models, {
+    'Factura': {'inlines': [inline(models.DetalleFactura)], 'list_filter': ('fecha', 'proveedor')},
+    'PrecioHistorico': {'list_display': ('id', 'producto', 'fecha', 'precio_costo_anterior', 'precio_costo_nuevo', 'precio_venta_anterior', 'precio_venta_nuevo'), 'list_filter': ('fecha',)},
+    'StoreConfig': {'fieldsets': (
+        ('Identidad', {'fields': ('id', 'nombre', 'locale', 'telefono', 'direccion'), 'description': 'Nombre y locale se sincronizan desde el entorno al reiniciar el servicio.'}),
+        ('Precios y preferencias', {'fields': ('tax_percent', 'timezone', 'currency_code', 'price_round_to', 'total_round_to', 'total_round_threshold', 'default_shipping_cost', 'default_margin_percent', 'ubicacion_por_defecto')}),
+        ('Configuración estructurada', {'fields': ('feature_flags', 'payment_methods', 'document_types', 'product_search_fields')}),
+    )},
+})

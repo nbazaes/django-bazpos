@@ -1,6 +1,8 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
+from bazpos.admin_site import technical_edit
+
 from .models import Producto, StockHistorico, StockProductoUbicacion
 
 
@@ -20,6 +22,8 @@ def capturar_cantidad_anterior(sender, instance, **kwargs):
 @receiver(post_save, sender=StockProductoUbicacion)
 def registrar_stock_historico(sender, instance, created, **kwargs):
     """Registra cada cambio real de cantidad en el historial de stock."""
+    if technical_edit.get():
+        return
     cantidad_anterior = getattr(instance, "_cantidad_anterior", 0)
     if instance.cantidad != cantidad_anterior:
         StockHistorico.objects.create(
@@ -31,6 +35,8 @@ def registrar_stock_historico(sender, instance, created, **kwargs):
 @receiver(post_save, sender=StockProductoUbicacion)
 def resetear_ignorar_stock(sender, instance, created, **kwargs):
     """Si un producto marcado como ignorado recibe stock, vuelve a ser recordatorio."""
+    if technical_edit.get():
+        return
     cantidad_anterior = getattr(instance, "_cantidad_anterior", 0)
     cantidad_actual = instance.cantidad
 

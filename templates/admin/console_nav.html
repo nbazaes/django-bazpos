@@ -1,0 +1,11 @@
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="Mostrar u ocultar navegación"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="Explorar datos">
+  <div class="console-nav-heading">EXPLORADOR DE DATOS</div>
+  <input type="search" id="nav-filter" placeholder="Buscar modelo…" aria-label="Buscar modelo">
+  <a class="console-home" href="{% url 'admin:index' %}">⌂ &nbsp; Vista general</a>
+  {% for section in console_sections %}
+  <section class="console-nav-section"><h2>{{ section.name }}</h2>
+    {% for model in section.models %}<a class="console-model-link{% if model.admin_url in request.path %} selected{% endif %}" href="{{ model.admin_url }}">{{ model.name }}</a>{% endfor %}
+  </section>{% endfor %}
+  <a class="console-home" href="{% url 'admin:logs' %}">↗ &nbsp; Logs de solicitudes</a>
+</nav>

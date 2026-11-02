@@ -113,6 +113,16 @@ flowchart LR
 - **Motor de BD:** PyMySQL (versión de compatibilidad forzada a `(2, 2, 1)` en `settings.py`; **no cambiar**).
 - **Middleware:** `RequestLogMiddleware` (primer middleware) registra todas las peticiones en un ring buffer visible en `/admin/logs/`.
 
+#### Consola técnica de Django
+
+`/admin/` está reservado a superusuarios activos. `is_staff` y los roles comerciales no conceden acceso. La consola ofrece todos los modelos propios, usuarios, grupos y tokens; permite buscar modelos por área y conserva la preferencia de tema claro/oscuro de Django.
+
+**Navegación:** Inicio, el logo y Vista general apuntan a `/admin/`. Ver el sitio usa `FRONTEND_URL`; si no se configura, apunta a `http://localhost:5173/` con `DEBUG=True` y a `/` en producción. Para desarrollo desde otra máquina, configurar la URL de React accesible desde ese equipo. Cerrar sesión vuelve a `/admin/login/` y termina únicamente la sesión Django; los tokens JWT de React son independientes. Reiniciar Django después de cambiar las variables de entorno.
+
+Los formularios realizan **correcciones directas**: permiten editar precios, históricos, JSON y fechas automáticas, sin recalcular ventas, pagos ni inventario relacionado. Corregir stock desde el admin tampoco crea históricos de stock ni cambia las marcas de recordatorio del producto. Esta excepción usa un contexto local a la petición; las operaciones normales conservan sus señales. IDs automáticos, columnas generadas y agregados no se editan. Las restricciones de base de datos y las eliminaciones protegidas siguen vigentes; el historial estándar del admin registra las acciones.
+
+Nombre y locale de la tienda son editables aquí, pero `sync_store_config` vuelve a sincronizarlos desde el entorno al iniciar el contenedor. `/admin/logs/` muestra el buffer en memoria del worker que atiende la solicitud, con filtro y actualización pausable; no es un registro persistente compartido entre workers.
+
 ### 2.5 Roles de negocio
 
 Grupos creados por `python manage.py setup_groups` (docker/management/commands/setup_groups.py):

@@ -1,0 +1,2 @@
+{% extends 'admin/change_form.html' %}
+{% block form_top %}<p class="console-notice"><strong>Corrección directa.</strong> Guardar modifica estos registros sin recalcular stock, pagos ni totales relacionados. La acción queda registrada en el historial del admin.</p>{{ block.super }}{% endblock %}

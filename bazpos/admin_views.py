@@ -1,10 +1,9 @@
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib import admin
 from django.shortcuts import render
 
 from bazpos.middleware import get_request_log
 
 
-@staff_member_required
 def admin_logs(request):
     if not request.user.is_superuser:
         from django.http import HttpResponseForbidden
@@ -19,6 +18,7 @@ def admin_logs(request):
         logs = all_logs
 
     return render(request, "admin/logs.html", {
+        **admin.site.each_context(request),
         "logs": logs,
         "query": query,
         "title": "Logs en vivo",

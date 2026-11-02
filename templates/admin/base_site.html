@@ -1,11 +1,8 @@
-{% extends "admin/base_site.html" %}
+{% extends "admin/base.html" %}
 {% load static %}
-
-{% block extrahead %}
-  {{ block.super }}
-  <link rel="stylesheet" href="{% static 'admin-css/bazpos-admin.css' %}">
-{% endblock %}
-
-{% block branding %}
-<h1 id="site-name">BAZPOS</h1>
-{% endblock %}
+{% block title %}{{ title }} · BAZPOS Admin{% endblock %}
+{% block responsive %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin-css/bazpos-admin.css' %}">{% endblock %}
+{% block extrahead %}{{ block.super }}<script src="{% static 'admin-js/console.js' %}" defer></script>{% endblock %}
+{% block branding %}<a class="console-brand" href="{% url 'admin:index' %}"><span class="console-mark">B<span>_</span></span><span>BAZPOS<small>DEVELOPER CONSOLE</small></span></a>{% endblock %}
+{% block nav-sidebar %}{% include 'admin/console_nav.html' %}{% endblock %}
+{% block footer %}BAZPOS <span> / </span> Consola de administración · Superusuarios{% endblock %}

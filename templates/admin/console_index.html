@@ -1,0 +1,12 @@
+{% extends 'admin/base_site.html' %}
+{% load i18n log %}
+{% block bodyclass %}{{ block.super }} console-index{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div class="console-intro"><div><span class="console-eyebrow">ADMINISTRACIÓN / SUPERUSUARIO</span><h1>Consola <span>de datos.</span></h1><p>Explora, relaciona y corrige los registros de BAZPOS.</p></div><a class="console-log-link" href="{% url 'admin:logs' %}"><span class="console-status-dot"></span> Registro de solicitudes <span>↗</span></a></div>
+<div class="console-workspace"><div class="console-grid">{% for section in console_sections %}
+<section class="console-card"><header><h2>{{ section.name }}</h2><span>{{ section.models|length }} modelo{{ section.models|length|pluralize }}</span></header>
+{% for model in section.models %}<div class="console-card-row"><a href="{{ model.admin_url }}">{{ model.name }} <span>↗</span></a>{% if model.add_url %}<a class="console-add" href="{{ model.add_url }}" aria-label="Añadir {{ model.name }}">+</a>{% endif %}</div>{% endfor %}
+</section>{% endfor %}</div>
+<aside class="console-activity"><span class="console-eyebrow">TRAZABILIDAD</span><h2>Actividad reciente</h2>{% get_admin_log 12 as recent_actions %}{% for entry in recent_actions %}<article><span class="console-action">{% if entry.is_addition %}+ Alta{% elif entry.is_deletion %}− Eliminación{% else %}↗ Corrección{% endif %}</span><p>{% if not entry.is_deletion and entry.get_admin_url %}<a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>{% else %}{{ entry.object_repr }}{% endif %}</p><small>{{ entry.user }} · {{ entry.action_time|date:'d M H:i' }}</small></article>{% empty %}<p>Las acciones administrativas aparecerán aquí.</p>{% endfor %}</aside></div>
+{% endblock %}
