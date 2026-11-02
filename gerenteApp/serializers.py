@@ -2,7 +2,7 @@ from django.contrib.auth.models import Group, User
 from django.db import transaction
 from rest_framework import serializers
 
-from gerenteApp.models import DetalleFactura, Factura, PrecioHistorico, Proveedor, StoreConfig
+from gerenteApp.models import DetalleFactura, Factura, PrecioHistorico, Proveedor, StoreConfig, PoliticaDescuentoUsuario
 from vendedorApp.models import Producto, StockProductoUbicacion, Ubicacion
 
 
@@ -22,6 +22,10 @@ class ProveedorSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    descuento_maximo_porcentaje = serializers.IntegerField(
+        source="politica_descuento.descuento_maximo_porcentaje",
+        min_value=0, max_value=100, required=False,
+    )
     group_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     groups = serializers.SerializerMethodField()
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -35,15 +39,27 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
             "is_active",
+            "is_superuser",
             "password",
             "group_id",
+            "descuento_maximo_porcentaje",
             "groups",
         ]
+
+        read_only_fields = ["is_superuser"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("descuento_maximo_porcentaje") is None:
+            data["descuento_maximo_porcentaje"] = 0
+        return data
 
     def get_groups(self, obj):
         return list(obj.groups.values("id", "name"))
 
+    @transaction.atomic
     def create(self, validated_data):
+        politica = validated_data.pop("politica_descuento", {})
         group_id = validated_data.pop("group_id", None)
         password = validated_data.pop("password", None)
         if not password:
@@ -54,9 +70,12 @@ class UserSerializer(serializers.ModelSerializer):
         if group_id:
             group = Group.objects.get(id=group_id)
             user.groups.set([group])
+        PoliticaDescuentoUsuario.objects.create(usuario=user, **politica)
         return user
 
+    @transaction.atomic
     def update(self, instance, validated_data):
+        politica = validated_data.pop("politica_descuento", None)
         group_id = validated_data.pop("group_id", None)
         password = validated_data.pop("password", None)
         for attr, value in validated_data.items():
@@ -70,6 +89,11 @@ class UserSerializer(serializers.ModelSerializer):
                 instance.groups.set([group])
             else:
                 instance.groups.clear()
+        if politica is not None:
+            politica_actualizada, _ = PoliticaDescuentoUsuario.objects.update_or_create(
+                usuario=instance, defaults=politica
+            )
+            instance.politica_descuento = politica_actualizada
         return instance
 
 

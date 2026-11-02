@@ -136,6 +136,67 @@ class VentaApiTest(BaseTest):
         data.update(kwargs)
         return data
 
+    def test_descuento_limites_y_ausencia_de_efectos_al_rechazar(self):
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        from vendedorApp.models import PagoVenta, StockHistorico
+        PoliticaDescuentoUsuario.objects.create(usuario=self.vendedor, descuento_maximo_porcentaje=10)
+        for tipo in ("VE", "CO"):
+            with self.subTest(tipo=tipo):
+                counts = (Venta.objects.count(), PagoVenta.objects.count(), StockHistorico.objects.count())
+                stock = StockProductoUbicacion.objects.get(producto=self.producto).cantidad
+                response = auth_client(self.vendedor).post("/api/ventas/", self._payload(
+                    descuento_porcentaje=11, monto_subtotal=10000, total=8000, tipo_documento=tipo,
+                ), format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn("descuento_porcentaje", response.data)
+                self.assertEqual(counts, (Venta.objects.count(), PagoVenta.objects.count(), StockHistorico.objects.count()))
+                self.assertEqual(StockProductoUbicacion.objects.get(producto=self.producto).cantidad, stock)
+                for descuento, total in ((0, 10000), (10, 9000)):
+                    response = auth_client(self.vendedor).post("/api/ventas/", self._payload(
+                        cantidad=1, descuento_porcentaje=descuento, monto_subtotal=10000, total=total, tipo_documento=tipo,
+                    ), format="json")
+                    self.assertEqual(response.status_code, 201, response.data)
+
+    def test_descuento_cero_predeterminado_y_validacion_de_rango(self):
+        for descuento in (1, -1, 101, 2.5):
+            with self.subTest(descuento=descuento):
+                response = auth_client(self.vendedor).post("/api/ventas/", self._payload(descuento_porcentaje=descuento), format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.assertIn("descuento_porcentaje", response.data)
+
+    def test_descuento_exencion_gestion_y_limite_100(self):
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        from docker.test_utils import make_superuser
+        encargado = make_user("Encargado")
+        superuser = make_superuser()
+        PoliticaDescuentoUsuario.objects.create(usuario=self.vendedor, descuento_maximo_porcentaje=100)
+        for user in (self.gerente, encargado, superuser, self.vendedor):
+            response = auth_client(user).post("/api/ventas/", self._payload(
+                cantidad=1, descuento_porcentaje=100, monto_subtotal=10000, total=0,
+            ), format="json")
+            self.assertEqual(response.status_code, 201, response.data)
+
+    def test_cotizacion_historica_conserva_descuento_pero_conversion_valida_limite_vigente(self):
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        politica = PoliticaDescuentoUsuario.objects.create(usuario=self.vendedor, descuento_maximo_porcentaje=20)
+        client = auth_client(self.vendedor)
+        payload = self._payload(cantidad=1, descuento_porcentaje=20, monto_subtotal=10000, total=8000)
+        response = client.post("/api/ventas/", {**payload, "tipo_documento": "CO"}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        cotizacion_id = response.data["id"]
+        politica.descuento_maximo_porcentaje = 10
+        politica.save()
+        response = client.post("/api/ventas/", {**payload, "venta_origen": cotizacion_id}, format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(Venta.objects.get(pk=cotizacion_id).descuento_porcentaje, 20)
+        response = client.post("/api/ventas/", {**payload, "descuento_porcentaje": 10, "total": 9000, "venta_origen": cotizacion_id}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_bodeguero_tambien_respeta_limite_individual(self):
+        response = auth_client(self.bodeguero).post("/api/ventas/", self._payload(descuento_porcentaje=10, monto_subtotal=10000, total=9000), format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("descuento_porcentaje", response.data)
+
     def test_create_venta(self):
         resp = auth_client(self.vendedor).post(
             "/api/ventas/", self._payload(), format="json"

@@ -87,6 +87,28 @@ export default function VentaPage() {
   const [quickPrecioCostoProducto, setQuickPrecioCostoProducto] = useState(null);
   const [preciosModificados, setPreciosModificados] = useState({});
   const oemRequestRef = useRef(0);
+  const [maximoDescuento, setMaximoDescuento] = useState(null);
+  const actualizarLimite = useCallback(async () => {
+    try {
+      const me = await apiRequest("/auth/me/");
+      setMaximoDescuento(me.descuento_maximo_porcentaje ?? 0);
+    } catch {
+      setMaximoDescuento(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(actualizarLimite);
+    window.addEventListener("focus", actualizarLimite);
+    window.addEventListener("online", actualizarLimite);
+    return () => {
+      window.removeEventListener("focus", actualizarLimite);
+      window.removeEventListener("online", actualizarLimite);
+    };
+  }, [actualizarLimite]);
+
+  const descuentoExcedido = maximoDescuento !== null && descuentoPorcentaje > maximoDescuento;
+  const descuentoBloqueado = maximoDescuento === null || descuentoExcedido;
   const taxPercent = getTaxPercent();
   const esGerente = isGerente(getUser());
 
@@ -496,6 +518,7 @@ export default function VentaPage() {
   }
 
   async function guardar(tipoDocumento = "VE") {
+    if (descuentoBloqueado) return;
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
@@ -567,6 +590,7 @@ export default function VentaPage() {
       throw ultimoError || new ApiError("No se pudo guardar la venta.", { retryable: true });
     } catch (err) {
       setError(err.message);
+      actualizarLimite();
       if (err instanceof ApiError && err.retryable) {
         setPendienteVerificacion({ clave, tipo: tipoDocumento });
       }
@@ -919,7 +943,8 @@ export default function VentaPage() {
                   value={descuentoPorcentaje || 0}
                   onChange={(val) => setDescuentoPorcentaje(val)}
                   min={0}
-                  max={100}
+                  max={maximoDescuento ?? 0}
+                  disabled={maximoDescuento === null || (maximoDescuento === 0 && !descuentoExcedido)}
                   active={discount > 0}
                   inputStyle={{
                     width: 52,
@@ -1000,11 +1025,16 @@ export default function VentaPage() {
             </div>
           </div>
         </div>
+        <div aria-live="polite" className={descuentoBloqueado ? "alert alert-warning" : "text-muted"}>
+          {maximoDescuento === null ? "No se pudo verificar tu límite de descuento. Vuelve a intentar antes de guardar." : descuentoExcedido ? `El descuento de ${descuentoPorcentaje}% supera tu máximo de ${maximoDescuento}%. Corrígelo para guardar.` : `Descuento máximo permitido: ${maximoDescuento}%.`}
+          {maximoDescuento === null && <button type="button" className="btn btn-sm btn-outline" onClick={actualizarLimite}>Reintentar</button>}
+          {descuentoExcedido && <button type="button" className="btn btn-sm btn-outline" onClick={() => setDescuentoPorcentaje(maximoDescuento)}>Aplicar máximo permitido</button>}
+        </div>
         <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
+          <button className="btn btn-success" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
-          <button className="btn btn-outline" disabled={!carro.length} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
+          <button className="btn btn-outline" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
             Generar cotización
           </button>
           <button className="btn btn-danger" disabled={!carro.length && !oem} onClick={limpiarVenta}>
@@ -1024,6 +1054,7 @@ export default function VentaPage() {
                 </button>
               </div>
               <div className="modal-body">
+                {descuentoBloqueado && <div className="alert alert-warning" role="alert">{maximoDescuento === null ? "No se pudo verificar tu límite de descuento. Cancela y vuelve a intentar." : `Tu máximo vigente es ${maximoDescuento}%. Cancela y corrige el descuento para guardar.`}</div>}
                 {confirmMode === "CO" && (
                   <div className="form-group mb-3">
                     <label className="font-weight-bold">Nombre del cliente:</label>
@@ -1210,7 +1241,7 @@ export default function VentaPage() {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowConfirmVenta(false); setOcultarTotales(false); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); }}>Cancelar</button>
-                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} disabled={isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}>
+                <button type="button" className={`btn ${confirmMode === "CO" ? "btn-outline" : "btn-success"}`} onClick={() => guardar(confirmMode)} title={descuentoBloqueado ? "Revisa el descuento y tu máximo permitido antes de guardar" : undefined} disabled={descuentoBloqueado || isSaving || (confirmMode === "VE" && !pagosValidos) || conflictoSeleccion}>
                   {isSaving ? (retryInfo ? `Reintentando… (${retryInfo.intento}/${retryInfo.total})` : "Guardando...") : confirmMode === "CO" ? "Generar cotización" : "Confirmar y guardar"}
                 </button>
               </div>

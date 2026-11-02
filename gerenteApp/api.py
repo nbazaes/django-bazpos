@@ -48,7 +48,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
-    queryset = User.objects.all().order_by("id")
+    queryset = User.objects.select_related("politica_descuento").prefetch_related("groups").order_by("id")
     pagination_class = DefaultPagination
     role_action_map = {
         "list": [ROLE_ENCARGADO, ROLE_GERENTE],

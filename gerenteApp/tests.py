@@ -532,3 +532,84 @@ class SyncStoreConfigTest(TestCase):
         config.refresh_from_db()
         self.assertEqual(config.nombre, settings.STORE_NAME)
         self.assertEqual(config.locale, settings.STORE_LOCALE)
+
+
+class PoliticaDescuentoUsuarioTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        create_business_groups()
+        cls.gerente = make_user("Gerente")
+        cls.encargado = make_user("Encargado")
+        cls.vendedor = make_user("Vendedor")
+        cls.bodeguero = make_user("Bodeguero")
+
+    def test_usuario_sin_politica_tiene_limite_cero(self):
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        response = auth_client(self.gerente).get(f"/api/usuarios/{self.vendedor.pk}/")
+        self.assertEqual(response.data["descuento_maximo_porcentaje"], 0)
+        self.assertEqual(PoliticaDescuentoUsuario.maximo_efectivo(self.vendedor), 0)
+        self.assertEqual(auth_client(self.vendedor).get("/api/auth/me/").data["descuento_maximo_porcentaje"], 0)
+
+    def test_gestion_crea_y_modifica_limites(self):
+        from django.contrib.auth.models import Group
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        for gestor in (self.gerente, self.encargado):
+            with self.subTest(gestor=gestor.username):
+                client = auth_client(gestor)
+                response = client.post("/api/usuarios/", {
+                    "username": f"nuevo_{gestor.pk}", "password": "testpass123",
+                    "group_id": Group.objects.get(name="Vendedor").pk,
+                    "descuento_maximo_porcentaje": 10,
+                }, format="json")
+                self.assertEqual(response.status_code, 201, response.data)
+                user_id = response.data["id"]
+                response = client.patch(f"/api/usuarios/{user_id}/", {"descuento_maximo_porcentaje": 25}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["descuento_maximo_porcentaje"], 25)
+                client.patch(f"/api/usuarios/{user_id}/", {"first_name": "Ana"}, format="json")
+                self.assertEqual(PoliticaDescuentoUsuario.objects.get(usuario_id=user_id).descuento_maximo_porcentaje, 25)
+                # Full updates that omit the field also preserve the policy.
+                response = client.put(f"/api/usuarios/{user_id}/", {"username": f"nuevo_{gestor.pk}"}, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(response.data["descuento_maximo_porcentaje"], 25)
+
+    def test_creacion_sin_limite_usa_cero(self):
+        response = auth_client(self.gerente).post("/api/usuarios/", {"username": "nuevo_cero", "password": "testpass123"}, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["descuento_maximo_porcentaje"], 0)
+
+    def test_limite_invalido_no_modifica_usuario(self):
+        for value in (-1, 101, 2.5, None):
+            with self.subTest(value=value):
+                response = auth_client(self.gerente).patch(f"/api/usuarios/{self.vendedor.pk}/", {
+                    "descuento_maximo_porcentaje": value, "first_name": "No guardar",
+                }, format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+                self.vendedor.refresh_from_db()
+                self.assertNotEqual(self.vendedor.first_name, "No guardar")
+
+    def test_no_gestores_no_pueden_leer_ni_modificar_limites(self):
+        for user in (self.vendedor, self.bodeguero):
+            client = auth_client(user)
+            for target in (self.vendedor, self.gerente):
+                url = f"/api/usuarios/{target.pk}/"
+                self.assertEqual(client.get(url).status_code, 403)
+                self.assertEqual(client.patch(url, {"descuento_maximo_porcentaje": 100}, format="json").status_code, 403)
+            self.assertEqual(client.post("/api/usuarios/", {"username": "prohibido", "password": "testpass123", "descuento_maximo_porcentaje": 100}, format="json").status_code, 403)
+
+    def test_me_refleja_cambios_y_exencion_de_gestores(self):
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        client = auth_client(self.vendedor)
+        self.assertEqual(client.get("/api/auth/me/").data["descuento_maximo_porcentaje"], 0)
+        auth_client(self.encargado).patch(f"/api/usuarios/{self.vendedor.pk}/", {"descuento_maximo_porcentaje": 15}, format="json")
+        self.assertEqual(client.get("/api/auth/me/").data["descuento_maximo_porcentaje"], 15)
+        for gestor in (self.gerente, self.encargado):
+            self.assertEqual(auth_client(gestor).get("/api/auth/me/").data["descuento_maximo_porcentaje"], 100)
+        self.vendedor.groups.add(self.encargado.groups.first())
+        self.assertEqual(PoliticaDescuentoUsuario.maximo_efectivo(self.vendedor), 100)
+
+    def test_restriccion_base_de_datos(self):
+        from django.db import IntegrityError, transaction
+        from gerenteApp.models import PoliticaDescuentoUsuario
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            PoliticaDescuentoUsuario.objects.create(usuario=self.vendedor, descuento_maximo_porcentaje=101)

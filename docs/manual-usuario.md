@@ -62,7 +62,7 @@
    - **Por OEM / texto:** escriba en el campo **[Ingrese código OEM]** el código, nombre o marca. El sistema busca automáticamente. Haga clic en **Buscar** si lo desea.
    - En los resultados, revise la fila del producto y haga clic en **Agregar**.
 3. **Ajustar cantidades:** en la tabla del carrito, use los botones **+ / −** de la columna Cantidad o escriba el número directamente.
-4. **Ajustar descuento (opcional):** junto al total, use el control de **Descuento %**. El descuento es redondeado a los $1.000 más cercanos.
+4. **Ajustar descuento (opcional):** junto al total, use el control de **Descuento %**. El total con descuento se redondea según las reglas de venta. El descuento no puede superar el máximo individual asignado por Gerente o Encargado; con un máximo de 0% no se permiten descuentos. Esto también aplica a cotizaciones.
 5. Haga clic en **Confirmar venta**.
 6. En la ventana de confirmación:
    - **[Documento]:** seleccione **Boleta**, **Factura** u **Otros**.
@@ -307,6 +307,8 @@
 3. Complete **[Usuario]**, **[Nombre]**, **[Apellido]**, **[Email]** y **[Contraseña]**.
 4. En **[Grupo]**, seleccione el rol: **Vendedor**, **Bodeguero**, **Encargado** o **Gerente**.
 5. Haga clic en **Guardar**.
+
+**Descuento máximo (%):** al crear o editar un usuario, Gerente o Encargado pueden asignar un máximo entero entre 0 y 100. El valor inicial es 0%. Gerente, Encargado y superusuarios pueden aplicar hasta 100%; para los demás roles rige el límite individual tanto en ventas como en cotizaciones. Al convertir una cotización se valida el límite vigente de quien registra la venta. Los descuentos de documentos anteriores se conservan.
 
 **Resultado esperado:** El usuario puede iniciar sesión con sus credenciales y ve solo las secciones de su rol.
 

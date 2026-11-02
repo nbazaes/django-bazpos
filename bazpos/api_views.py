@@ -4,6 +4,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from gerenteApp.models import PoliticaDescuentoUsuario
+
 from .resend_client import ResendEmailError, send_ticket_email
 
 
@@ -29,6 +31,7 @@ class MeView(APIView):
                 "email": user.email,
                 "is_superuser": user.is_superuser,
                 "groups": groups,
+                "descuento_maximo_porcentaje": PoliticaDescuentoUsuario.maximo_efectivo(user),
             }
         )
 

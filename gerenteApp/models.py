@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -167,3 +169,30 @@ class StoreConfig(models.Model):
     @classmethod
     def current_document_types(cls):
         return cls.current().active_document_types()
+
+
+class PoliticaDescuentoUsuario(models.Model):
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="politica_descuento"
+    )
+    descuento_maximo_porcentaje = models.PositiveSmallIntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(descuento_maximo_porcentaje__gte=0, descuento_maximo_porcentaje__lte=100),
+                name="descuento_usuario_entre_0_y_100",
+            )
+        ]
+
+    @classmethod
+    def maximo_efectivo(cls, usuario):
+        from bazpos.permissions import has_any_role, ROLE_ENCARGADO, ROLE_GERENTE
+
+        if has_any_role(usuario, [ROLE_ENCARGADO, ROLE_GERENTE]):
+            return 100
+        return cls.objects.filter(usuario=usuario).values_list(
+            "descuento_maximo_porcentaje", flat=True
+        ).first() or 0

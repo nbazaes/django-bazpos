@@ -12,6 +12,7 @@ const initial = {
   password: "",
   group_id: "",
   is_active: true,
+  descuento_maximo_porcentaje: 0,
 };
 
 export default function UsuarioFormPage() {
@@ -28,12 +29,14 @@ export default function UsuarioFormPage() {
   const updateMutation = useUpdateUsuario();
 
   const groups = gruposData ?? [];
+  const rolSeleccionado = groups.find((g) => g.id === Number(data.group_id))?.name;
+  const exentoDescuento = usuarioData?.is_superuser || ["Gerente", "Encargado"].includes(rolSeleccionado);
 
   useEffect(() => {
     if (usuarioData && id) {
       let cancelled = false;
       Promise.resolve().then(() => {
-        if (!cancelled) setData({ ...usuarioData, password: "", group_id: usuarioData.groups?.[0]?.id || "" });
+        if (!cancelled) setData({ ...initial, ...usuarioData, password: "", group_id: usuarioData.groups?.[0]?.id || "" });
       });
       return () => { cancelled = true; };
     }
@@ -44,6 +47,7 @@ export default function UsuarioFormPage() {
     setError("");
     const payload = {
       ...data,
+      descuento_maximo_porcentaje: Number(data.descuento_maximo_porcentaje),
       group_id: data.group_id ? Number(data.group_id) : null,
     };
     if (id && !payload.password) delete payload.password;
@@ -65,6 +69,11 @@ export default function UsuarioFormPage() {
           <div className="col-md-6 form-group"><label>Email</label><input className="form-control" value={data.email} onChange={(e) => setData({ ...data, email: e.target.value })} /></div>
           <div className="col-md-6 form-group"><label>Contraseña {id ? "(opcional)" : ""}</label><input type="password" className="form-control" value={data.password} onChange={(e) => setData({ ...data, password: e.target.value })} required={!id} /></div>
           <div className="col-md-6 form-group"><label>Grupo</label><select className="form-control" value={data.group_id} onChange={(e) => setData({ ...data, group_id: e.target.value })}><option value="">Sin grupo</option>{groups.map((g) => <option value={g.id} key={g.id}>{g.name}</option>)}</select></div>
+          <div className="col-md-6 form-group">
+            <label htmlFor="descuento-maximo">Descuento máximo (%)</label>
+            <input id="descuento-maximo" type="number" min="0" max="100" step="1" required disabled={exentoDescuento} className="form-control" value={data.descuento_maximo_porcentaje} onChange={(e) => setData({ ...data, descuento_maximo_porcentaje: e.target.value })} aria-describedby="descuento-maximo-ayuda" />
+            <small id="descuento-maximo-ayuda" className="text-muted">{exentoDescuento ? "Gerente, Encargado y superusuarios pueden descontar hasta 100%. El límite individual se conserva para otros roles." : "Aplica a ventas y cotizaciones. Con 0% no se permiten descuentos."}</small>
+          </div>
         </div>
         <button className="btn btn-primary" disabled={createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending ? "Guardando..." : "Guardar"}

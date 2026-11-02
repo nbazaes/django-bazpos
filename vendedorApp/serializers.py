@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
-from gerenteApp.models import PrecioHistorico, StoreConfig
+from gerenteApp.models import PrecioHistorico, StoreConfig, PoliticaDescuentoUsuario
 from vendedorApp.stock_utils import resolver_producto_por_identidad
 from vendedorApp.timezone_guard import log_cruce
 from vendedorApp.models import (
@@ -377,6 +377,11 @@ class RegistrarVentaSerializer(serializers.Serializer):
         subtotal = data.get("monto_subtotal")
         total = data.get("total")
         descuento = data.get("descuento_porcentaje", 0)
+        maximo = PoliticaDescuentoUsuario.maximo_efectivo(self.context["request"].user)
+        if descuento > maximo:
+            raise serializers.ValidationError({
+                "descuento_porcentaje": f"Tu descuento máximo permitido es {maximo}%."
+            })
 
         if descuento > 0:
             if not subtotal:

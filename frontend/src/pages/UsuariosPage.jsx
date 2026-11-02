@@ -55,6 +55,7 @@ export default function UsuariosPage() {
           { key: "username", label: "Usuario" },
           { key: "first_name", label: "Nombre" },
           { key: "last_name", label: "Apellido" },
+          { key: "descuento_maximo_porcentaje", label: "Descuento máximo", render: (row) => row.is_superuser || row.groups?.some((g) => ["Gerente", "Encargado"].includes(g.name)) ? "100% (gestión)" : `${row.descuento_maximo_porcentaje ?? 0}%` },
           { key: "groups", label: "Rol", render: (row) => row.groups?.[0]?.name ?? "—" },
         ]}
         onEdit={(row) => navigate(`/usuarios/${row.id}/editar`)}

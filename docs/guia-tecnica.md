@@ -349,7 +349,7 @@ Base: `/api/`. Prefijo en producción servido por nginx. Formato JSON. La API es
 | :--- | :--- | :--- |
 | `POST` | `/api/auth/token/` | Body `{"username", "password"}` → `{"access", "refresh"}` |
 | `POST` | `/api/auth/token/refresh/` | Body `{"refresh"}` → `{"access"}` (rota y blacklistea el refresh) |
-| `GET` | `/api/auth/me/` | Devuelve el usuario actual (grupos incluidos) |
+| `GET` | `/api/auth/me/` | Devuelve el usuario actual, grupos y `descuento_maximo_porcentaje` efectivo (0–100) |
 | `GET` | `/api/store-name/` | **Público (sin auth)** → `{"name": settings.STORE_NAME}` |
 
 **Parámetros de SimpleJWT** (`settings.py`): `ACCESS_TOKEN_LIFETIME=1h`, `REFRESH_TOKEN_LIFETIME=7d`, `ROTATE_REFRESH_TOKENS=True`, `BLACKLIST_AFTER_ROTATION=True`.
@@ -375,6 +375,12 @@ Mapeo de `role_action_map` de cada ViewSet. `V=Vendedor, B=Bodeguero, E=Encargad
 
 ### 4.3 Fichas técnicas de endpoints principales
 
+#### `/api/usuarios/`: límite de descuento individual
+
+Las operaciones de lectura, creación y edición incluyen `descuento_maximo_porcentaje` (entero 0–100). Solo Gerente, Encargado o superusuarios pueden administrar usuarios. Omitir el campo al crear usa 0%; omitirlo al editar conserva el valor anterior. `is_superuser` se expone como solo lectura para identificar cuentas exentas.
+
+La política se persiste en `PoliticaDescuentoUsuario`, con relación uno a uno al usuario, eliminación en cascada y restricción de rango en la base. Una cuenta sin política tiene máximo 0%. Gerente, Encargado y superusuarios tienen máximo efectivo 100%, aunque conserven otro límite individual para futuros cambios de rol.
+
 #### `POST` `/api/ventas/`
 **Descripción:** Registra una venta o cotización (define `tipo_documento`).
 **Autenticación:** Bearer JWT. **Roles:** Vendedor, Bodeguero, Encargado, Gerente.
@@ -393,6 +399,7 @@ Mapeo de `role_action_map` de cada ViewSet. `V=Vendedor, B=Bodeguero, E=Encargad
 }
 ```
 **Reglas de validación** (`RegistrarVentaSerializer`):
+- El porcentaje explícito de descuento no puede superar el máximo vigente del usuario autenticado. Aplica a ventas, cotizaciones y conversiones; los excesos devuelven HTTP 400 con error en `descuento_porcentaje`, sin efectos sobre documentos, pagos o stock. Los documentos históricos no se recalculan.
 - Si hay descuento, `monto_subtotal` es obligatorio y `total` debe coincidir con el redondeo esperado (`_round_total`, múltiplo de $1.000).
 - La suma de `pagos` debe ser exactamente `total`.
 - `venta_origen` debe ser una cotización (`tipo_documento=CO`) no convertida.
