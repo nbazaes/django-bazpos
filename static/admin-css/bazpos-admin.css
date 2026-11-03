@@ -129,3 +129,21 @@ textarea.vLargeTextField { font-family:var(--font-family-monospace); font-size:1
   display:inline-flex; align-items:center; justify-content:center;
   height:auto; min-height:36px; line-height:1.4; padding:8px 14px;
 }
+
+/* Persistent warning on every developer-console screen, in both themes. */
+.console-danger-banner {
+  margin:20px 32px 0; padding:18px 20px; border:2px solid #ffb4b4;
+  border-radius:8px; background:#8f1525; color:#fff;
+}
+.console-danger-banner strong { display:block; font-size:18px; line-height:1.4; }
+.console-danger-banner p { margin:8px 0 14px; font-size:14px; line-height:1.6; }
+.console-danger-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.console-danger-actions form { margin:0; padding:0; }
+.console-danger-actions button, .console-danger-actions a:link, .console-danger-actions a:visited {
+  display:inline-block; box-sizing:border-box; padding:8px 12px;
+  border:1px solid #fff; border-radius:5px; background:transparent; color:#fff;
+  font:600 13px/1.5 var(--font-family-primary); cursor:pointer; text-decoration:underline;
+}
+.console-danger-actions button:hover, .console-danger-actions a:hover { background:#68101b; color:#fff; }
+.console-danger-actions button:focus-visible, .console-danger-actions a:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+@media(max-width:767px) { .console-danger-banner { margin:16px 18px 0; padding:16px; } }

@@ -5,4 +5,17 @@
 {% block extrahead %}{{ block.super }}<script src="{% static 'admin-js/console.js' %}" defer></script>{% endblock %}
 {% block branding %}<a class="console-brand" href="{% url 'admin:index' %}"><span class="console-mark">B<span>_</span></span><span>BAZPOS<small>DEVELOPER CONSOLE</small></span></a>{% endblock %}
 {% block nav-sidebar %}{% include 'admin/console_nav.html' %}{% endblock %}
+{% block messages %}
+<section class="console-danger-banner" aria-labelledby="console-danger-title">
+  <strong id="console-danger-title">Consola exclusiva para desarrolladores</strong>
+  <p>Si no eres desarrollador, avisa a soporte, cierra sesión y vuelve al sitio. Los cambios que realices en esta consola pueden ser destructivos y provocar pérdida de datos.</p>
+  <div class="console-danger-actions">
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button type="submit">Cerrar sesión</button></form>
+    {% endif %}
+    <a href="{{ site_url|default:'/' }}">Volver al sitio</a>
+  </div>
+</section>
+{{ block.super }}
+{% endblock %}
 {% block footer %}BAZPOS <span> / </span> Consola de administración · Superusuarios{% endblock %}
