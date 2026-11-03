@@ -612,6 +612,8 @@ flowchart LR
 | `frontend-build` | `npm ci` → `npm run lint` → `npm run build` | — |
 | `docker-build-push` | `buildx` + login GHCR; push solo en push a main | — |
 
+Django reconoce HTTPS detrás de nginx mediante `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")`. nginx sobrescribe el encabezado con `$scheme` y Gunicorn permanece accesible solo dentro de la red de Compose. Esto permite validar el origen CSRF del admin en HTTPS sin añadir la misma URL a `CSRF_TRUSTED_ORIGINS`. Si el login devuelve 403 con `Origin checking failed`, comprobar el esquema reenviado antes de revisar credenciales. Una contraseña incorrecta debe devolver el formulario con un error de acceso.
+
 ### 5.4 Variables de entorno (`.env`)
 
 | Variable | Uso | Default en ejemplo | Obligatoria en prod |

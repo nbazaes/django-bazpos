@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from datetime import timedelta
 from decimal import Decimal
 
@@ -7,7 +8,7 @@ from django.middleware.csrf import get_token
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import User
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.contrib.sessions.backends.signed_cookies import SessionStore
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -248,3 +249,52 @@ class AdminNavigationTests(SimpleTestCase):
                 self.assertEqual(response.url, reverse('admin:login'))
                 self.assertNotIn('_auth_user_id', request.session)
                 self.assertTrue(request.user.is_anonymous)
+
+
+@override_settings(
+    DEBUG=False, ALLOWED_HOSTS=['192.168.150.160'], CSRF_TRUSTED_ORIGINS=[],
+    SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies',
+)
+class AdminProxyCsrfTests(SimpleTestCase):
+    def setUp(self):
+        self.client = Client(enforce_csrf_checks=True)
+        self.headers = {'HTTP_HOST': '192.168.150.160', 'HTTP_X_FORWARDED_PROTO': 'https'}
+        self.client.get('/admin/login/', **self.headers)
+        self.data = {
+            'username': 'admin', 'password': 'incorrect-test-password',
+            'csrfmiddlewaretoken': self.client.cookies[settings.CSRF_COOKIE_NAME].value,
+        }
+
+    def test_forwarded_https_is_recognized(self):
+        request = RequestFactory().get('/admin/login/', **self.headers)
+        self.assertTrue(request.is_secure())
+
+    @patch('django.contrib.auth.forms.authenticate', return_value=None)
+    def test_wrong_password_reaches_authentication_over_https_proxy(self, authenticate):
+        response = self.client.post('/admin/login/', self.data,
+            HTTP_ORIGIN='https://192.168.150.160', **self.headers)
+        self.assertEqual(response.status_code, 200)
+        authenticate.assert_called_once()
+        self.assertEqual(response.context['form'].errors.as_data()['__all__'][0].code, 'invalid_login')
+
+    @patch('django.contrib.auth.forms.authenticate', return_value=None)
+    def test_foreign_origin_still_rejected(self, authenticate):
+        response = self.client.post('/admin/login/', self.data,
+            HTTP_ORIGIN='https://untrusted.example', **self.headers)
+        self.assertEqual(response.status_code, 403)
+        authenticate.assert_not_called()
+
+    @patch('django.contrib.auth.forms.authenticate', return_value=None)
+    def test_missing_csrf_token_still_rejected(self, authenticate):
+        self.data.pop('csrfmiddlewaretoken')
+        response = self.client.post('/admin/login/', self.data,
+            HTTP_ORIGIN='https://192.168.150.160', **self.headers)
+        self.assertEqual(response.status_code, 403)
+        authenticate.assert_not_called()
+
+    @patch('django.contrib.auth.forms.authenticate', return_value=None)
+    def test_direct_http_development_login_still_reaches_authentication(self, authenticate):
+        response = self.client.post('/admin/login/', self.data,
+            HTTP_HOST='192.168.150.160', HTTP_ORIGIN='http://192.168.150.160')
+        self.assertEqual(response.status_code, 200)
+        authenticate.assert_called_once()
