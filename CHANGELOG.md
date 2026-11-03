@@ -4,6 +4,13 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.5.0] - 2026-11-03
+
+### Agregado
+
+- El equipo de liderazgo ahora puede definir límites de descuento por usuario.
+- La consola de administración permite corregir datos directamente.
+
 ## [2.4.0] - 2026-10-30
 
 ### Agregado
