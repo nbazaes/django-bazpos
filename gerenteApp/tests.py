@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from docker.test_utils import auth_client, create_business_groups, make_user
-from gerenteApp.models import PrecioHistorico, Proveedor, StoreConfig
+from gerenteApp.models import Factura, PrecioHistorico, Proveedor, StoreConfig
 from gerenteApp.pricing import apply_tax, round_price, round_sale_total
 from vendedorApp.models import Pedido, PedidoDetalle, Producto, StockProductoUbicacion, Ubicacion, Venta
 
@@ -207,6 +207,78 @@ class ProveedorApiTest(TestCase):
     def test_unauthenticated(self):
         resp = self.client.get("/api/proveedores/")
         self.assertEqual(resp.status_code, 401)
+
+
+class FacturaFiltersTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        create_business_groups()
+        cls.gerente = make_user("Gerente")
+        proveedor = Proveedor.objects.create(nombre="Repuestos Norte")
+        otro = Proveedor.objects.create(nombre="Comercial Sur")
+        cls.primera = Factura.objects.create(
+            numero_factura=12345, proveedor=proveedor, fecha="2026-10-01",
+        )
+        cls.segunda = Factura.objects.create(
+            numero_factura=23456, proveedor=otro, fecha="2026-10-15",
+        )
+        cls.tercera = Factura.objects.create(
+            numero_factura=12399, proveedor=proveedor, fecha="2026-10-31",
+        )
+
+    def setUp(self):
+        self.client = auth_client(self.gerente)
+
+    def assert_facturas(self, params, expected):
+        response = self.client.get("/api/facturas/", params)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["count"], len(expected))
+        self.assertEqual([row["id"] for row in response.data["results"]], expected)
+
+    def test_text_search(self):
+        for texto, expected in (
+            ("123", [self.tercera.id, self.primera.id]),
+            ("  rEPUESTOS  ", [self.tercera.id, self.primera.id]),
+            ("2345", [self.segunda.id, self.primera.id]),
+            ("inexistente", []),
+            ("", [self.tercera.id, self.segunda.id, self.primera.id]),
+        ):
+            with self.subTest(texto=texto):
+                self.assert_facturas({"texto": texto}, expected)
+
+    def test_dates_and_combined_filters(self):
+        cases = (
+            ({"fecha_desde": "2026-10-15"}, [self.tercera.id, self.segunda.id]),
+            ({"fecha_hasta": "2026-10-15"}, [self.segunda.id, self.primera.id]),
+            ({"fecha_desde": "2026-10-15", "fecha_hasta": "2026-10-15"}, [self.segunda.id]),
+            ({"texto": "norte", "fecha_desde": "2026-10-02", "fecha_hasta": "2026-10-31"}, [self.tercera.id]),
+            ({"fecha_desde": "2026-11-01"}, []),
+        )
+        for params, expected in cases:
+            with self.subTest(params=params):
+                self.assert_facturas(params, expected)
+
+    def test_invalid_dates_return_clear_validation_error(self):
+        for params in (
+            {"fecha_desde": "ayer"},
+            {"fecha_hasta": "2026-02-30"},
+            {"fecha_desde": "2026-1-1"},
+            {"fecha_desde": "2026-10-31", "fecha_hasta": "2026-10-01"},
+        ):
+            with self.subTest(params=params):
+                response = self.client.get("/api/facturas/", params)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("detail", response.data)
+
+    def test_pagination_counts_filtered_results(self):
+        response = self.client.get("/api/facturas/", {"texto": "norte", "page_size": 1, "page": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual([row["id"] for row in response.data["results"]], [self.primera.id])
+
+    def test_list_filters_do_not_hide_detail(self):
+        response = self.client.get(f"/api/facturas/{self.primera.id}/", {"texto": "inexistente"})
+        self.assertEqual(response.status_code, 200)
 
 
 class FacturaUpsertTest(TestCase):

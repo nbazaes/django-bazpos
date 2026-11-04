@@ -1,8 +1,10 @@
 from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.db.models import Q
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 
@@ -106,9 +108,30 @@ class FacturaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        if self.action != "list":
+            return queryset
         texto = self.request.query_params.get("texto", "").strip()
         if texto:
-            queryset = queryset.filter(proveedor__nombre__icontains=texto)
+            queryset = queryset.filter(
+                Q(proveedor__nombre__icontains=texto) | Q(numero_factura__icontains=texto)
+            )
+        fechas = {}
+        for key in ("fecha_desde", "fecha_hasta"):
+            valor = self.request.query_params.get(key, "").strip()
+            if valor:
+                try:
+                    fecha = parse_date(valor)
+                except ValueError:
+                    fecha = None
+                if fecha is None or fecha.isoformat() != valor:
+                    raise ValidationError({"detail": "Las fechas deben ser válidas y usar el formato AAAA-MM-DD."})
+                fechas[key] = fecha
+        if len(fechas) == 2 and fechas["fecha_desde"] > fechas["fecha_hasta"]:
+            raise ValidationError({"detail": "La fecha desde no puede ser posterior a la fecha hasta."})
+        if "fecha_desde" in fechas:
+            queryset = queryset.filter(fecha__gte=fechas["fecha_desde"])
+        if "fecha_hasta" in fechas:
+            queryset = queryset.filter(fecha__lte=fechas["fecha_hasta"])
         return queryset
 
     def create(self, request, *args, **kwargs):

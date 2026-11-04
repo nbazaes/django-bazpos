@@ -6,6 +6,7 @@ import PageCard from "../components/PageCard";
 import Pagination from "../components/Pagination";
 import PageSizeSelector from "../components/PageSizeSelector";
 import { usePageTitle } from "../lib/usePageTitle";
+import { useDebounce } from "../lib/hooks";
 import { useDeleteFactura, useFactura, useFacturas, useImpuesto } from "../lib/queries";
 import { applyTax } from "../lib/tax";
 
@@ -61,12 +62,17 @@ export default function FacturasPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Facturas");
 
-  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
-  const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+  const pageSize = [25, 50, 100].includes(Number(searchParams.get("page_size")))
+    ? Number(searchParams.get("page_size")) : 50;
+  const texto = searchParams.get("texto") || "";
+  const fechaDesde = searchParams.get("fecha_desde") || "";
+  const fechaHasta = searchParams.get("fecha_hasta") || "";
+  const debouncedTexto = useDebounce(texto.trim());
   const [detalleId, setDetalleId] = useState(null);
 
-  const params = { page, page_size: pageSize };
-  const { data } = useFacturas(params);
+  const params = { page, page_size: pageSize, texto: debouncedTexto, fecha_desde: fechaDesde, fecha_hasta: fechaHasta };
+  const { data, error } = useFacturas(params);
   const deleteMutation = useDeleteFactura();
   const { data: impuestoData } = useImpuesto();
   const { data: detalle } = useFactura(detalleId);
@@ -76,19 +82,23 @@ export default function FacturasPage() {
   const count = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
-  const syncURL = (p, ps) => {
-    setSearchParams({ page: String(p), page_size: String(ps) }, { replace: true });
+  const updateParams = (changes) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      for (const [key, value] of Object.entries(changes)) {
+        if (value) next.set(key, String(value));
+        else next.delete(key);
+      }
+      return next;
+    }, { replace: true });
   };
 
   function handlePageChange(newPage) {
-    setPage(newPage);
-    syncURL(newPage, pageSize);
+    updateParams({ page: newPage, page_size: pageSize });
   }
 
   function handlePageSizeChange(newSize) {
-    setPageSize(newSize);
-    setPage(1);
-    syncURL(1, newSize);
+    updateParams({ page: 1, page_size: newSize });
   }
 
   function onDelete(row) {
@@ -106,8 +116,36 @@ export default function FacturasPage() {
         <div className="page-actions">
           <Link className="btn btn-success" to="/facturas/crear">Nueva factura</Link>
         </div>
+        <div className="filter-bar flex flex-wrap items-end gap-3 mb-3">
+          <label className="flex flex-col gap-1" style={{ flex: "1 1 240px" }}>
+            Buscar factura o proveedor
+            <input
+              type="search"
+              className="form-control"
+              placeholder="Número de factura o nombre del proveedor"
+              value={texto}
+              onChange={(e) => updateParams({ texto: e.target.value, page: 1 })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Desde
+            <input type="date" className="form-control" value={fechaDesde}
+              onChange={(e) => updateParams({ fecha_desde: e.target.value, page: 1 })} />
+          </label>
+          <label className="flex flex-col gap-1">
+            Hasta
+            <input type="date" className="form-control" value={fechaHasta}
+              onChange={(e) => updateParams({ fecha_hasta: e.target.value, page: 1 })} />
+          </label>
+          <button type="button" className="btn btn-secondary"
+            disabled={!texto && !fechaDesde && !fechaHasta}
+            onClick={() => updateParams({ texto: "", fecha_desde: "", fecha_hasta: "", page: 1 })}>
+            Limpiar filtros
+          </button>
+        </div>
+        {error && <div className="alert alert-danger" role="alert">{error.message}</div>}
         <CrudTable
-          rows={rows}
+          rows={error ? [] : rows}
           columns={[
             { key: "numero_factura", label: "Número" },
             { key: "proveedor_nombre", label: "Proveedor" },
