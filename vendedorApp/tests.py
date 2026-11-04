@@ -2343,14 +2343,138 @@ class DashboardTest(BaseTest):
         self.assertNotIn("anulaciones", fila)
 
     def test_dashboard_bajo_minimo(self):
-        resp = auth_client(self.gerente).get("/api/dashboard/stats/")
+        resp = auth_client(self.gerente).get("/api/dashboard/stock/")
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(
-            any(
-                p["producto_id"] == self.producto.producto_id
-                for p in resp.data["stock"]["bajo_minimo"]
-            )
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["producto_id"], self.producto.pk)
+
+    def _producto_stock(self, codigo, oem="OEM-H", stock=0, minimo=5, **kwargs):
+        producto = Producto.objects.create(
+            codigo_producto=codigo, nombre=codigo, oem=oem,
+            descripcion="", precio_costo=100, margen_utilidad=Decimal("30"),
+            stock_minimo=minimo, stock_maximo=50, proveedor=self.proveedor, **kwargs,
         )
+        StockProductoUbicacion.objects.create(
+            producto=producto, ubicacion=self.ubicacion, cantidad=stock,
+        )
+        return producto
+
+    def test_stats_no_incluye_lista_ni_busca_sustitutos(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        with CaptureQueriesContext(connection) as queries:
+            resp = auth_client(self.gerente).get("/api/dashboard/stats/")
+        self.assertNotIn("bajo_minimo", resp.data["stock"])
+        self.assertNotIn("productos_en_pedido", resp.data["stock"])
+        self.assertEqual(resp.data["stock"]["total_productos"], 1)
+        self.assertEqual(resp.data["stock"]["sin_stock"], 0)
+        self.assertFalse(any("store_config" in q["sql"] for q in queries))
+        self.assertLess(len(resp.content), 2000)
+
+    def test_oem_vacio_o_espacios_no_tiene_sustitutos(self):
+        config = StoreConfig.current()
+        config.feature_flags = {"oem_stock_substitutes": True}
+        config.save()
+        for i, oem in enumerate(["", "   "]):
+            self._producto_stock(f"ALERTA-{i}", oem=oem)
+            self._producto_stock(f"SUSTITUTO-{i}", oem=oem, stock=8)
+        resp = auth_client(self.gerente).get("/api/dashboard/stock/")
+        for row in resp.data["results"]:
+            if not row["oem"].strip():
+                self.assertEqual(row["oem_productos"], [])
+        self.assertLess(len(resp.content), 2000)
+
+    def test_sustitutos_y_ubicaciones_solo_para_pagina_visible(self):
+        config = StoreConfig.current()
+        config.feature_flags = {"oem_stock_substitutes": True}
+        config.save()
+        first = self._producto_stock("A", oem="VISIBLE", stock=0)
+        other = self._producto_stock("B", oem="OTRA-PAGINA", stock=0)
+        substitute = self._producto_stock("C", oem="VISIBLE", stock=8)
+        self._producto_stock("D", oem="OTRA-PAGINA", stock=8)
+        # A positive-stock alert on another page must not become a substitute.
+        self._producto_stock("E", oem="VISIBLE", stock=1)
+        StockProductoUbicacion.objects.create(producto=substitute, ubicacion=None, cantidad=0)
+        resp = auth_client(self.gerente).get("/api/dashboard/stock/?page_size=1")
+        self.assertEqual(resp.data["count"], 4)
+        self.assertEqual(len(resp.data["results"]), 1)
+        row = resp.data["results"][0]
+        self.assertEqual(row["producto_id"], first.pk)
+        self.assertEqual([p["producto_id"] for p in row["oem_productos"]], [substitute.pk])
+        self.assertEqual(row["oem_productos"][0]["ubicaciones"], [
+            {"nombre": self.ubicacion.nombre, "cantidad": 8}
+        ])
+        page2 = auth_client(self.gerente).get("/api/dashboard/stock/?page_size=1&page=2")
+        self.assertEqual(page2.data["results"][0]["producto_id"], other.pk)
+
+    def test_sustitutos_desactivados_y_alertas_ocultas(self):
+        self._producto_stock("C", stock=10)
+        self._producto_stock("IGNORADO", ignorar_stock_permanente=True)
+        self._producto_stock("MANANA", recordar_stock_desde=timezone.now() + timedelta(days=1))
+        resp = auth_client(self.gerente).get("/api/dashboard/stock/")
+        self.assertEqual(resp.data["count"], 1)
+        self.assertEqual(resp.data["results"][0]["oem_productos"], [])
+
+    def test_paginacion_limite_y_ultima_pagina_tras_borrar_alertas(self):
+        for i in range(52):
+            self._producto_stock(f"P-{i:03}")
+        client = auth_client(self.gerente)
+        first = client.get("/api/dashboard/stock/?page_size=999")
+        self.assertEqual(len(first.data["results"]), 50)
+        last = client.get("/api/dashboard/stock/?page_size=50&page=99")
+        self.assertEqual(last.status_code, 200)
+        self.assertEqual(len(last.data["results"]), 3)
+        self.assertIsNone(last.data["next"])
+        self.assertEqual(client.get("/api/dashboard/stock/?page=no").status_code, 404)
+
+    def test_pedido_del_dia_y_roles(self):
+        dia = PedidoProveedorDia.objects.create(fecha=timezone.localdate())
+        ItemPedidoProveedor.objects.create(dia=dia, producto=self.producto, proveedor=self.proveedor)
+        for user in [self.gerente, self.vendedor, self.bodeguero]:
+            response = auth_client(user).get("/api/dashboard/stock/")
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.data["results"][0]["en_pedido"])
+        self.assertEqual(self.client.get("/api/dashboard/stock/").status_code, 401)
+        unknown = make_user("Vendedor")
+        unknown.groups.clear()
+        self.assertEqual(auth_client(unknown).get("/api/dashboard/stock/").status_code, 403)
+
+    def test_stock_consultas_no_crecen_por_producto(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        config = StoreConfig.current()
+        config.feature_flags = {"oem_stock_substitutes": True}
+        config.save()
+        for i in range(12):
+            self._producto_stock(f"ALERTA-{i}", oem=f"OEM-{i}")
+            self._producto_stock(f"SUST-{i}", oem=f"OEM-{i}", stock=8)
+        client = auth_client(self.gerente)
+        with CaptureQueriesContext(connection) as one:
+            first = client.get("/api/dashboard/stock/?page_size=1")
+        with CaptureQueriesContext(connection) as ten:
+            page = client.get("/api/dashboard/stock/?page_size=10")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(len(page.data["results"]), 10)
+        self.assertEqual(len(ten), len(one))
+        self.assertLessEqual(len(ten), 8)
+
+    def test_comando_perfila_dashboard_incluyendo_json(self):
+        from io import StringIO
+        output = StringIO()
+        call_command("profile_endpoints", endpoints=["dashboard", "dashboard_stock"],
+                     user_id=self.gerente.pk, limit=10, slow=0, stdout=output)
+        self.assertEqual(output.getvalue().count("HTTP 200"), 2)
+        self.assertIn("incluye JSON", output.getvalue())
+        self.assertIn("bytes", output.getvalue())
+
+    def test_stock_vacio(self):
+        Producto.objects.filter(pk=self.producto.pk).update(ignorar_stock_permanente=True)
+        resp = auth_client(self.gerente).get("/api/dashboard/stock/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["count"], 0)
+        self.assertEqual(resp.data["results"], [])
+
 
     def test_dashboard_requiere_auth(self):
         resp = self.client.get("/api/dashboard/stats/")

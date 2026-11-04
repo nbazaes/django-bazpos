@@ -534,7 +534,13 @@ La política se persiste en `PoliticaDescuentoUsuario`, con relación uno a uno 
 #### `GET` `/api/dashboard/stats/`
 **Descripción:** Indicadores del día para el Dashboard.
 **Roles:** Todos.
-**Respuestas:** `es_gerente`, `ventas_dia` (total = vendido − devoluciones, total_vendido, devoluciones, cantidad, desglose por vendedor; las anulaciones no intervienen: la venta anulada desaparece del día), `stock` (total_productos, sin_stock, bajo_minimo con `oem_productos`, productos_en_pedido).
+**Respuestas:** `es_gerente`, `ventas_dia` (total = vendido − devoluciones, total_vendido, devoluciones, cantidad, desglose por vendedor; las anulaciones no intervienen: la venta anulada desaparece del día), `stock` (total_productos, sin_stock). No incluye listas de productos: los indicadores cargan independientemente de la tabla.
+
+#### `GET` `/api/dashboard/stock/?page=1&page_size=10`
+**Descripción:** Productos bajo stock mínimo, paginados en el servidor (10 por defecto, máximo 50). Orden: stock actual, nombre e ID. Si desaparecen alertas de la última página, devuelve la última página disponible.
+**Roles:** Todos.
+**Respuesta:** `count`, `next`, `previous`, `results`. Cada producto incluye `proveedor_nombre`, `en_pedido` (pedido de proveedores del día) y `oem_productos` con stock y ubicaciones positivas. Los sustitutos respetan la configuración `oem_stock_substitutes`, requieren un OEM no vacío y excluyen todos los productos que ya tienen alerta de stock. Solo se buscan sustitutos para la página solicitada.
+**Frontend:** Indicadores y tabla se consultan en paralelo, con carga y errores independientes. Ajustes, edición, pedidos y cambios de alertas invalidan las consultas del dashboard.
 
 #### `GET` `/api/reportes/stats/?mes=&anio=`
 **Descripción:** Reportes del mes (gráfico diario, top 10 productos, stock crítico, ventas por vendedor).

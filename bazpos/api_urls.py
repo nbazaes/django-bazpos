@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from chatApp.api import ChatMessageCreateView, ChatStateView
 from gerenteApp.api import FacturaViewSet, ProveedorViewSet, StoreConfigViewSet, UbicacionViewSet, UserViewSet
-from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
+from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, CierreCajaView, DashboardStatsView, DashboardStockView, DevolucionViewSet, PedidoProveedorViewSet, PedidoViewSet, ProductoViewSet, ReporteExportView, ReporteQueryView, ReporteSchemaView, ReportesStatsView, VentaViewSet
 from vendedorApp.publico_api import CatalogoPublicoViewSet
 from .api_views import MeView, StoreNameView, SupportTicketView
 
@@ -27,6 +27,7 @@ urlpatterns = [
     path("auth/me/", MeView.as_view(), name="auth_me"),
     path("store-name/", StoreNameView.as_view(), name="store_name"),
     path("soporte/tickets/", SupportTicketView.as_view(), name="soporte_ticket_create"),
+    path("dashboard/stock/", DashboardStockView.as_view(), name="dashboard_stock"),
     path("dashboard/stats/", DashboardStatsView.as_view(), name="dashboard_stats"),
     path("reportes/stats/", ReportesStatsView.as_view(), name="reportes_stats"),
     path("reportes/custom/schema/", ReporteSchemaView.as_view(), name="reporte_custom_schema"),

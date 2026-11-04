@@ -21,3 +21,16 @@ class DevolucionPagination(DefaultPagination):
 
 class PedidoPagination(DefaultPagination):
     pass
+
+
+class DashboardStockPagination(DefaultPagination):
+    page_size = 10
+    max_page_size = 50
+
+    def get_page_number(self, request, paginator):
+        page = super().get_page_number(request, paginator)
+        try:
+            # Stock alerts can disappear while the user is on the last page.
+            return min(int(page), paginator.num_pages)
+        except (TypeError, ValueError):
+            return page

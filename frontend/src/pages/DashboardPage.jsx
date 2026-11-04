@@ -10,7 +10,7 @@ import AjusteStockModal from "../components/AjusteStockModal";
 import { usePageTitle } from "../lib/usePageTitle";
 import { getUser, isBodeguero, isGerente } from "../lib/auth";
 import { apiRequest } from "../lib/api";
-import { queryKeys, useDashboardStats, queryKeysPedidoProveedor } from "../lib/queries";
+import { queryKeys, useDashboardStats, useDashboardStock, queryKeysPedidoProveedor } from "../lib/queries";
 import { useToast } from "../lib/useToast";
 
 const fmtMoney = (n) => `$${Number(n || 0).toLocaleString()}`;
@@ -46,6 +46,10 @@ export default function DashboardPage() {
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
   const [stockPage, setStockPage] = useState(1);
   const [stockPageSize, setStockPageSize] = useState(10);
+  const stockParams = { page: stockPage, page_size: stockPageSize };
+  const stockQueryKey = queryKeys.dashboardStock(stockParams);
+  const { data: stockData, error: stockError, isFetching: stockFetching, isPlaceholderData } = useDashboardStock(stockParams);
+
   const [editarProductoId, setEditarProductoId] = useState(null);
   const [ajusteProducto, setAjusteProducto] = useState(null);
   const popoverRef = useRef(null);
@@ -75,31 +79,27 @@ export default function DashboardPage() {
         body: { accion },
       }),
     onMutate: async ({ productoId }) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
-      const previousDashboard = queryClient.getQueryData(queryKeys.dashboard);
+      await queryClient.cancelQueries({ queryKey: stockQueryKey, exact: true });
+      const previousDashboard = queryClient.getQueryData(stockQueryKey);
 
       if (popoverAbierto === productoId) {
         setPopoverAbierto(null);
       }
 
-      queryClient.setQueryData(queryKeys.dashboard, (old) => {
-        if (!old?.stock?.bajo_minimo) return old;
+      queryClient.setQueryData(stockQueryKey, (old) => {
+        if (!old?.results) return old;
         return {
           ...old,
-          stock: {
-            ...old.stock,
-            bajo_minimo: old.stock.bajo_minimo.filter(
-              (p) => p.producto_id !== productoId
-            ),
-          },
+          count: Math.max(0, old.count - 1),
+          results: old.results.filter((p) => p.producto_id !== productoId),
         };
       });
 
-      return { previousDashboard };
+      return { previousDashboard, stockQueryKey };
     },
     onError: (err, _, context) => {
       if (context?.previousDashboard) {
-        queryClient.setQueryData(queryKeys.dashboard, context.previousDashboard);
+        queryClient.setQueryData(context.stockQueryKey, context.previousDashboard);
       }
       showToast(err.message || "No se pudo actualizar el producto", "danger");
     },
@@ -110,6 +110,7 @@ export default function DashboardPage() {
           : "Producto ignorado permanentemente";
       showToast(mensaje, "success");
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
   });
 
   const agregarPedidoMutation = useMutation({
@@ -119,27 +120,22 @@ export default function DashboardPage() {
         body: { producto_id: productoId },
       }),
     onMutate: async (productoId) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
-      const previousDashboard = queryClient.getQueryData(queryKeys.dashboard);
+      await queryClient.cancelQueries({ queryKey: stockQueryKey, exact: true });
+      const previousDashboard = queryClient.getQueryData(stockQueryKey);
 
-      queryClient.setQueryData(queryKeys.dashboard, (old) => {
-        if (!old?.stock) return old;
-        const currentList = old.stock.productos_en_pedido || [];
-        if (currentList.includes(productoId)) return old;
+      queryClient.setQueryData(stockQueryKey, (old) => {
+        if (!old?.results) return old;
         return {
           ...old,
-          stock: {
-            ...old.stock,
-            productos_en_pedido: [...currentList, productoId],
-          },
+          results: old.results.map((p) => p.producto_id === productoId ? { ...p, en_pedido: true } : p),
         };
       });
 
-      return { previousDashboard };
+      return { previousDashboard, stockQueryKey };
     },
     onError: (err, _, context) => {
       if (context?.previousDashboard) {
-        queryClient.setQueryData(queryKeys.dashboard, context.previousDashboard);
+        queryClient.setQueryData(context.stockQueryKey, context.previousDashboard);
       }
       showToast(err.message || "No se pudo agregar el producto", "danger");
     },
@@ -147,6 +143,7 @@ export default function DashboardPage() {
       showToast("Producto agregado a la lista de pedidos", "success");
       queryClient.invalidateQueries({ queryKey: queryKeysPedidoProveedor.all });
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
   });
 
   useEffect(() => {
@@ -234,17 +231,20 @@ export default function DashboardPage() {
               </PageCard>
             </div>
           )}
-          {data.stock.bajo_minimo && data.stock.bajo_minimo.length > 0 && (() => {
-            const bajoMinimoList = data.stock.bajo_minimo;
-            const stockCount = bajoMinimoList.length;
+        </>
+      )}
+      {stockError && <div className="alert alert-danger">{stockError.message}</div>}
+      {!stockData && !stockError && <div className="text-muted">Cargando productos bajo stock mínimo...</div>}
+      {stockData && (
+        <>
+          {stockData.count > 0 && (() => {
+            const stockCount = stockData.count;
             const stockTotalPages = Math.max(1, Math.ceil(stockCount / stockPageSize));
             const activeStockPage = Math.max(1, Math.min(stockPage, stockTotalPages));
-            const paginatedBajoMinimo = bajoMinimoList.slice(
-              (activeStockPage - 1) * stockPageSize,
-              activeStockPage * stockPageSize
-            );
+            const paginatedBajoMinimo = stockData.results;
 
             const handleStockPageSizeChange = (newSize) => {
+              setPopoverAbierto(null);
               setStockPageSize(newSize);
               setStockPage(1);
             };
@@ -252,6 +252,8 @@ export default function DashboardPage() {
             return (
               <div className="mb-4">
                 <PageCard title="Productos bajo stock mínimo">
+                  {stockFetching && <div className="text-muted" role="status">Actualizando productos...</div>}
+                  <fieldset disabled={isPlaceholderData} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
                   <div className="table-responsive">
                     <table className="table table-sm table-bordered">
                       <thead>
@@ -274,7 +276,7 @@ export default function DashboardPage() {
                           const isAgregarPending =
                             agregarPedidoMutation.isPending &&
                             agregarPedidoMutation.variables === p.producto_id;
-                          const yaAgregado = (data.stock.productos_en_pedido || []).includes(p.producto_id);
+                          const yaAgregado = p.en_pedido;
 
                           return (
                             <tr key={p.producto_id}>
@@ -453,6 +455,7 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
+                  </fieldset>
                   <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                     <PageSizeSelector
                       value={stockPageSize}
@@ -462,7 +465,7 @@ export default function DashboardPage() {
                     <Pagination
                       page={activeStockPage}
                       totalPages={stockTotalPages}
-                      onPageChange={setStockPage}
+                      onPageChange={(page) => { setPopoverAbierto(null); setStockPage(page); }}
                       count={stockCount}
                       pageSize={stockPageSize}
                     />
@@ -472,7 +475,7 @@ export default function DashboardPage() {
             );
           })()}
           {(() => {
-            const productoActivo = data.stock.bajo_minimo?.find(
+            const productoActivo = stockData.results?.find(
               (p) => p.producto_id === popoverAbierto
             );
             return (
@@ -537,6 +540,7 @@ export default function DashboardPage() {
                   productoId={editarProductoId}
                   onSaved={() => {
                     setEditarProductoId(null);
+                    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
                     showToast("Producto actualizado exitosamente", "success");
                   }}
                 />

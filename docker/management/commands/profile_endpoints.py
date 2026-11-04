@@ -8,13 +8,20 @@ Uso:
     python manage.py profile_endpoints
     python manage.py profile_endpoints --endpoints ventas devoluciones
     python manage.py profile_endpoints --limit 100 --slow 10
+    python manage.py profile_endpoints --endpoints dashboard dashboard_stock --limit 10
 """
 
-from django.core.management.base import BaseCommand
+from time import perf_counter
+
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.test.utils import CaptureQueriesContext
 
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from vendedorApp.api import DashboardStatsView, DashboardStockView
 from vendedorApp.models import Devolucion, PedidoProveedorDia, Producto, Venta
 from vendedorApp.serializers import (
     DevolucionSerializer,
@@ -64,6 +71,9 @@ ENDPOINTS = {
 }
 
 
+DASHBOARD_ENDPOINTS = {"dashboard": DashboardStatsView, "dashboard_stock": DashboardStockView}
+
+
 class Command(BaseCommand):
     help = "Perfila queries SQL de los endpoints mas pesados (N+1 audit)."
 
@@ -81,6 +91,7 @@ class Command(BaseCommand):
             default=50,
             help="Tamano de la muestra por endpoint (filas serializadas).",
         )
+        parser.add_argument("--user-id", type=int, help="Usuario existente para perfilar el dashboard.")
         parser.add_argument(
             "--slow",
             type=int,
@@ -89,8 +100,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        endpoints = [e for e in options["endpoints"] if e in ENDPOINTS]
-        missing = [e for e in options["endpoints"] if e not in ENDPOINTS]
+        known = ENDPOINTS.keys() | DASHBOARD_ENDPOINTS.keys()
+        endpoints = [e for e in options["endpoints"] if e in known]
+        missing = [e for e in options["endpoints"] if e not in known]
         if missing:
             self.stderr.write(f"Endpoints desconocidos (ignorados): {', '.join(missing)}")
         if not endpoints:
@@ -98,7 +110,10 @@ class Command(BaseCommand):
             return
 
         for name in endpoints:
-            self._profile(name, options["limit"], options["slow"])
+            if name in DASHBOARD_ENDPOINTS:
+                self._profile_dashboard(name, options)
+            else:
+                self._profile(name, options["limit"], options["slow"])
 
     def _profile(self, name, limit, slow):
         queryset, serializer_class = ENDPOINTS[name]
@@ -123,3 +138,36 @@ class Command(BaseCommand):
         for q in sorted(queries, key=lambda x: float(x["time"]), reverse=True)[:slow]:
             sql = " ".join(q["sql"].split())
             self.stdout.write(f"    [{q['time']}s] {sql[:200]}")
+
+    def _profile_dashboard(self, name, options):
+        users = User.objects.filter(is_active=True)
+        if options["user_id"] is not None:
+            users = users.filter(pk=options["user_id"])
+        else:
+            users = users.filter(Q(is_superuser=True) | Q(groups__name__in=[
+                "Gerente", "Encargado", "Vendedor", "Bodeguero"
+            ])).distinct()
+        user = users.order_by("pk").first()
+        if user is None:
+            raise CommandError("Se necesita un usuario activo existente para perfilar el dashboard.")
+        request = APIRequestFactory().get(
+            "/api/dashboard/stock/" if name == "dashboard_stock" else "/api/dashboard/stats/",
+            {"page_size": min(max(options["limit"], 1), 50)},
+            HTTP_HOST="localhost",
+        )
+        force_authenticate(request, user=user)
+        start = perf_counter()
+        with CaptureQueriesContext(connection) as context:
+            response = DASHBOARD_ENDPOINTS[name].as_view()(request)
+            response.render()
+        elapsed = perf_counter() - start
+        queries = context.captured_queries
+        total_sql = sum(float(q["time"]) for q in queries)
+        self.stdout.write(
+            f"--- {name}: HTTP {response.status_code} ---\n"
+            f"    Queries: {len(queries)} | SQL: {total_sql:.3f}s | "
+            f"total (incluye JSON): {elapsed:.3f}s | respuesta: {len(response.content)} bytes"
+        )
+        for query in sorted(queries, key=lambda q: float(q["time"]), reverse=True)[:options["slow"]]:
+            sql = " ".join(query["sql"].split())
+            self.stdout.write(f"    [{query['time']}s] {sql[:200]}")

@@ -56,6 +56,7 @@ export const queryKeys = {
     all: ["configuracion"],
   },
   dashboard: ["dashboard", "stats"],
+  dashboardStock: (params) => ["dashboard", "stats", "stock", params],
   reportes: (params) => ["reportes", "stats", params],
   reportesCustom: {
     schema: ["reportes", "custom", "schema"],
@@ -621,6 +622,15 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: queryKeys.dashboard,
     queryFn: () => apiRequest("/dashboard/stats/"),
+    staleTime: 30_000,
+  });
+}
+
+export function useDashboardStock(params = {}) {
+  return useQuery({
+    queryKey: queryKeys.dashboardStock(params),
+    queryFn: () => apiRequest(`/dashboard/stock/${buildQuery(params)}`),
+    placeholderData: (previousData) => previousData,
     staleTime: 30_000,
   });
 }

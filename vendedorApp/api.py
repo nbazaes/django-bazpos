@@ -39,6 +39,7 @@ from vendedorApp.serializers import (
 )
 from vendedorApp.pagination import (
     DefaultPagination,
+    DashboardStockPagination,
     DevolucionPagination,
     PedidoPagination,
     ProductoPagination,
@@ -84,10 +85,11 @@ class DashboardStatsView(APIView):
             return nombre if nombre else row.get("usuario__username", "")
 
         if es_gerente:
-            total_vendido = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
+            resumen = ventas_hoy.aggregate(total=Sum("monto_total"), cantidad=Count("id"))
+            total_vendido = resumen["total"] or 0
             monto_devuelto = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
             total_dia = total_vendido - monto_devuelto
-            cant_ventas_dia = ventas_hoy.count()
+            cant_ventas_dia = resumen["cantidad"]
 
             ventas_por_vendedor = (
                 ventas_hoy.values("usuario_id", "usuario__first_name", "usuario__last_name", "usuario__username")
@@ -127,10 +129,11 @@ class DashboardStatsView(APIView):
         else:
             ventas_propias = ventas_hoy.filter(usuario=user)
             devoluciones_propias = devoluciones_hoy.filter(usuario=user)
-            total_vendido = ventas_propias.aggregate(total=Sum("monto_total"))["total"] or 0
+            resumen = ventas_propias.aggregate(total=Sum("monto_total"), cantidad=Count("id"))
+            total_vendido = resumen["total"] or 0
             monto_devuelto = devoluciones_propias.aggregate(total=Sum("monto_devuelto"))["total"] or 0
             total_dia = total_vendido - monto_devuelto
-            cant_ventas_dia = ventas_propias.count()
+            cant_ventas_dia = resumen["cantidad"]
             nombre = f"{user.first_name} {user.last_name}".strip()
             desglose = [
                 {
@@ -142,6 +145,27 @@ class DashboardStatsView(APIView):
                 }
             ]
 
+        return Response({
+            "es_gerente": es_gerente,
+            "ventas_dia": {
+                "total": total_dia,
+                "total_vendido": total_vendido,
+                "devoluciones": monto_devuelto,
+                "cantidad": cant_ventas_dia,
+                "desglose": desglose,
+            },
+            "stock": {
+                # Avoid the default manager's stock aggregation just to count products.
+                "total_productos": Producto._base_manager.count(),
+                "sin_stock": Producto.objects.filter(stock_actual=0).count(),
+            },
+        })
+
+
+class DashboardStockView(APIView):
+    permission_classes = [IsAuthenticated, HasKnownRole]
+
+    def get(self, request):
         now = timezone.now()
         bajo_minimo_qs = (
             Producto.objects.filter(
@@ -161,18 +185,23 @@ class DashboardStatsView(APIView):
             )
             .order_by("stock_actual", "nombre", "producto_id")
         )
-        bajo_minimo = list(bajo_minimo_qs)
+        paginator = DashboardStockPagination()
+        bajo_minimo = paginator.paginate_queryset(bajo_minimo_qs, request, view=self)
 
         # Find related products by OEM that have active stock.
         config = StoreConfig.current()
         show_oem_substitutes = (config.feature_flags or {}).get("oem_stock_substitutes", False)
         if bajo_minimo and show_oem_substitutes:
-            oems = [p["oem"] for p in bajo_minimo]
-            producto_ids = [p["producto_id"] for p in bajo_minimo]
+            oems = {p["oem"] for p in bajo_minimo if p["oem"].strip()}
             oem_productos = (
                 Producto.objects.filter(oem__in=oems, stock_actual__gt=0)
-                .exclude(producto_id__in=producto_ids)
-                .prefetch_related("stocks_ubicacion__ubicacion")
+                .exclude(producto_id__in=bajo_minimo_qs.order_by().values("producto_id"))
+                .only("producto_id", "codigo_producto", "nombre", "oem")
+                .prefetch_related(
+                    Prefetch("stocks_ubicacion", queryset=StockProductoUbicacion.objects.filter(
+                        cantidad__gt=0
+                    ).select_related("ubicacion"))
+                )
             )
             oem_map = {}
             for p in oem_productos:
@@ -191,41 +220,20 @@ class DashboardStatsView(APIView):
                 )
             for p in bajo_minimo:
                 p["proveedor_nombre"] = p.pop("proveedor__nombre")
-                p["oem_productos"] = oem_map.get(p["oem"], [])
+                p["oem_productos"] = oem_map.get(p["oem"], []) if p["oem"].strip() else []
         elif bajo_minimo:
             for p in bajo_minimo:
                 p["proveedor_nombre"] = p.pop("proveedor__nombre")
                 p["oem_productos"] = []
 
-        productos_en_pedido = []
-        hoy_fecha = date.today()
-        try:
-            dia_hoy = PedidoProveedorDia.objects.filter(fecha=hoy_fecha).first()
-            if dia_hoy:
-                productos_en_pedido = list(
-                    ItemPedidoProveedor.objects.filter(dia=dia_hoy).values_list("producto_id", flat=True)
-                )
-        except Exception:
-            pass
-
-        return Response(
-            {
-                "es_gerente": es_gerente,
-                "ventas_dia": {
-                    "total": total_dia,
-                    "total_vendido": total_vendido,
-                    "devoluciones": monto_devuelto,
-                    "cantidad": cant_ventas_dia,
-                    "desglose": desglose,
-                },
-                "stock": {
-                    "total_productos": Producto.objects.count(),
-                    "sin_stock": Producto.objects.filter(stock_actual=0).count(),
-                    "bajo_minimo": bajo_minimo,
-                    "productos_en_pedido": productos_en_pedido,
-                },
-            }
-        )
+        # Only the visible products need order membership flags.
+        producto_ids = [p["producto_id"] for p in bajo_minimo]
+        productos_en_pedido = set(ItemPedidoProveedor.objects.filter(
+            dia__fecha=timezone.localdate(), producto_id__in=producto_ids
+        ).values_list("producto_id", flat=True))
+        for producto in bajo_minimo:
+            producto["en_pedido"] = producto["producto_id"] in productos_en_pedido
+        return paginator.get_paginated_response(bajo_minimo)
 
 
 class ReportesStatsView(APIView):
