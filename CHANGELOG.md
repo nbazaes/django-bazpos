@@ -4,6 +4,16 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.6.0] - 2026-11-04
+
+### Agregado
+
+- Busca facturas y filtra los resultados por fecha.
+
+### Rendimiento
+
+- El panel principal carga más rápido y las alertas de stock se muestran por páginas.
+
 ## [2.5.0] - 2026-11-03
 
 ### Agregado
