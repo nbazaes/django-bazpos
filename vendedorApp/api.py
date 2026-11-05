@@ -984,7 +984,26 @@ def _ubicacion_id_from_key(key):
     return None if key == "None" else int(key)
 
 
-class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class HistorialVendedorMixin:
+    def filtrar_vendedor(self, queryset):
+        vendedor = self.request.query_params.get("vendedor", "").strip()
+        if vendedor:
+            vendedor_id = serializers.IntegerField(min_value=1).run_validation(vendedor)
+            queryset = queryset.filter(usuario_id=vendedor_id)
+        return queryset
+
+    @action(detail=False, methods=["get"])
+    def vendedores(self, request):
+        usuarios = User.objects.filter(
+            pk__in=self.get_queryset().values("usuario_id")
+        ).order_by("first_name", "last_name", "username")
+        return Response([
+            {"value": user.pk, "label": user.get_full_name().strip() or user.username}
+            for user in usuarios
+        ])
+
+
+class VentaViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     queryset = Venta.objects.select_related("usuario").prefetch_related(
         "pagos",
@@ -1000,6 +1019,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
     serializer_class = VentaSerializer
     pagination_class = VentaPagination
     role_action_map = {
+        "vendedores": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
@@ -1037,6 +1057,7 @@ class VentaViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retrie
         if fecha_hasta:
             queryset = queryset.filter(fecha_venta__date__lte=fecha_hasta)
 
+        queryset = self.filtrar_vendedor(queryset)
         user = self.request.user
         if has_any_role(user, [ROLE_ENCARGADO, ROLE_GERENTE]):
             return queryset
@@ -1575,11 +1596,12 @@ class CancelarPedidoSerializer(serializers.Serializer):
     motivo = serializers.CharField(max_length=500, trim_whitespace=True)
 
 
-class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, DjangoModelPermissions, RoleActionPermission]
     serializer_class = PedidoSerializer
     pagination_class = PedidoPagination
     role_action_map = {
+        "vendedores": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "list": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "retrieve": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
         "create": [ROLE_VENDEDOR, ROLE_ENCARGADO, ROLE_GERENTE, ROLE_BODEGUERO],
@@ -1613,7 +1635,7 @@ class PedidoViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Retri
         if fecha_hasta:
             queryset = queryset.filter(fecha_creacion__date__lte=fecha_hasta)
 
-        return queryset
+        return self.filtrar_vendedor(queryset)
 
     def create(self, request, *args, **kwargs):
         serializer = CrearPedidoSerializer(data=request.data, context={"request": request})

@@ -15,6 +15,7 @@ import {
   useUbicaciones,
   useVenta,
   useVentas,
+  useVendedoresHistorial,
 } from "../lib/queries";
 import { getAccessToken, getUser, isGerente } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
@@ -36,6 +37,8 @@ export default function PedidosPage() {
   const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const debouncedSearch = useDebounce(search.trim());
+  const [vendedorFiltro, setVendedorFiltro] = useState(searchParams.get("vendedor") || "");
+  const { data: vendedores = [] } = useVendedoresHistorial("ventas");
   const [tipoFiltro, setTipoFiltro] = useState(searchParams.get("tipo") || "");
   const [fechaDesde, setFechaDesde] = useState(searchParams.get("fecha_desde") || "");
   const [fechaHasta, setFechaHasta] = useState(searchParams.get("fecha_hasta") || "");
@@ -63,6 +66,7 @@ export default function PedidosPage() {
   const params = { page, page_size: pageSize };
   const ventasParams = { ...params };
   if (debouncedSearch) ventasParams.codigo = debouncedSearch;
+  if (vendedorFiltro) ventasParams.vendedor = vendedorFiltro;
   if (tipoFiltro) ventasParams.tipo_documento = tipoFiltro;
   if (fechaDesde) ventasParams.fecha_desde = fechaDesde;
   if (fechaHasta) ventasParams.fecha_hasta = fechaHasta;
@@ -147,12 +151,13 @@ export default function PedidosPage() {
     return total;
   }, [devolverVentaData, devolverSeleccion, devolverMontos]);
 
-  const syncURL = (t, p, ps, s, tf, fd, fh) => {
+  const syncURL = (t, p, ps, s, tf, fd, fh, vf = vendedorFiltro) => {
     const params = { tab: t, page: String(p), page_size: String(ps) };
     if (s) params.search = s;
     if (tf) params.tipo = tf;
     if (fd) params.fecha_desde = fd;
     if (fh) params.fecha_hasta = fh;
+    if (vf) params.vendedor = vf;
     setSearchParams(params, { replace: true });
   };
 
@@ -161,9 +166,10 @@ export default function PedidosPage() {
     setPage(1);
     setSearch("");
     setTipoFiltro("");
+    setVendedorFiltro("");
     setFechaDesde("");
     setFechaHasta("");
-    syncURL(newTab, 1, pageSize, "", "", "", "");
+    syncURL(newTab, 1, pageSize, "", "", "", "", "");
   }
 
   function handleSearchChange(val) {
@@ -318,6 +324,22 @@ export default function PedidosPage() {
                   <option value="">Todos</option>
                   <option value="VE">Ventas</option>
                   <option value="CO">Cotizaciones</option>
+                </select>
+                <select
+                  className="form-control"
+                  style={{ maxWidth: 220 }}
+                  aria-label="Filtrar por vendedor"
+                  value={vendedorFiltro}
+                  onChange={(e) => {
+                    setVendedorFiltro(e.target.value);
+                    setPage(1);
+                    syncURL(tab, 1, pageSize, debouncedSearch, tipoFiltro, fechaDesde, fechaHasta, e.target.value);
+                  }}
+                >
+                  <option value="">Todos los vendedores</option>
+                  {vendedores.map((vendedor) => (
+                    <option key={vendedor.value} value={vendedor.value}>{vendedor.label}</option>
+                  ))}
                 </select>
                 <div className="flex items-center gap-2">
                   <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>

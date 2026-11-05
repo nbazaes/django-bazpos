@@ -9,6 +9,7 @@ import {
   useMarcarRetiro,
   usePedido,
   usePedidos,
+  useVendedoresHistorial,
   useUbicaciones,
 } from "../lib/queries";
 import { getStoreName } from "../lib/storeName";
@@ -42,6 +43,8 @@ const ESTADO_BADGE = {
 export default function PedidosHistorial() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [vendedorFiltro, setVendedorFiltro] = useState("");
+  const { data: vendedores = [] } = useVendedoresHistorial("pedidos");
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -68,6 +71,7 @@ export default function PedidosHistorial() {
 
   const addToast = useToast();
   const pedidosParams = { page, page_size: pageSize };
+  if (vendedorFiltro) pedidosParams.vendedor = vendedorFiltro;
   if (estadoFiltro) pedidosParams.estado = estadoFiltro;
   if (search.trim()) pedidosParams.search = search.trim();
   if (fechaDesde) pedidosParams.fecha_desde = fechaDesde;
@@ -349,6 +353,7 @@ export default function PedidosHistorial() {
 
   function handleFilterChange(field, value) {
     switch (field) {
+      case "vendedor": setVendedorFiltro(value); break;
       case "estado": setEstadoFiltro(value); break;
       case "search": setSearch(value); break;
       case "fecha_desde": setFechaDesde(value); break;
@@ -381,6 +386,18 @@ export default function PedidosHistorial() {
           value={search}
           onChange={(e) => handleFilterChange("search", e.target.value)}
         />
+        <select
+          className="form-control"
+          style={{ maxWidth: 220 }}
+          aria-label="Filtrar por vendedor"
+          value={vendedorFiltro}
+          onChange={(e) => handleFilterChange("vendedor", e.target.value)}
+        >
+          <option value="">Todos los vendedores</option>
+          {vendedores.map((vendedor) => (
+            <option key={vendedor.value} value={vendedor.value}>{vendedor.label}</option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>
           <input

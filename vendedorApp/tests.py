@@ -46,6 +46,65 @@ class BaseTest(TestCase):
         cls.ubicacion = Ubicacion.objects.create(nombre="Bodega Central")
 
 
+class HistorialVendedorTest(BaseTest):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for usuario in (cls.vendedor, cls.vendedor2):
+            Venta.objects.create(usuario=usuario, monto_subtotal=1000, monto_total=1000)
+            Pedido.objects.create(
+                usuario=usuario, nombre_cliente="Cliente", telefono_cliente="123",
+                monto_subtotal=1000, monto_total=1000,
+            )
+
+    def test_filtra_antes_de_paginar_y_combina_busqueda(self):
+        client = auth_client(self.gerente)
+        for recurso, busqueda in (("ventas", "codigo"), ("pedidos", "search")):
+            with self.subTest(recurso=recurso):
+                response = client.get(f"/api/{recurso}/", {
+                    "vendedor": self.vendedor2.pk, "page_size": 1,
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["count"], 1)
+                self.assertEqual(response.data["results"][0]["usuario"], self.vendedor2.pk)
+                response = client.get(f"/api/{recurso}/", {
+                    "vendedor": self.vendedor2.pk, busqueda: "inexistente",
+                })
+                self.assertEqual(response.data["count"], 0)
+                self.assertEqual(client.get(f"/api/{recurso}/").data["count"], 2)
+
+    def test_opciones_incluyen_vendedores_inactivos_del_historial(self):
+        self.vendedor2.is_active = False
+        self.vendedor2.save(update_fields=["is_active"])
+        client = auth_client(self.gerente)
+        for recurso in ("ventas", "pedidos"):
+            response = client.get(f"/api/{recurso}/vendedores/")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data, [
+                {"value": self.vendedor.pk, "label": "Ana Perez"},
+                {"value": self.vendedor2.pk, "label": "Luis Rojas"},
+            ])
+
+    def test_filtro_y_opciones_respetan_visibilidad_de_ventas(self):
+        client = auth_client(self.vendedor)
+        response = client.get("/api/ventas/", {"vendedor": self.vendedor2.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+        response = client.get("/api/ventas/vendedores/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{"value": self.vendedor.pk, "label": "Ana Perez"}])
+        response = client.get("/api/pedidos/", {"vendedor": self.vendedor2.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_vendedor_invalido(self):
+        client = auth_client(self.gerente)
+        for recurso in ("ventas", "pedidos"):
+            for valor in ("abc", "-1", "0"):
+                with self.subTest(recurso=recurso, valor=valor):
+                    self.assertEqual(client.get(f"/api/{recurso}/", {"vendedor": valor}).status_code, 400)
+
+
 class ProductoModelTest(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -153,6 +153,14 @@ export function useHistorialPrecios(productoId, params = {}) {
 
 // ── Ventas ──
 
+export function useVendedoresHistorial(recurso) {
+  return useQuery({
+    queryKey: [recurso, "vendedores"],
+    queryFn: () => apiRequest(`/${recurso}/vendedores/`),
+    staleTime: 30_000,
+  });
+}
+
 export function useVentas(params = {}) {
   return useQuery({
     queryKey: queryKeys.ventas.list(params),
