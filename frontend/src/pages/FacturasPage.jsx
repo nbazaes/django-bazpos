@@ -1,3 +1,4 @@
+import FacturaDraftList from "../components/FacturaDraftList";
 import { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import JsBarcode from "jsbarcode";
@@ -112,6 +113,7 @@ export default function FacturasPage() {
 
   return (
     <>
+      <FacturaDraftList />
       <PageCard title="Listado de facturas">
         <div className="page-actions">
           <Link className="btn btn-success" to="/facturas/crear">Nueva factura</Link>

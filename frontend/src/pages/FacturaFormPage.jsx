@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
+import FacturaPhotoInput from "../components/FacturaPhotoInput";
+import { useFacturaDraft } from "../lib/useFacturaDraft";
 import StepperInput from "../components/StepperInput";
 import ProductoForm from "../components/ProductoForm";
 import { usePageTitle } from "../lib/usePageTitle";
 import { formatDateTime } from "../lib/format";
 import {
   useCheckFacturaExiste,
-  useCreateFactura,
   useFactura,
   useImpuesto,
   useProveedores,
@@ -19,6 +20,9 @@ import { calcularPrecioVenta } from "../lib/tax";
 import { useDebounce } from "../lib/hooks";
 import { apiRequest } from "../lib/api";
 import { getStoreConfig, fetchStoreConfig } from "../lib/store";
+
+const invoiceMoneyFormat = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 2 });
+const formatInvoiceMoney = (value) => value == null ? "Por revisar" : invoiceMoneyFormat.format(Number(value));
 
 function todayLocal() {
   const now = new Date();
@@ -53,13 +57,19 @@ export default function FacturaFormPage() {
   const isEdit = Boolean(id);
   usePageTitle(isEdit ? "Editar factura" : "Crear factura");
 
-  const [initialDraft] = useState(() => (isEdit ? null : readStoredFactura()));
+  const initialDraft = null;
+  const [legacyDraft, setLegacyDraft] = useState(() => isEdit ? null : readStoredFactura());
+  const [importedLegacy, setImportedLegacy] = useState(false);
   const [step, setStep] = useState(initialDraft ? initialDraft.step : isEdit ? "items" : "header");
   const [header, setHeader] = useState(
     initialDraft ? initialDraft.header : { numero_factura: "", proveedor_id: "", fecha: todayLocal() }
   );
   const [items, setItems] = useState(initialDraft ? initialDraft.items : []);
-  const [showDraftBanner, setShowDraftBanner] = useState(Boolean(initialDraft));
+  const [pending, setPending] = useState([]);
+  const [excluded, setExcluded] = useState([]);
+  const [reviewedSnapshot, setReviewedSnapshot] = useState("");
+  const [acceptedSnapshot, setAcceptedSnapshot] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [productoModal, setProductoModal] = useState(null);
@@ -79,7 +89,6 @@ export default function FacturaFormPage() {
   const { data: impuestoData } = useImpuesto();
   const { data: ubicacionesData } = useUbicaciones({ page_size: 200 });
   const checkMutation = useCheckFacturaExiste();
-  const createMutation = useCreateFactura();
   const updateMutation = useUpdateFactura();
 
   const ubicaciones = useMemo(() => ubicacionesData?.results ?? [], [ubicacionesData?.results]);
@@ -88,24 +97,63 @@ export default function FacturaFormPage() {
     fetchStoreConfig();
   }, []);
 
+  const restoreDraft = useCallback((saved) => {
+    setHeader(saved.header || { numero_factura: "", proveedor_id: "", fecha: todayLocal() });
+    setItems(saved.items || []);
+    setStep(saved.step || "header");
+    setPending(saved.pending || []);
+    setExcluded(saved.excluded || []);
+    setReviewedSnapshot("");
+    setAcceptedSnapshot("");
+  }, []);
+  const draftData = useMemo(() => ({ step, header, items, pending, excluded }), [step, header, items, pending, excluded]);
+  const draftController = useFacturaDraft({ enabled: !isEdit, data: draftData, onRestore: restoreDraft });
+  const reviewSignature = JSON.stringify([draftData, draftController.draft?.ocr, draftController.draft?.documentos]);
+  const reviewed = reviewedSnapshot === reviewSignature;
+  const acceptedWarnings = acceptedSnapshot === reviewSignature;
   useEffect(() => {
-    if (isEdit) return;
-    const hasContent = header.numero_factura || header.proveedor_id || items.length > 0;
-    if (hasContent) {
-      localStorage.setItem(FACTURA_STORAGE_KEY, JSON.stringify({ step, header, items }));
-    } else {
+    if (importedLegacy && draftController.status === "Guardado" && JSON.stringify([draftController.draft?.datos.header, draftController.draft?.datos.items]) === importedLegacy) {
       localStorage.removeItem(FACTURA_STORAGE_KEY);
     }
-  }, [step, header, items, isEdit]);
+  }, [importedLegacy, draftController.status, draftController.draft]);
 
-  function descartarBorrador() {
-    localStorage.removeItem(FACTURA_STORAGE_KEY);
-    setStep("header");
-    setHeader({ numero_factura: "", proveedor_id: "", fecha: todayLocal() });
-    setItems([]);
-    setShowDraftBanner(false);
-    setError("");
-    setWarning("");
+  async function descartarBorrador() {
+    if (!window.confirm("¿Descartar este borrador y sus documentos?")) return;
+    try {
+      await draftController.perform("", { method: "DELETE", final: true });
+      navigate("/facturas");
+    } catch (err) { setError(err.message); }
+  }
+
+  function itemFromOCR(line, product) {
+    const quantity = Number(line.cantidad);
+    const cost = Number(line.costo_neto);
+    const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+    return {
+      producto_id: product.producto_id, codigo_producto: product.codigo_producto,
+      codigo_proveedor: product.codigo_proveedor || "", nombre: product.nombre,
+      proveedor_nombre: product.proveedor_nombre || "", margen_utilidad: Number(product.margen_utilidad) || 0,
+      cantidad: line.cantidad != null && Number.isInteger(quantity) && quantity > 0 ? quantity : "",
+      precio: line.costo_neto != null && Number.isInteger(cost) && cost >= 0 ? cost : "",
+      ocr_line: line.ocr_line,
+      ubicaciones: defaultUbicacion && Number.isInteger(quantity) && quantity > 0
+        ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: quantity }] : [],
+    };
+  }
+
+  function applyOCR(ocr) {
+    setHeader({ numero_factura: ocr.numero_factura || "", proveedor_id: ocr.proveedor_id || "", proveedor_nombre: ocr.proveedor_nombre || "", fecha: ocr.fecha || "" });
+    const matched = [], unmatched = [];
+    for (const line of ocr.lineas) {
+      if (line.candidatos?.length === 1) matched.push(itemFromOCR(line, line.candidatos[0]));
+      else unmatched.push(line);
+    }
+    setItems(matched); setPending(unmatched); setExcluded([]); setStep("header");
+  }
+
+  function linkOCR(line, product) {
+    setItems((prev) => [...prev, itemFromOCR(line, product)]);
+    setPending((prev) => prev.filter((p) => p.ocr_line !== line.ocr_line));
   }
 
   const buscarProductos = useCallback(async (texto) => {
@@ -173,31 +221,47 @@ export default function FacturaFormPage() {
   const taxPercent = impuestoData?.tax_percent ?? 0;
   const totalFactura = items.reduce((sum, it) => sum + Number(it.precio || 0) * Number(it.cantidad || 0), 0);
   const totalFacturaConIva = Math.round(totalFactura * (1 + taxPercent / 100));
+  const ocrWarnings = [...(draftController.draft?.ocr?.advertencias || [])];
+  const printed = draftController.draft?.ocr;
+  if (printed?.lineas) {
+    for (const [key, calculated] of [["neto", totalFactura], ["iva", Math.round(totalFactura * taxPercent / 100)], ["total", totalFacturaConIva]]) {
+      if (printed[key] != null && Math.abs(Number(printed[key]) - calculated) > 1) ocrWarnings.push(`El ${key} calculado ($${calculated}) difiere del impreso ($${Number(printed[key])}).`);
+    }
+    printed.lineas.forEach((line, i) => {
+      if (line.cantidad == null || line.costo_neto == null || !Number.isInteger(Number(line.cantidad)) || !Number.isInteger(Number(line.costo_neto))) ocrWarnings.push(`Línea ${i + 1}: cantidad o costo ilegible o fraccionario. Corrígelo manualmente.`);
+      if (line.total_neto != null && line.cantidad != null && line.costo_neto != null && Math.abs(Number(line.cantidad) * Number(line.costo_neto) - Number(line.total_neto)) > 1) ocrWarnings.push(`Línea ${i + 1}: cantidad por costo difiere del importe impreso.`);
+    });
+    if (printed.lineas.some((line) => Number(line.descuento))) ocrWarnings.push("Hay descuentos impresos: revisa el costo neto efectivo de cada línea.");
+  }
 
   useEffect(() => {
-    if (facturaData && id) {
-      setHeader({
-        numero_factura: facturaData.numero_factura,
-        proveedor_id: facturaData.proveedor,
-        fecha: facturaData.fecha,
-      });
-      const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
-      setItems(
-        (facturaData.detalles || []).map((d) => ({
-          producto_id: d.producto,
-          codigo_producto: d.codigo_producto,
-          codigo_proveedor: d.codigo_proveedor || "",
-          nombre: d.nombre,
-          proveedor_nombre: d.proveedor_nombre || "",
-          precio: d.costo_compra,
-          cantidad: d.cantidad,
-          margen_utilidad: Number(d.margen_utilidad) || 0,
-          ubicaciones: defaultUbicacion
-            ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: d.cantidad }]
-            : [],
-        }))
-      );
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled && facturaData && id) {
+        setHeader({
+          numero_factura: facturaData.numero_factura,
+          proveedor_id: facturaData.proveedor,
+          fecha: facturaData.fecha,
+        });
+        const defaultUbicacion = getStoreConfig().ubicacion_por_defecto;
+        setItems(
+          (facturaData.detalles || []).map((d) => ({
+            producto_id: d.producto,
+            codigo_producto: d.codigo_producto,
+            codigo_proveedor: d.codigo_proveedor || "",
+            nombre: d.nombre,
+            proveedor_nombre: d.proveedor_nombre || "",
+            precio: d.costo_compra,
+            cantidad: d.cantidad,
+            margen_utilidad: Number(d.margen_utilidad) || 0,
+            ubicaciones: defaultUbicacion
+              ? [{ ubicacion_id: Number(defaultUbicacion), cantidad: d.cantidad }]
+              : [],
+          }))
+        );
+      }
+    });
+    return () => { cancelled = true; };
   }, [facturaData, id]);
 
   const proveedorNombre = useMemo(() => {
@@ -275,12 +339,7 @@ export default function FacturaFormPage() {
       {
         onSuccess: (data) => {
           if (data.exists) {
-            localStorage.removeItem(FACTURA_STORAGE_KEY);
-            setWarning("Factura ya ingresada.");
-            setTimeout(() => {
-              setWarning("");
-              navigate(`/facturas/${data.id}/editar`);
-            }, 1500);
+            setWarning("Factura ya ingresada. Revisa el folio y proveedor; el borrador se conserva.");
           } else {
             setStep("items");
           }
@@ -311,10 +370,19 @@ export default function FacturaFormPage() {
         ubicaciones: (it.ubicaciones || []).filter((u) => u.ubicacion_id && u.cantidad > 0),
       })),
     };
-    const mutation = id ? updateMutation : createMutation;
+    if (!isEdit && (!reviewed || pending.length || !draftController.ready || draftController.conflict)) {
+      setError("Revisa los datos y resuelve las líneas pendientes antes de confirmar.");
+      return;
+    }
+    const mutation = id ? updateMutation : {
+      mutate: (_payload, callbacks) => {
+        setConfirming(true);
+        draftController.perform("confirmar/", { body: { revisado: true, acepta_advertencias: acceptedWarnings }, final: true })
+          .then(callbacks.onSuccess).catch(callbacks.onError).finally(() => setConfirming(false));
+      },
+    };
     mutation.mutate(id ? { id, data: payload } : payload, {
       onSuccess: (data) => {
-        localStorage.removeItem(FACTURA_STORAGE_KEY);
         if (data?.existing) {
           setWarning("Factura ya ingresada.");
           setTimeout(() => {
@@ -368,7 +436,7 @@ export default function FacturaFormPage() {
     return `${valid.length} ubicaciones`;
   }
 
-  const saving = createMutation.isPending || updateMutation.isPending;
+  const saving = confirming || updateMutation.isPending;
 
   const esUbicacionInvalida = (it) => {
     const ubs = it.ubicaciones || [];
@@ -615,7 +683,13 @@ export default function FacturaFormPage() {
                         </div>
                       )}
                     </td>
-                    <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}></i></td>
+                    <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => {
+                      if (it.ocr_line != null) {
+                        if (!window.confirm("¿Excluir esta línea leída de la factura?")) return;
+                        setExcluded((prev) => [...prev, it.ocr_line]);
+                      }
+                      setItems(items.filter((_, i) => i !== idx));
+                    }}></i></td>
                   </tr>
                   );
                 })}
@@ -637,13 +711,19 @@ export default function FacturaFormPage() {
           </div>
         )}
 
+        {!isEdit && <div className="mb-3">
+          {printed?.lineas && <p>Impreso: neto {formatInvoiceMoney(printed.neto)} · IVA {formatInvoiceMoney(printed.iva)} · Total {formatInvoiceMoney(printed.total)}</p>}
+          {ocrWarnings.length > 0 && <div className="alert alert-warning" role="status">{ocrWarnings.map((note, i) => <p key={i}>{note}</p>)}</div>}
+          <label className="d-block"><input type="checkbox" checked={reviewed} onChange={(e) => setReviewedSnapshot(e.target.checked ? reviewSignature : "")} /> Revisé los datos de la factura</label>
+          {draftController.draft?.ocr?.lineas && <label className="d-block"><input type="checkbox" checked={acceptedWarnings} onChange={(e) => setAcceptedSnapshot(e.target.checked ? reviewSignature : "")} /> Revisé las advertencias, descuentos y diferencias con los totales impresos</label>}
+        </div>}
         <div className="flex gap-2">
           {!isEdit && (
             <button type="button" className="btn btn-secondary" onClick={volver}>
               Volver
             </button>
           )}
-          <button className="btn btn-primary" type="submit" disabled={saving || ubicacionesInvalidas}>
+          <button className="btn btn-primary" type="submit" disabled={saving || ubicacionesInvalidas || (!isEdit && (!reviewed || pending.length > 0 || !draftController.ready || draftController.conflict))}>
             {saving ? "Guardando..." : "Guardar factura"}
           </button>
         </div>
@@ -805,18 +885,30 @@ export default function FacturaFormPage() {
 
   return (
     <>
-      {showDraftBanner && !isEdit && (
-        <div className="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>
-            Borrador recuperado{header.numero_factura ? ` — factura N° ${header.numero_factura}` : ""} ({items.length} producto{items.length === 1 ? "" : "s"}).
-          </span>
-          <button type="button" className="btn btn-sm btn-secondary" onClick={descartarBorrador}>
-            Descartar borrador
+      {!isEdit && <PageCard title="Ingreso de factura">
+        {draftController.error && <div className="alert alert-danger" role="alert">{draftController.error}
+          <button type="button" className="btn btn-sm btn-secondary" onClick={draftController.conflict || !draftController.ready ? () => { if (window.confirm("¿Recargar el borrador del servidor? Los cambios sin guardar permanecerán visibles hasta que termine la carga.")) draftController.reload(); } : draftController.save}>
+            {draftController.conflict || !draftController.ready ? "Recargar versión del servidor" : "Reintentar guardado"}
           </button>
-        </div>
-      )}
+        </div>}
+        {legacyDraft && <div className="alert alert-info">
+          Hay un borrador antiguo en este navegador. Confirma que es tuyo antes de importarlo a tu cuenta.
+          <button type="button" className="btn btn-sm btn-secondary" disabled={!draftController.ready} onClick={() => {
+            if ((items.length || header.numero_factura) && !window.confirm("¿Reemplazar los campos actuales por el borrador antiguo?")) return;
+            restoreDraft(legacyDraft); setImportedLegacy(JSON.stringify([legacyDraft.header, legacyDraft.items])); setLegacyDraft(null);
+          }}>Importar a mi cuenta</button>
+          <button type="button" className="btn btn-sm btn-secondary" onClick={() => { if (window.confirm("¿Eliminar el borrador antiguo de este navegador?")) { localStorage.removeItem(FACTURA_STORAGE_KEY); setLegacyDraft(null); } }}>Eliminar copia local</button>
+        </div>}
+        <FacturaPhotoInput controller={draftController} header={header} items={items} pending={pending} excluded={excluded} setPending={setPending} setExcluded={setExcluded} onApply={applyOCR} onLinked={linkOCR} />
+        {(draftController.status || draftController.draft) && <div className="invoice-draft-footer">
+          <span role="status" className="invoice-draft-status"><i className={`bi ${draftController.status === "Guardado" ? "bi-cloud-check" : "bi-cloud-arrow-up"}`} aria-hidden="true" /> {draftController.status}</span>
+          {draftController.draft && <button type="button" className="btn btn-sm invoice-ocr__discard" disabled={saving || draftController.conflict} onClick={descartarBorrador}><i className="bi bi-trash3" aria-hidden="true" /> Descartar borrador</button>}
+        </div>}
+      </PageCard>}
+      <fieldset disabled={(!isEdit && (!draftController.ready || draftController.conflict)) || saving} style={{ border: 0, padding: 0, minWidth: 0 }}>
       {step === "header" && renderStepHeader()}
       {step === "items" && renderStepItems()}
+      </fieldset>
       {renderUbicacionModal()}
 
       {productoModal && (

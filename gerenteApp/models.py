@@ -3,6 +3,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+import uuid
 
 # Create your models here.
 class Proveedor(models.Model):
@@ -196,3 +197,37 @@ class PoliticaDescuentoUsuario(models.Model):
         return cls.objects.filter(usuario=usuario).values_list(
             "descuento_maximo_porcentaje", flat=True
         ).first() or 0
+
+
+class FacturaBorrador(models.Model):
+    """Private, incomplete input; never participates in stock or accounting."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    datos = models.JSONField(default=dict)
+    ocr = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    actualizado = models.DateTimeField(auto_now=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-actualizado']
+
+
+class FacturaBorradorDocumento(models.Model):
+    borrador = models.ForeignKey(FacturaBorrador, on_delete=models.CASCADE, related_name='documentos')
+    nombre = models.CharField(max_length=200)
+    mime = models.CharField(max_length=30)
+    paginas = models.PositiveSmallIntegerField()
+    tamano = models.PositiveIntegerField()
+    # Database storage is private, transactionally cleaned up and covered by DB backups.
+    contenido = models.BinaryField()
+
+    class Meta:
+        ordering = ['id']
+
+
+class FacturaBorradorConfirmacion(models.Model):
+    """Minimal idempotency receipt; no document or draft payload is retained."""
+    id = models.UUIDField(primary_key=True)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    factura = models.ForeignKey(Factura, null=True, on_delete=models.SET_NULL)

@@ -8,7 +8,10 @@ from vendedorApp.api import CierreCajaDetalleView, CierreCajaHistorialView, Cier
 from vendedorApp.publico_api import CatalogoPublicoViewSet
 from .api_views import MeView, StoreNameView, SupportTicketView
 
+from gerenteApp.factura_borradores import FacturaBorradorViewSet
+
 router = DefaultRouter()
+router.register("facturas-borradores", FacturaBorradorViewSet, basename="factura-borrador")
 router.register("productos", ProductoViewSet, basename="producto")
 router.register("ventas", VentaViewSet, basename="venta")
 router.register("proveedores", ProveedorViewSet, basename="proveedor")

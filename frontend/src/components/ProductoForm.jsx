@@ -27,12 +27,13 @@ const initialState = {
 
 export default function ProductoForm({
   productoId,
+  initialValues = null,
   initialCodigoProducto = "",
   initialProveedor = "",
   onSaved,
 }) {
   const id = productoId;
-  const [data, setData] = useState(initialState);
+  const [data, setData] = useState(() => ({ ...initialState, ...initialValues }));
   const [error, setError] = useState("");
 
   const { data: proveedoresData } = useProveedores({ page_size: 200 });

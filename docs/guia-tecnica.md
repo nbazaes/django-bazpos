@@ -828,3 +828,7 @@ Como failsafe, `vendedorApp/timezone_guard.py` detecta cualquier registro de din
 | **Blue-Green sin downtime** | Las imágenes se versionan por SHA en GHCR (`app-<sha>` / `nginx-<sha>`) y se referencian por alias; el upstream de nginx puede apuntarse al nuevo contenedor sin cortes. |
 | **PyMySQL 2.2.1 forzado** | Compatibilidad de versión necesaria para MariaDB; no reemplazar por mysqlclient. |
 | **MariaDB sobre SQLite** | SQLite fue evaluada (driver puro ORM, sin SQL crudo, simplifica backup/dev), pero se descartó: `select_for_update` es no-op en SQLite y los 4 workers competirían en read-modify-write de stock. MariaDB escala a múltiples cajeros y la penalización se mitiga con límites de memoria + 2 workers. |
+
+### Facturas con OCR y borradores por usuario
+
+Ver [configuración de OpenRouter/Gemini, almacenamiento privado y API de borradores](facturas-ocr.md).

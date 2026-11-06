@@ -426,3 +426,7 @@
 | La venta quedó guardada sin imprimir | Error al imprimir el comprobante | Vaya a **Historial** ➔ **Ver** y use **Imprimir** para reimprimir (§ 2.5). |
 
 💡 **Nota / Protip:** El carrito de venta se guarda automáticamente mientras trabaja. Si cierra el navegador sin confirmar, al volver a **VENTAS** los productos siguen en el carrito. Use **Limpiar venta** para descartarlos.
+
+### Ingreso de facturas desde el teléfono
+
+En **Facturas → Nueva factura**, usar **Ingresar con foto** para subir una imagen/PDF o usar la cámara. Los borradores de la cuenta se pueden retomar desde otro dispositivo en **Mis borradores**. Ver el [flujo de lectura y revisión humana](facturas-ocr.md).

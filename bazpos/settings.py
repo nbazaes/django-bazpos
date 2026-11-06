@@ -241,3 +241,10 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+# Invoice OCR credentials are runtime server secrets, never VITE_* variables.
+BAZPOS_OCR_ENABLED = os.environ.get("BAZPOS_OCR_ENABLED", "False").lower() == "true"
+BAZPOS_OCR_PROVIDER = os.environ.get("BAZPOS_OCR_PROVIDER", "openrouter").lower()
+BAZPOS_OCR_OPENROUTER_API_KEY = os.environ.get("BAZPOS_OCR_OPENROUTER_API_KEY", os.environ.get("BAZPOS_OCR_API_KEY", os.environ.get("BAZPOS_LLM_API_KEY", "")))
+BAZPOS_OCR_GEMINI_API_KEY = os.environ.get("BAZPOS_OCR_GEMINI_API_KEY", "")
+BAZPOS_OCR_MODEL = os.environ.get("BAZPOS_OCR_MODEL", "")
