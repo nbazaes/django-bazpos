@@ -4,6 +4,13 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.7.0] - 2026-11-06
+
+### Agregado
+
+- Carga facturas usando OCR y guarda borradores asociados a tu usuario.
+- Filtra el historial de ventas y pedidos por vendedor.
+
 ## [2.6.0] - 2026-11-04
 
 ### Agregado
