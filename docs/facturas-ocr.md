@@ -2,7 +2,9 @@
 
 En **Facturas → Nueva factura** se abre el formulario habitual. El botón **Ingresar con foto** ofrece **Subir foto o PDF** y **Usar cámara**. La captura solicita la cámara trasera cuando el navegador del teléfono lo admite; también puede ofrecer el selector de imágenes del sistema. Utilizar HTTPS al acceder desde otro equipo.
 
-Revisar la vista previa, quitar las fotos que no sirvan y pulsar **Adjuntar al borrador**. Todos los adjuntos deben corresponder a una sola factura: máximo 5 archivos JPG/PNG/PDF, 5 páginas y 10 MB en total. Las imágenes admiten hasta 25 megapíxeles. Si el teléfono entrega HEIC, exportar o capturar en JPG/PNG. Los PDF deben estar sin contraseña.
+Con **Usar cámara**, primero se guarda el borrador en el servidor y se comprueba que siga disponible. Una vez guardado, el botón cambia a **Abrir cámara**: tocarlo abre el selector directamente, sin llamadas de red entre el toque y la apertura. Este segundo paso evita depender de una apertura asíncrona, que Safari antiguo puede bloquear sin mostrar un error. Al regresar, las fotos grandes se reducen antes de previsualizarlas y se adjuntan automáticamente al borrador. Así los campos y el documento adjunto se pueden recuperar si Android suspende o recarga la pestaña.
+
+Al seleccionar archivos con **Subir foto o PDF**, revisar la vista previa, quitar las fotos que no sirvan y pulsar **Adjuntar al borrador**. Todos los adjuntos deben corresponder a una sola factura: máximo 5 archivos JPG/PNG/PDF, 5 páginas y 10 MB en total. Las imágenes admiten hasta 25 megapíxeles. Si el teléfono entrega HEIC, exportar o capturar en JPG/PNG. Los PDF deben estar sin contraseña.
 
 Pulsar **Leer documentos** y después **Rellenar formulario con esta lectura**. Este último paso pide confirmación si ya hay campos completados. Revisar proveedor emisor, folio, fecha de emisión, códigos, cantidades y costos netos. El OCR puede equivocarse, especialmente con códigos borrosos, sellos o anotaciones manuscritas.
 
@@ -14,7 +16,9 @@ En la revisión final se muestran los totales impresos y calculados, junto con d
 
 Los borradores se guardan en el servidor, no en el navegador. **Mis borradores** permite continuar cualquiera de las facturas pendientes desde otro dispositivo con la misma cuenta. El autoguardado espera un segundo tras el último cambio: comprobar el indicador **Guardado** antes de cerrar la página. Si falla, usar **Reintentar guardado**. Los cambios aún sin guardar permanecen en el formulario abierto; no se garantiza recuperarlos después de cerrar la pestaña.
 
-Una edición simultánea desde otro dispositivo produce un conflicto, sin sobrescribir el servidor. Recargar su versión antes de continuar; los cambios sin guardar siguen visibles hasta que finalice esa carga. Los borradores no caducan automáticamente. Solo su propietario puede verlos o acceder a sus documentos, incluso entre usuarios de gestión.
+Una edición simultánea desde otro dispositivo produce un conflicto, sin sobrescribir el servidor. Recargar su versión antes de continuar; los cambios sin guardar siguen visibles hasta que finalice esa carga. Si aparece que un borrador ya no está disponible (por ejemplo, porque fue descartado desde otro dispositivo), no se borran los campos que sigan visibles. **Guardar como nuevo borrador** permite conservarlos bajo un identificador nuevo; esta acción no recupera documentos que ya no estén en el servidor.
+
+Los borradores no caducan automáticamente. Solo su propietario puede verlos o acceder a sus documentos, incluso entre usuarios de gestión.
 
 El antiguo borrador local no tiene propietario identificable: se ofrece importarlo con confirmación explícita a la cuenta actual. La copia antigua se elimina únicamente después de guardar la importación en el servidor, o cuando el usuario decide eliminarla.
 
@@ -69,3 +73,5 @@ Todos los endpoints requieren sesión/JWT, rol Encargado o Gerente y permiso `ge
 Se probaron las tres fotos de referencia con OpenRouter y `google/gemini-2.5-flash`: Mannheim (3 líneas, folio 3458262, total $271.639), Adriazola (9 líneas, folio 1198069, total $608.923) y Refax (4 líneas, folio 4430284, total $1.150.425). La transcripción conserva los separadores impresos y Django interpreta los puntos de miles/comas decimales; no se confía en una conversión numérica del modelo. Los códigos borrosos de Mannheim variaron entre ejecuciones y siguen requiriendo revisión humana. Esto es una comprobación de estas muestras, no una garantía de exactitud para todas las facturas.
 
 Las pruebas automatizadas usan proveedores simulados para verificar permisos, privacidad, conflictos, límites, formatos numéricos y ausencia de efectos de stock antes de confirmar.
+
+La preparación de fotos de cámara se verifica con `node frontend/src/lib/__tests__/cameraPhoto.test.js` (reducción de imágenes, conservación de archivos pequeños y liberación de memoria).

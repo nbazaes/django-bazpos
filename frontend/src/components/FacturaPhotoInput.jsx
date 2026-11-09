@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest, downloadFile } from "../lib/api";
+import { prepareCameraPhoto } from "../lib/cameraPhoto";
 import ProductoForm from "./ProductoForm";
 import "./FacturaPhotoInput.css";
 
@@ -39,6 +40,7 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [cameraHint, setCameraHint] = useState("");
   const [result, setResult] = useState(null);
   const [search, setSearch] = useState("");
   const [matches, setMatches] = useState([]);
@@ -47,7 +49,9 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
   const uploadRef = useRef(null);
   const cameraRef = useRef(null);
   const sequence = useRef(0);
+  const [cameraPrepared, setCameraPrepared] = useState("");
   const draft = controller.draft;
+  const cameraReady = cameraPrepared === `${draft?.id}:${draft?.revision}` && controller.status === "Guardado";
 
   async function run(task) {
     setBusy(true); setError("");
@@ -59,6 +63,43 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
     setFiles((previous) => [...previous, ...added]);
     e.target.value = "";
     if (added[0]) setPreview({ local: added[0], mime: added[0].type });
+  }
+  function openCamera() {
+    if (cameraReady) {
+      setCameraHint("");
+      setCameraPrepared("");
+      // Safari requires this call directly in the tap handler, with no await,
+      // timer or reliance on navigator.userActivation (missing in older iOS).
+      cameraRef.current.click();
+      return;
+    }
+    return run(async () => {
+      const saved = await controller.prepareCapture();
+      setCameraPrepared(`${saved.id}:${saved.revision}`);
+      setCameraHint("Borrador guardado. Pulsa Abrir cámara para tomar la foto.");
+    });
+  }
+  async function capturePhoto(event) {
+    const original = event.target.files?.[0];
+    event.target.value = "";
+    if (!original) return;
+    setCameraHint("");
+    await run(async () => {
+      let photo = original;
+      try {
+        photo = await prepareCameraPhoto(original);
+        const body = new FormData();
+        body.append("archivos", photo);
+        const saved = await controller.perform("documentos/", { body });
+        const doc = saved.documentos[saved.documentos.length - 1];
+        setResult(null);
+        setPreview({ path: `/facturas-borradores/${saved.id}/documentos/${doc.id}/`, mime: doc.mime });
+      } catch (err) {
+        // Keep the file available for a retry; never clear the invoice fields.
+        setFiles((previous) => [...previous, photo]);
+        throw err;
+      }
+    });
   }
   async function lookup(value) {
     setSearch(value);
@@ -85,7 +126,7 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
   const linkedCount = items.filter((item) => item.ocr_line != null).length;
   const currentStep = applied ? 2 : hasReading ? 1 : 0;
   const active = open || draft?.documentos?.length > 0 || pending.length > 0 || files.length > 0;
-  const locked = busy || controller.conflict || !controller.ready;
+  const locked = busy || controller.conflict || controller.missing || !controller.ready;
 
   function exclude(line) {
     if (!window.confirm("¿Excluir expresamente esta línea de la factura?")) return;
@@ -110,13 +151,14 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
           {hasReading && <button type="button" className="btn btn-sm btn-secondary" aria-expanded={documentsOpen} onClick={() => setDocumentsOpen(!documentsOpen)}>{documentsOpen ? "Cerrar opciones" : "Cambiar documentos"}</button>}
         </div>
         <input ref={uploadRef} type="file" hidden accept="image/jpeg,image/png,application/pdf" multiple onChange={choose} />
-        <input ref={cameraRef} type="file" hidden accept="image/*" capture="environment" onChange={choose} />
+        <input ref={cameraRef} type="file" hidden accept="image/*" capture="environment" onChange={capturePhoto} />
         {(!hasReading || documentsOpen) && <div className="invoice-ocr__upload">
           {!draft?.documentos?.length && !files.length && <div className="invoice-ocr__upload-intro"><i className="bi bi-camera" aria-hidden="true" /><div><strong>Captura tu factura</strong><p>Selecciona un archivo o toma una foto desde tu teléfono.</p></div></div>}
           <div className="invoice-ocr__actions">
             <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => uploadRef.current.click()}><i className="bi bi-upload" aria-hidden="true" /> Subir foto o PDF</button>
-            <button type="button" className="btn btn-secondary" disabled={locked} onClick={() => cameraRef.current.click()}><i className="bi bi-camera" aria-hidden="true" /> Usar cámara</button>
+            <button type="button" className="btn btn-secondary" disabled={locked} onClick={openCamera}><i className="bi bi-camera" aria-hidden="true" /> {cameraReady ? "Abrir cámara" : "Usar cámara"}</button>
           </div>
+          {cameraReady && cameraHint && <p className="invoice-ocr__hint" role="status">{cameraHint}</p>}
           <p className="invoice-ocr__hint">Una factura · JPG, PNG o PDF · Hasta 5 páginas y 10 MB</p>
         </div>}
         <div className="invoice-ocr__files">
@@ -135,7 +177,7 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
           const body = new FormData(); files.forEach((file) => body.append("archivos", file));
           await controller.perform("documentos/", { body }); setFiles([]); setPreview(null); setResult(null);
         })}>{busy ? "Adjuntando…" : "Adjuntar al borrador"}</button>}
-        {preview && <Preview file={preview} close={() => setPreview(null)} />}
+        {preview && (!preview.path || preview.path.startsWith(`/facturas-borradores/${draft?.id}/`)) && <Preview file={preview} close={() => setPreview(null)} />}
         {draft?.documentos?.length > 0 && (!hasReading || documentsOpen) && <div className="invoice-ocr__read-action">
           <button type="button" className="btn btn-primary" disabled={locked || files.length > 0} onClick={() => run(async () => {
             const response = await controller.perform("extraer/"); setResult(response.ocr); setDocumentsOpen(false);

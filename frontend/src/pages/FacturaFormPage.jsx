@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ConfirmDialog from "../components/ConfirmDialog";
 import PageCard from "../components/PageCard";
 import FacturaPhotoInput from "../components/FacturaPhotoInput";
 import { useFacturaDraft } from "../lib/useFacturaDraft";
@@ -70,6 +71,9 @@ export default function FacturaFormPage() {
   const [reviewedSnapshot, setReviewedSnapshot] = useState("");
   const [acceptedSnapshot, setAcceptedSnapshot] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState("");
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [productoModal, setProductoModal] = useState(null);
@@ -118,11 +122,14 @@ export default function FacturaFormPage() {
   }, [importedLegacy, draftController.status, draftController.draft]);
 
   async function descartarBorrador() {
-    if (!window.confirm("¿Descartar este borrador y sus documentos?")) return;
+    if (discarding) return;
+    setDiscarding(true);
+    setDiscardError("");
     try {
       await draftController.perform("", { method: "DELETE", final: true });
       navigate("/facturas");
-    } catch (err) { setError(err.message); }
+    } catch (err) { setDiscardError(err.message); }
+    finally { setDiscarding(false); }
   }
 
   function itemFromOCR(line, product) {
@@ -370,7 +377,7 @@ export default function FacturaFormPage() {
         ubicaciones: (it.ubicaciones || []).filter((u) => u.ubicacion_id && u.cantidad > 0),
       })),
     };
-    if (!isEdit && (!reviewed || pending.length || !draftController.ready || draftController.conflict)) {
+    if (!isEdit && (!reviewed || pending.length || !draftController.ready || draftController.conflict || draftController.missing)) {
       setError("Revisa los datos y resuelve las líneas pendientes antes de confirmar.");
       return;
     }
@@ -436,7 +443,7 @@ export default function FacturaFormPage() {
     return `${valid.length} ubicaciones`;
   }
 
-  const saving = confirming || updateMutation.isPending;
+  const saving = confirming || discarding || updateMutation.isPending;
 
   const esUbicacionInvalida = (it) => {
     const ubs = it.ubicaciones || [];
@@ -723,7 +730,7 @@ export default function FacturaFormPage() {
               Volver
             </button>
           )}
-          <button className="btn btn-primary" type="submit" disabled={saving || ubicacionesInvalidas || (!isEdit && (!reviewed || pending.length > 0 || !draftController.ready || draftController.conflict))}>
+          <button className="btn btn-primary" type="submit" disabled={saving || ubicacionesInvalidas || (!isEdit && (!reviewed || pending.length > 0 || !draftController.ready || draftController.conflict || draftController.missing))}>
             {saving ? "Guardando..." : "Guardar factura"}
           </button>
         </div>
@@ -887,9 +894,9 @@ export default function FacturaFormPage() {
     <>
       {!isEdit && <PageCard title="Ingreso de factura">
         {draftController.error && <div className="alert alert-danger" role="alert">{draftController.error}
-          <button type="button" className="btn btn-sm btn-secondary" onClick={draftController.conflict || !draftController.ready ? () => { if (window.confirm("¿Recargar el borrador del servidor? Los cambios sin guardar permanecerán visibles hasta que termine la carga.")) draftController.reload(); } : draftController.save}>
+          {draftController.missing ? <button type="button" className="btn btn-sm btn-secondary" onClick={draftController.recover}>Guardar como nuevo borrador</button> : <button type="button" className="btn btn-sm btn-secondary" onClick={draftController.conflict || !draftController.ready ? () => { if (window.confirm("¿Recargar el borrador del servidor? Los cambios sin guardar permanecerán visibles hasta que termine la carga.")) draftController.reload(); } : draftController.save}>
             {draftController.conflict || !draftController.ready ? "Recargar versión del servidor" : "Reintentar guardado"}
-          </button>
+          </button>}
         </div>}
         {legacyDraft && <div className="alert alert-info">
           Hay un borrador antiguo en este navegador. Confirma que es tuyo antes de importarlo a tu cuenta.
@@ -902,14 +909,22 @@ export default function FacturaFormPage() {
         <FacturaPhotoInput controller={draftController} header={header} items={items} pending={pending} excluded={excluded} setPending={setPending} setExcluded={setExcluded} onApply={applyOCR} onLinked={linkOCR} />
         {(draftController.status || draftController.draft) && <div className="invoice-draft-footer">
           <span role="status" className="invoice-draft-status"><i className={`bi ${draftController.status === "Guardado" ? "bi-cloud-check" : "bi-cloud-arrow-up"}`} aria-hidden="true" /> {draftController.status}</span>
-          {draftController.draft && <button type="button" className="btn btn-sm invoice-ocr__discard" disabled={saving || draftController.conflict} onClick={descartarBorrador}><i className="bi bi-trash3" aria-hidden="true" /> Descartar borrador</button>}
+          {draftController.draft && <button type="button" className="btn btn-sm invoice-ocr__discard" disabled={saving || draftController.conflict || draftController.missing} onClick={() => { setDiscardError(""); setShowDiscardDialog(true); }}><i className="bi bi-trash3" aria-hidden="true" /> Descartar borrador</button>}
         </div>}
       </PageCard>}
-      <fieldset disabled={(!isEdit && (!draftController.ready || draftController.conflict)) || saving} style={{ border: 0, padding: 0, minWidth: 0 }}>
+      <fieldset disabled={(!isEdit && (!draftController.ready || draftController.conflict || draftController.missing)) || saving} style={{ border: 0, padding: 0, minWidth: 0 }}>
       {step === "header" && renderStepHeader()}
       {step === "items" && renderStepItems()}
       </fieldset>
       {renderUbicacionModal()}
+      {showDiscardDialog && <ConfirmDialog
+        title="Descartar borrador"
+        confirmLabel="Descartar borrador"
+        busy={discarding}
+        error={discardError}
+        onCancel={() => setShowDiscardDialog(false)}
+        onConfirm={descartarBorrador}
+      >Se eliminará{header.numero_factura ? ` el borrador de la factura N° ${header.numero_factura}` : " este borrador"} junto con sus fotos y documentos. Esta acción no se puede deshacer.</ConfirmDialog>}
 
       {productoModal && (
         <div className="modal" role="dialog" aria-modal="true">

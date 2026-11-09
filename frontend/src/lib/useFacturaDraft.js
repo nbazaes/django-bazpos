@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "./api";
 
@@ -12,6 +13,7 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
   const [error, setError] = useState("");
   const [savedData, setSavedData] = useState(() => JSON.stringify(data));
   const [conflict, setConflict] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [ready, setReady] = useState(!initialId);
   const latest = useRef(data);
   const current = useRef(null);
@@ -19,8 +21,10 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
   const queue = useRef(Promise.resolve());
   const blocked = useRef(Boolean(initialId));
   const reloadGeneration = useRef(0);
+  const recoveryPending = useRef(false);
   const finished = useRef(false);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   useEffect(() => { latest.current = data; }, [data]);
 
   const accept = useCallback((result) => {
@@ -32,6 +36,11 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
   const report = useCallback((err) => {
     setStatus("");
     setError(err.message);
+    if (err.status === 404) {
+      blocked.current = true;
+      setMissing(true);
+      setError("Este borrador ya no está disponible para tu cuenta. Los datos visibles se conservan; puedes guardarlos como un nuevo borrador.");
+    }
     if (err.status === 409) {
       blocked.current = true;
       setConflict(true);
@@ -58,10 +67,11 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
       accept(result);
       blocked.current = false;
       setConflict(false);
+      setMissing(false);
       setError("");
       setStatus("Guardado");
       setReady(true);
-    } catch (err) { report(err); }
+    } catch (err) { if (generation === reloadGeneration.current) report(err); }
   }, [accept, initialId, onRestore, report]);
 
   useEffect(() => {
@@ -84,18 +94,20 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
     lastSaved.current = encoded;
     setSavedData(encoded);
     accept(result);
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}?borrador=${result.id}`);
+    const search = new URLSearchParams(window.location.search);
+    search.set("borrador", result.id);
+    await navigate({ pathname: window.location.pathname, search: `?${search}` }, { replace: true });
     setStatus("Guardado");
     setError("");
     return result;
-  }, [accept]);
+  }, [accept, navigate]);
 
   const save = useCallback(() => enqueue(() => finished.current ? null : persist()).catch(report), [enqueue, persist, report]);
   useEffect(() => {
-    if (!enabled || !ready || conflict) return;
+    if (!enabled || !ready || conflict || missing) return;
     const timer = setTimeout(save, 1000);
     return () => clearTimeout(timer);
-  }, [data, enabled, ready, conflict, save]);
+  }, [data, enabled, ready, conflict, missing, save]);
 
   const perform = useCallback((suffix, { method = "POST", body = {}, final = false } = {}) => enqueue(async () => {
     try {
@@ -116,6 +128,43 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
     } catch (err) { report(err); throw err; }
   }), [accept, enqueue, persist, qc, report]);
 
+  const prepareCapture = useCallback(() => enqueue(async () => {
+    try {
+      const existing = Boolean(current.current);
+      const saved = await persist(true);
+      if (existing) {
+        const remote = await apiRequest(`${BASE}${saved.id}/`);
+        if (remote.revision !== saved.revision) {
+          const err = new Error("Este borrador cambió en otro dispositivo. Recarga su versión antes de abrir la cámara.");
+          err.status = 409;
+          throw err;
+        }
+      }
+      setStatus("Guardado");
+      setError("");
+      return saved;
+    } catch (err) { report(err); throw err; }
+  }), [enqueue, persist, report]);
+
+  const recover = useCallback(() => {
+    if (recoveryPending.current) return;
+    recoveryPending.current = true;
+    return enqueue(async () => {
+      try {
+        if (!missing) return;
+        // Explicit recovery only: a missing draft might already have been confirmed.
+        current.current = null;
+        lastSaved.current = "";
+        blocked.current = false;
+        await persist(true);
+        setMissing(false);
+        setConflict(false);
+        setReady(true);
+      } catch (err) { report(err); }
+      finally { recoveryPending.current = false; }
+    });
+  }, [enqueue, missing, persist, report]);
+
   useEffect(() => {
     if (!enabled) return;
     const warnIfUnsaved = (event) => {
@@ -130,5 +179,5 @@ export function useFacturaDraft({ enabled, data, onRestore }) {
   }, [enabled]);
 
   const displayStatus = status === "Guardado" && JSON.stringify(data) !== savedData ? "Cambios sin guardar…" : status;
-  return { draft, status: displayStatus, error, conflict, ready, save, perform, reload };
+  return { draft, status: displayStatus, error, conflict, missing, ready, save, perform, reload, prepareCapture, recover };
 }
