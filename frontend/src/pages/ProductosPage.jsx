@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useDebounce } from "../lib/hooks";
+import { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import CrudTable from "../components/CrudTable";
@@ -52,12 +53,12 @@ export default function ProductosPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle("Productos");
 
-  const [texto, setTexto] = useState(searchParams.get("texto") || "");
-  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
-  const [pageSize, setPageSize] = useState(parseInt(searchParams.get("page_size") || "50", 10));
-  const debounceRef = useRef(null);
-
-  const params = { texto, page, page_size: pageSize };
+  const texto = searchParams.get("texto") || "";
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+  const pageSize = [25, 50, 100].includes(Number(searchParams.get("page_size")))
+    ? Number(searchParams.get("page_size")) : 50;
+  const debouncedTexto = useDebounce(texto, 300);
+  const params = { texto: debouncedTexto, page, page_size: pageSize };
   const { data, isFetching } = useProductos(params);
   const deleteMutation = useDeleteProducto();
 
@@ -91,16 +92,6 @@ export default function ProductosPage() {
   const historialCount = historialData?.count ?? 0;
   const historialTotalPages = Math.max(1, Math.ceil(historialCount / historialPageSize));
 
-  useEffect(() => {
-    const urlTexto = searchParams.get("texto") || "";
-    const urlPage = parseInt(searchParams.get("page") || "1", 10);
-    const urlPageSize = parseInt(searchParams.get("page_size") || "50", 10);
-    if (urlTexto !== texto) setTexto(urlTexto);
-    if (urlPage !== page) setPage(urlPage);
-    if (urlPageSize !== pageSize) setPageSize(urlPageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
   const syncURL = (t, p, ps) => {
     setSearchParams(
       { ...(t ? { texto: t } : {}), page: String(p), page_size: String(ps) },
@@ -109,22 +100,14 @@ export default function ProductosPage() {
   };
 
   function handleTextoChange(value) {
-    setTexto(value);
-    setPage(1);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      syncURL(value, 1, pageSize);
-    }, 300);
+    syncURL(value, 1, pageSize);
   }
 
   function handlePageChange(newPage) {
-    setPage(newPage);
     syncURL(texto, newPage, pageSize);
   }
 
   function handlePageSizeChange(newSize) {
-    setPageSize(newSize);
-    setPage(1);
     syncURL(texto, 1, newSize);
   }
 
@@ -162,7 +145,7 @@ export default function ProductosPage() {
           value={texto}
           onChange={(e) => handleTextoChange(e.target.value)}
         />
-        <button className="btn btn-primary" onClick={() => { setPage(1); syncURL(texto, 1, pageSize); }}>
+        <button className="btn btn-primary" onClick={() => syncURL(texto, 1, pageSize)}>
           Buscar
         </button>
         <Link className="btn btn-success" to="/productos/crear">

@@ -63,13 +63,19 @@ export default function Shell() {
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia(desktopMediaQuery).matches);
   const embed = searchParams.get("embed") === "1";
   const [changelogModal, setChangelogModal] = useState(null);
-  const unseenChangelog = getUnseenChangelog();
+  const [unseenChangelog] = useState(() => getUnseenChangelog());
+  const [updatesDismissed, setUpdatesDismissed] = useState(false);
+  const visibleChangelog = changelogModal || (!updatesDismissed && !embed && unseenChangelog.length
+    ? { entries: unseenChangelog, dismissable: true } : null);
   const storeName = useStoreName();
   const sidebarHidden = isDesktop && sidebarCollapsed;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(desktopMediaQuery);
-    const updateViewport = () => setIsDesktop(mediaQuery.matches);
+    const updateViewport = () => {
+      setIsDesktop(mediaQuery.matches);
+      if (mediaQuery.matches) setSidebarOpen(false);
+    };
 
     updateViewport();
     mediaQuery.addEventListener("change", updateViewport);
@@ -85,17 +91,11 @@ export default function Shell() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    if (isDesktop) setSidebarOpen(false);
-  }, [isDesktop]);
-
-  useEffect(() => {
     if (embed) return;
     if (unseenChangelog.length > 0) {
       markChangelogSeen();
-      setChangelogModal({ entries: unseenChangelog, dismissable: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embed]);
+  }, [embed, unseenChangelog]);
 
   useEffect(() => {
     if (sidebarOpen && !isDesktop) {
@@ -141,6 +141,7 @@ export default function Shell() {
   function closeChangelog() {
     markChangelogSeen();
     setChangelogModal(null);
+    setUpdatesDismissed(true);
   }
 
   if (embed) {
@@ -316,10 +317,10 @@ export default function Shell() {
         </div>
       )}
 
-      {changelogModal && (
+      {visibleChangelog && (
         <ChangelogModal
-          entries={changelogModal.entries}
-          dismissable={changelogModal.dismissable}
+          entries={visibleChangelog.entries}
+          dismissable={visibleChangelog.dismissable}
           onClose={closeChangelog}
         />
       )}

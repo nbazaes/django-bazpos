@@ -4,6 +4,16 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.8.0] - 2026-11-09
+
+### Cambiado
+
+- Actualizamos el logo de BAZPOS y el ícono del carrito.
+
+### Corregido
+
+- Los borradores de factura ahora se conservan al usar la cámara del celular.
+
 ## [2.7.0] - 2026-11-06
 
 ### Agregado
