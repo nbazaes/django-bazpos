@@ -43,7 +43,8 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "compose.prod.yaml,ops/deploy/runtime_env.py,ops/deploy/check_ocr.py,.deploy/runtime-env.json,docker/mariadb/zz-bazpos-tuning.cnf"
+          # MariaDB tuning is provisioned separately; its existing mount may be a directory.
+          source: "compose.prod.yaml,ops/deploy/runtime_env.py,ops/deploy/check_ocr.py,.deploy/runtime-env.json"
           target: ${{ secrets.COMPOSE_DIR }}
 
       - name: Pull images and quick-swap on VPS

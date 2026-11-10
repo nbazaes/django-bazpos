@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -116,6 +117,40 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         result = subprocess.run(["docker", "compose", "-f", str(compose), "--env-file", str(self.env), "config", "--environment"], capture_output=True, text=True, check=True)
         value = next(line.split("=", 1)[1] for line in result.stdout.splitlines() if line.startswith("BAZPOS_OCR_GEMINI_API_KEY="))
         self.assertEqual(value, secret)
+
+    @unittest.skipUnless(shutil.which("tar"), "tar no disponible")
+    def test_deploy_archive_can_be_repeated_without_touching_mariadb_or_env(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/deploy.yml").read_text()
+        sources = re.search(r'^\s+source: "([^"]+)"$', workflow, re.MULTILINE).group(1).split(",")
+        directory = Path(self.directory.name)
+        source = directory / "source"
+        target = directory / "target"
+        source.mkdir()
+        target.mkdir()
+        for name in sources:
+            destination = source / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if name == ".deploy/runtime-env.json":
+                destination.write_text(json.dumps({"APP_IMAGE": "registry/app:new"}))
+                destination.chmod(0o600)
+            else:
+                shutil.copy2(root / name, destination)
+        # This directory reproduces the exact destination that made GNU tar fail.
+        config_directory = target / "docker/mariadb/zz-bazpos-tuning.cnf"
+        config_directory.mkdir(parents=True)
+        marker = config_directory / "existing-config"
+        marker.write_text("keep database configuration")
+        env = target / ".env"
+        env.write_text("DB_PASSWORD=do-not-change\n")
+        archive = directory / "deploy.tar.gz"
+        subprocess.run(["tar", "-zcf", str(archive), "-C", str(source), *sources], check=True)
+        for _ in range(2):
+            subprocess.run(["tar", "-zxf", str(archive), "-C", str(target)], capture_output=True, check=True)
+            self.assertEqual(marker.read_text(), "keep database configuration")
+            self.assertEqual(env.read_text(), "DB_PASSWORD=do-not-change\n")
+            self.assertTrue((target / "ops/deploy/runtime_env.py").is_file())
+            self.assertEqual((target / ".deploy/runtime-env.json").stat().st_mode & 0o777, 0o600)
 
     def test_invalid_json_cli_does_not_echo_secret_contents(self):
         payload = Path(self.directory.name) / "invalid.json"
