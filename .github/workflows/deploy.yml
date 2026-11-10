@@ -5,6 +5,10 @@ on:
     workflows: ["CI"]
     types: [completed]
 
+concurrency:
+  group: bazpos-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to VPS
@@ -23,13 +27,23 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Copy compose file to VPS
+      - name: Prepare private runtime configuration
+        env:
+          BAZPOS_OCR_ENABLED: ${{ vars.BAZPOS_OCR_ENABLED }}
+          BAZPOS_OCR_PROVIDER: ${{ vars.BAZPOS_OCR_PROVIDER }}
+          BAZPOS_OCR_MODEL: ${{ vars.BAZPOS_OCR_MODEL }}
+          BAZPOS_OCR_OPENROUTER_API_KEY: ${{ secrets.BAZPOS_OCR_OPENROUTER_API_KEY }}
+          BAZPOS_OCR_GEMINI_API_KEY: ${{ secrets.BAZPOS_OCR_GEMINI_API_KEY }}
+          BAZPOS_OCR_API_KEY: ${{ secrets.BAZPOS_OCR_API_KEY }}
+        run: python3 ops/deploy/runtime_env.py export --environment --output .deploy/runtime-env.json
+
+      - name: Copy deployment files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "compose.prod.yaml"
+          source: "compose.prod.yaml,ops/deploy/runtime_env.py,ops/deploy/check_ocr.py,.deploy/runtime-env.json,docker/mariadb/zz-bazpos-tuning.cnf"
           target: ${{ secrets.COMPOSE_DIR }}
 
       - name: Pull images and quick-swap on VPS
@@ -44,8 +58,20 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           envs: GHCR_TOKEN,GHCR_USER,APP_IMAGE,NGINX_IMAGE,COMPOSE_DIR
           script: |
+            set -eu
+            cd "$COMPOSE_DIR"
+            trap 'rm -f .deploy/runtime-env.json' EXIT
+            chmod 700 .deploy
+            chmod 600 .deploy/runtime-env.json
+            command -v python3 >/dev/null || { echo "ERROR: instala Python 3 en el host del VPS." >&2; exit 1; }
+            python3 ops/deploy/runtime_env.py apply --target .env --input .deploy/runtime-env.json
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             cd "$COMPOSE_DIR"
             docker compose -f compose.prod.yaml pull
             docker compose -f compose.prod.yaml up -d --wait
+            docker compose -f compose.prod.yaml exec -T app python - < ops/deploy/check_ocr.py
             docker image prune -f
+
+      - name: Remove local private deployment payload
+        if: always()
+        run: rm -f .deploy/runtime-env.json

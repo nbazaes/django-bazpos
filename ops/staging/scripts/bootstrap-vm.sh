@@ -4,7 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 echo "==> [bootstrap] Instalando Docker + compose plugin en la VM..."
-ssh_vm 'sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io docker-compose-v2'
+ssh_vm 'sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io docker-compose-v2 python3'
 
 echo "==> [bootstrap] Agregando usuario staging al grupo docker..."
 ssh_vm 'sudo usermod -aG docker staging'

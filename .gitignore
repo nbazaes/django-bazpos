@@ -79,3 +79,6 @@ yarn-error.log*
 
 tareas.md
 local_resources/
+
+# Private transient deployment payloads
+.deploy/

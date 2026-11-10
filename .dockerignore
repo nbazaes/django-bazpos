@@ -71,3 +71,7 @@ Desktop.ini
 ehthumbs.db
 *.swp
 *.tmp
+
+# Private deployment configuration and staging secrets
+.deploy/
+ops/staging/

@@ -59,6 +59,11 @@ NGINX_IMAGE=${NGINX_IMAGE}
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="BazPos <onboarding@resend.dev>"
 SUPPORT_EMAIL=soporte@bazpos.com
+BAZPOS_OCR_ENABLED=False
+BAZPOS_OCR_PROVIDER=openrouter
+BAZPOS_OCR_MODEL=
+BAZPOS_OCR_OPENROUTER_API_KEY=
+BAZPOS_OCR_GEMINI_API_KEY=
 EOF
   chmod 600 "${LOCAL_ENV}"
 else
@@ -91,6 +96,8 @@ rsync -a "${LOCAL_ENV}" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/.env"
 rsync -a "${REPO_ROOT}/certs/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/certs/"
 rsync -a "${REPO_ROOT}/docker/mariadb/" "${VM_USER}@${VM_HOST}:${COMPOSE_DIR}/docker/mariadb/"
 
+"$(dirname "$0")/sync-runtime-config.sh" --include-images
+
 # 5) Login a GHCR (token por stdin, nunca por línea de comandos)
 if [ -z "${GHCR_TOKEN:-}" ]; then
   echo "==> [deploy] GHCR_TOKEN no exportado; leyendo de pass (ghcr.io/staging-bazpos)..."
@@ -109,6 +116,7 @@ echo "==> [deploy] Levantando stack (pull + up, puede tardar)..."
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml up -d"
 echo "==> [deploy] Esperando a que el stack quede healthy (hasta 10 min)..."
 stack_wait_healthy
+ssh_vm "cd '${COMPOSE_DIR}' && docker compose -f compose.prod.yaml exec -T app python - < ops/deploy/check_ocr.py"
 
 echo "==> [deploy] Stack levantado:"
 ssh_vm "docker ps --format 'table {{.Names}}\t{{.Status}}'"

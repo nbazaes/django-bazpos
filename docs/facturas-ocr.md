@@ -75,3 +75,30 @@ Se probaron las tres fotos de referencia con OpenRouter y `google/gemini-2.5-fla
 Las pruebas automatizadas usan proveedores simulados para verificar permisos, privacidad, conflictos, límites, formatos numéricos y ausencia de efectos de stock antes de confirmar.
 
 La preparación de fotos de cámara se verifica con `node frontend/src/lib/__tests__/cameraPhoto.test.js` (reducción de imágenes, conservación de archivos pequeños y liberación de memoria).
+
+## Despliegue en staging y producción
+
+En staging, editar `ops/staging/.env.generated`. Tanto `deploy-stack.sh` como `update-images.sh` sincronizan las variables OCR al `.env` de la VM; `start.sh` también sincroniza si hay archivo local. Para aplicar solo configuración sin cambiar imágenes, ejecutar `ops/staging/scripts/sync-runtime-config.sh` y recrear únicamente `app` con `docker compose -f compose.prod.yaml up -d --no-deps --force-recreate app` en la VM.
+
+El host de staging/VPS necesita Python 3 además de Docker Compose; los scripts de bootstrap de staging lo instalan. El helper usa solo biblioteca estándar y no necesita instalar las dependencias Django en el host.
+
+Para producción por GitHub Actions, configurar en **Settings → Secrets and variables → Actions** del repositorio:
+
+| Tipo | Nombre | Ejemplo / uso |
+|---|---|---|
+| Variable | `BAZPOS_OCR_ENABLED` | `True` para activar; `False` para desactivar |
+| Variable | `BAZPOS_OCR_PROVIDER` | `gemini` u `openrouter` |
+| Variable | `BAZPOS_OCR_MODEL` | `gemini-3.5-flash-lite` directo o `google/gemini-3.5-flash-lite` en OpenRouter |
+| Secret | `BAZPOS_OCR_GEMINI_API_KEY` | Clave de Gemini directo |
+| Secret | `BAZPOS_OCR_OPENROUTER_API_KEY` | Clave de OpenRouter |
+| Secret opcional | `BAZPOS_OCR_API_KEY` | Alias anterior para OpenRouter |
+
+Configurar únicamente la clave del proveedor elegido. Estas variables no son argumentos de build ni variables del frontend: llegan a Django al desplegar el contenedor.
+
+Un push a `main` que pase CI construye imágenes y activa `deploy.yml`. El workflow transfiere un paquete temporal privado, actualiza solo OCR e imágenes en el `.env` del VPS y ejecuta Compose. Conserva los secretos de base de datos y las variables de OCR del servidor cuando GitHub no proporciona reemplazos. Un valor vacío o ausente de Actions no borra la configuración existente; para desactivar usar explícitamente `BAZPOS_OCR_ENABLED=False`. Para eliminar una clave del servidor, editar el `.env` remoto; para rotarla, actualizar el secret de Actions.
+
+Las imágenes quedan persistidas en el `.env` del VPS para que un reinicio posterior mantenga la misma versión. Los despliegues de producción se serializan para no mezclar paquetes de configuración. El workflow verifica la salud del stack y la configuración efectiva de Django. No hace llamadas OCR pagadas como parte de cada deploy.
+
+Los paquetes de configuración se escriben con permisos `600`, se transfieren por SSH y se eliminan al terminar. Se excluyen `.deploy/` y el directorio de staging del contexto de Docker para evitar incorporar secretos a las imágenes. La comprobación de configuración muestra `ocr_enabled`, `provider`, `model` y `key_configured`, sin valores de claves.
+
+La actualización selectiva rechaza OCR activado sin una clave efectiva del proveedor antes de escribir el `.env`. Las pruebas del despliegue se ejecutan con `python3 -m unittest discover -s ops/deploy -p 'test_*.py' -v` y están incluidas en CI.

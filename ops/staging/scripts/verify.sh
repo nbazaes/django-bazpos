@@ -29,3 +29,6 @@ ssh_vm "docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.Mem
 
 echo "==> [verify] qdisc de latencia (VM):"
 ssh_vm "tc qdisc show dev ${VM_IFACE} | grep -E 'netem|ingress' || echo '    sin netem en ${VM_IFACE}'; tc qdisc show dev ifb0 | grep netem || echo '    sin netem en ifb0'" | sed 's/^/    /'
+
+echo "==> [verify] Configuración OCR dentro de Django (sin claves):"
+ssh_vm "cd '${COMPOSE_DIR}' && docker compose -f compose.prod.yaml exec -T app python - < ops/deploy/check_ocr.py"

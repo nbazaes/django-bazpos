@@ -18,6 +18,10 @@ ssh_vm 'true'
 echo "==> [start] Esperando Docker..."
 ssh_vm 'for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done; docker info >/dev/null 2>&1 || { echo "Docker no responde"; exit 1; }'
 
+if [ -f "${LOCAL_ENV}" ]; then
+  "$(dirname "$0")/sync-runtime-config.sh"
+fi
+
 echo "==> [start] Asegurando stack arriba..."
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml up -d"
 stack_wait_healthy

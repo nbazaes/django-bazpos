@@ -56,9 +56,31 @@ FORCE=1 ops/staging/scripts/update-images.sh    # saltar la validación de que C
 ```
 
 `update-images.sh` valida que CI terminó OK para esa SHA, actualiza `APP_IMAGE`/`NGINX_IMAGE`
-en `/opt/bazpos/.env`, y hace `docker compose pull && up -d` en la VM. Los **datos** (volúmenes)
+en `/opt/bazpos/.env`, sincroniza la configuración OCR de `.env.generated` y hace `docker compose pull && up -d` en la VM. Los **datos** (volúmenes)
 y la **latencia netem** (vive en las interfaces de la VM, no en los contenedores) se conservan;
 las migraciones nuevas corren solas al arrancar el contenedor.
+
+### Cambiar OCR sin cambiar imágenes
+
+Editar `ops/staging/.env.generated`, por ejemplo:
+
+```dotenv
+BAZPOS_OCR_ENABLED=True
+BAZPOS_OCR_PROVIDER=gemini
+BAZPOS_OCR_MODEL=gemini-3.5-flash-lite
+BAZPOS_OCR_GEMINI_API_KEY=clave_de_staging
+```
+
+`update-images.sh` y `deploy-stack.sh` sincronizan OCR en cada despliegue. `start.sh` también lo sincroniza si existe el archivo local. El control posterior imprime solo proveedor, modelo y presencia de clave.
+
+Para aplicar únicamente configuración conservando las imágenes actuales:
+
+```bash
+ops/staging/scripts/sync-runtime-config.sh
+ssh staging@192.168.150.160 'cd /opt/bazpos && docker compose -f compose.prod.yaml up -d --no-deps --force-recreate app'
+```
+
+La sincronización selectiva conserva las credenciales de MariaDB y demás variables del `.env` remoto. `--include-images` se reserva para los scripts de despliegue de imágenes. Los valores vacíos explícitos de `.env.generated` se respetan. Las claves no se imprimen ni se pasan como argumentos de comandos remotos.
 
 ## Ciclo de vida diario
 
@@ -75,7 +97,7 @@ Acceso: **https://192.168.150.160/** (aceptar el certificado autofirmado) · adm
 - **Secretos**: el `.env` del staging se genera en `ops/staging/.env.generated` (gitignored) y se sincroniza a `/opt/bazpos/.env` en la VM. Nada secreto se versiona.
 - **Certificados**: autofirmados en `<repo>/certs/` (gitignored), generados por `make-certs.sh` (SAN = IP de la VM).
 - **La latencia no es persistente**: se pierde al reiniciar la VM. `apply-latency.sh`/`start.sh` la reaplican (todo dentro de la VM: `tc netem` en egress de `enp0s2` + ingress vía `ifb0`). No requiere módulos del kernel del host (el kernel zen del host no incluye `sch_netem`).
-- **Envelope de 1 GB**: el app corre gunicorn con 4 workers (como prod). El swapfile de 1 GB absorbe picos; si aparecen OOM-kills, es un hallazgo real de producción, no un bug del staging.
+- **Envelope de 1 GB**: el app corre Gunicorn con 2 workers (como prod). El swapfile de 1 GB absorbe picos; si aparecen OOM-kills, es un hallazgo real de producción, no un bug del staging.
 - La latencia simula el enlace navegador→VPS; el `rsync`/SSH/docker a la VM va sin latencia mientras no se aplique.
 
 ## Teardown

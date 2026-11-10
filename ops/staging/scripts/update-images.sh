@@ -54,12 +54,8 @@ if [ -f "${LOCAL_ENV}" ]; then
   grep -q '^APP_IMAGE=' "${LOCAL_ENV}"   || echo "APP_IMAGE=${APP_IMAGE}"   >> "${LOCAL_ENV}"
   grep -q '^NGINX_IMAGE=' "${LOCAL_ENV}" || echo "NGINX_IMAGE=${NGINX_IMAGE}" >> "${LOCAL_ENV}"
 fi
-ssh_vm "
-cd ${COMPOSE_DIR}
-grep -q '^APP_IMAGE=' .env   || echo 'APP_IMAGE=${APP_IMAGE}'   >> .env
-grep -q '^NGINX_IMAGE=' .env || echo 'NGINX_IMAGE=${NGINX_IMAGE}' >> .env
-sed -i 's#^APP_IMAGE=.*#APP_IMAGE=${APP_IMAGE}#; s#^NGINX_IMAGE=.*#NGINX_IMAGE=${NGINX_IMAGE}#' .env
-"
+# Sync OCR from the locally edited .env.generated as well as image tags.
+"$(dirname "$0")/sync-runtime-config.sh" --include-images
 ssh_vm "cd ${COMPOSE_DIR} && grep -E '^(APP_IMAGE|NGINX_IMAGE)=' .env" | sed 's/^/    /'
 
 # 4) Pull + up (los datos y la latencia netem se conservan)
@@ -67,6 +63,7 @@ echo "==> [update] docker compose pull + up -d (puede tardar)..."
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml pull"
 ssh_vm "cd ${COMPOSE_DIR} && docker compose -f compose.prod.yaml up -d"
 stack_wait_healthy
+ssh_vm "cd '${COMPOSE_DIR}' && docker compose -f compose.prod.yaml exec -T app python - < ops/deploy/check_ocr.py"
 
 # 5) Garantizar latencia activa (idempotente; netem vive en interfaces de la VM,
 #    puede perderse por eventos transitorios de red)
