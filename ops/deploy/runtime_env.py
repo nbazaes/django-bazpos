@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Transfer only image/OCR runtime settings. Never source or log a secret."""
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -141,6 +142,7 @@ def main():
     source.add_argument("--environment", action="store_true")
     export.add_argument("--output", type=Path, required=True)
     export.add_argument("--ocr-only", action="store_true", help="Do not change deployed image tags.")
+    export.add_argument("--github-env", type=Path, help="Register a masked SSH payload in GITHUB_ENV.")
     apply = sub.add_parser("apply")
     apply.add_argument("--target", type=Path, required=True)
     apply.add_argument("--input", type=Path, required=True)
@@ -156,7 +158,16 @@ def main():
                 values = {key: os.environ[key] for key in keys if os.environ.get(key)}
             if any(any(c in value for c in "\r\n\x00") for value in values.values()):
                 raise ConfigError("La configuración contiene valores de varias líneas.")
-            atomic_write(args.output, json.dumps(values))
+            if args.github_env and os.environ.get("GITHUB_ACTIONS") != "true":
+                raise ConfigError("--github-env solo está disponible dentro de GitHub Actions.")
+            content = json.dumps(values)
+            atomic_write(args.output, content)
+            if args.github_env:
+                # Mask the derived value before exposing it to subsequent action steps.
+                encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
+                print(f"::add-mask::{encoded}", flush=True)
+                with args.github_env.open("a", encoding="utf-8") as stream:
+                    stream.write(f"BAZPOS_RUNTIME_CONFIG_B64={encoded}\n")
         else:
             try:
                 updates = json.loads(args.input.read_text(encoding="utf-8"))

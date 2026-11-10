@@ -1,5 +1,6 @@
 """No external services or real credentials are used in these deployment tests."""
 import importlib.util
+import base64
 import json
 import os
 import re
@@ -131,11 +132,7 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         for name in sources:
             destination = source / name
             destination.parent.mkdir(parents=True, exist_ok=True)
-            if name == ".deploy/runtime-env.json":
-                destination.write_text(json.dumps({"APP_IMAGE": "registry/app:new"}))
-                destination.chmod(0o600)
-            else:
-                shutil.copy2(root / name, destination)
+            shutil.copy2(root / name, destination)
         # This directory reproduces the exact destination that made GNU tar fail.
         config_directory = target / "docker/mariadb/zz-bazpos-tuning.cnf"
         config_directory.mkdir(parents=True)
@@ -150,7 +147,25 @@ class RuntimeEnvironmentTests(unittest.TestCase):
             self.assertEqual(marker.read_text(), "keep database configuration")
             self.assertEqual(env.read_text(), "DB_PASSWORD=do-not-change\n")
             self.assertTrue((target / "ops/deploy/runtime_env.py").is_file())
-            self.assertEqual((target / ".deploy/runtime-env.json").stat().st_mode & 0o777, 0o600)
+            self.assertFalse((target / ".deploy/runtime-env.json").exists())
+
+    def test_github_payload_is_masked_and_can_be_delivered_over_ssh_without_scp(self):
+        directory = Path(self.directory.name)
+        payload = directory / "payload.json"
+        github_env = directory / "github-env"
+        environment = {**os.environ, **{key: "" for key in runtime.KEYS}, "GITHUB_ACTIONS": "true",
+                       "BAZPOS_OCR_ENABLED": "True", "BAZPOS_OCR_PROVIDER": "gemini", "BAZPOS_OCR_GEMINI_API_KEY": "private-test-key"}
+        result = subprocess.run([sys.executable, str(Path(runtime.__file__)), "export", "--environment", "--output", str(payload), "--github-env", str(github_env)], env=environment, capture_output=True, text=True, check=True)
+        encoded = github_env.read_text().strip().split("=", 1)[1]
+        self.assertIn(f"::add-mask::{encoded}", result.stdout)
+        self.assertNotIn("private-test-key", result.stdout)
+        # Reproduce the SSH step receiving only a masked environment value.
+        remote = directory / "remote-payload.json"
+        with remote.open("wb") as stream:
+            subprocess.run(["base64", "--decode"], input=encoded.encode(), stdout=stream, check=True)
+        runtime.apply_config(self.env, json.loads(remote.read_text()))
+        self.assertEqual(runtime.read_values(self.env.read_text())["BAZPOS_OCR_GEMINI_API_KEY"], "private-test-key")
+        self.assertEqual(base64.b64decode(encoded), payload.read_bytes())
 
     def test_invalid_json_cli_does_not_echo_secret_contents(self):
         payload = Path(self.directory.name) / "invalid.json"
