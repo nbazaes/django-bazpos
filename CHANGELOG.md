@@ -4,6 +4,13 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.8.1] - 2026-11-11
+
+### Corregido
+
+- Los pedidos anulados ya no se consideran en el cierre de caja.
+- El descuento Stellantis se conserva al guardar pedidos y cotizaciones.
+- La configuración de lectura OCR se mantiene sincronizada para un funcionamiento consistente.
 ## [2.8.0] - 2026-11-09
 
 ### Cambiado
