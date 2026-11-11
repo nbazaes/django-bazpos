@@ -2693,6 +2693,95 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["pagos"]["CH"], 15000)
         self.assertEqual(stats["documentos"]["OT"], 30000)
 
+    def test_cancelar_pedido_lo_excluye_de_totales_y_detalles_cierre(self):
+        client = auth_client(self.gerente)
+        venta_id = self._crear_venta(
+            monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}], documento="BO"
+        )
+        vigente = self._crear_pedido_venta()
+        cancelado = self._crear_pedido_venta()
+        pedido = cancelado.pedido.get()
+
+        antes = client.get("/api/cierre-caja/")
+        self.assertEqual(antes.status_code, 200)
+        self.assertEqual(antes.data["total_vendido"], 48000)
+        for tipo, clave in (("pago", "EF"), ("documento", "BO")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertIn(cancelado.id, {row["id"] for row in detalle.data})
+
+        response = client.post(
+            f"/api/pedidos/{pedido.id}/cancelar/", {"motivo": "Cliente desistió"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        cancelado.refresh_from_db()
+        self.assertEqual(cancelado.estado, Venta.Estado.COMPLETADA)
+        despues = client.get("/api/cierre-caja/")
+        self.assertEqual(despues.status_code, 200)
+        for campo in ("total_vendido", "total_final"):
+            self.assertEqual(despues.data[campo], 33000)
+        self.assertEqual(despues.data["cantidad_ventas"], 2)
+        self.assertEqual(despues.data["pagos"]["EF"], 33000)
+        self.assertEqual(despues.data["documentos"]["BO"], 33000)
+        for tipo, clave in (("pago", "EF"), ("documento", "BO")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertEqual({row["id"] for row in detalle.data}, {venta_id, vigente.id})
+
+    def test_cierre_excluye_pedidos_ya_cancelados_e_inactivos(self):
+        for cambios in ({"estado": Pedido.Estado.CANCELADO}, {"activo": False}):
+            venta = self._crear_pedido_venta(metodo_pago="TJ", estado_documento="SB")
+            venta.pedido.update(**cambios)
+
+        client = auth_client(self.gerente)
+        response = client.get("/api/cierre-caja/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_vendido"], 0)
+        self.assertEqual(response.data["total_final"], 0)
+        self.assertEqual(response.data["cantidad_ventas"], 0)
+        self.assertEqual(response.data["pagos"]["TJ"], 0)
+        self.assertEqual(response.data["documentos"]["SIN"], 0)
+        for tipo, clave in (("pago", "TJ"), ("documento", "SIN")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertEqual(detalle.data, [])
+
+    def test_cancelacion_posterior_conserva_cierre_guardado(self):
+        client = auth_client(self.gerente)
+        venta = self._crear_pedido_venta(metodo_pago="TR", estado_documento="FA")
+        fecha_venta = timezone.localdate() - timedelta(days=1)
+        Venta.objects.filter(pk=venta.pk).update(fecha_venta=timezone.now() - timedelta(days=1))
+        fecha = {"fecha": fecha_venta.isoformat()}
+        anterior = client.post("/api/cierre-caja/", fecha, format="json")
+        self.assertEqual(anterior.status_code, 201)
+        cierre = CierreCaja.objects.get(pk=anterior.data["cierre_guardado"]["id"])
+        valores_guardados = CierreCaja.objects.filter(pk=cierre.pk).values().get()
+        self.assertEqual(cierre.total_final, 15000)
+
+        response = client.post(
+            f"/api/pedidos/{venta.pedido.get().id}/cancelar/",
+            {"motivo": "Cancelado al día siguiente"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        recalculado = client.get("/api/cierre-caja/", fecha)
+        self.assertEqual(recalculado.status_code, 200)
+        self.assertEqual(recalculado.data["total_final"], 0)
+        nuevo = client.post("/api/cierre-caja/", fecha, format="json")
+        self.assertEqual(nuevo.status_code, 201)
+        nuevo_cierre = CierreCaja.objects.get(pk=nuevo.data["cierre_guardado"]["id"])
+        self.assertEqual(nuevo_cierre.total_vendido, 0)
+        self.assertEqual(nuevo_cierre.total_final, 0)
+        self.assertEqual(nuevo_cierre.cantidad_ventas, 0)
+        self.assertEqual(nuevo_cierre.desglose["pagos"]["TR"], 0)
+        self.assertEqual(nuevo_cierre.desglose["documentos"]["FA"], 0)
+        self.assertEqual(CierreCaja.objects.filter(pk=cierre.pk).values().get(), valores_guardados)
+        historial = client.get("/api/cierre-caja/historial/")
+        self.assertEqual(historial.status_code, 200)
+        previo = next(row for row in historial.data if row["id"] == cierre.pk)
+        self.assertEqual(previo["total_final"], 15000)
+        self.assertEqual(previo["pagos"]["TR"], 15000)
+        self.assertEqual(previo["documentos"]["FA"], 15000)
+
     def test_cierre_anulaciones_solo_informativas(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
         venta_anulada = Venta.objects.create(
