@@ -1382,6 +1382,45 @@ class PedidoApiTest(BaseTest):
         self.assertEqual(pedido.monto_subtotal, 39000)
         self.assertEqual(pedido.monto_total, 60000)
 
+    def test_stellantis_preserva_descuento_en_pedido_cotizacion_e_historial(self):
+        client = auth_client(self.vendedor)
+        for es_cotizacion in (True, False):
+            for sumar_envio, precio_unitario in ((True, 16900), (False, 12400)):
+                with self.subTest(es_cotizacion=es_cotizacion, sumar_envio=sumar_envio):
+                    payload = self._item(es_cotizacion=es_cotizacion)
+                    item = payload["items"][0]
+                    payload["items"].append(dict(item))
+                    item.update(cost_modifiers=["stellantis"], cantidad=2, sumar_envio=sumar_envio)
+                    response = client.post("/api/pedidos/", payload, format="json")
+                    self.assertEqual(response.status_code, 201, response.data)
+                    pedido = Pedido.objects.get(pk=response.data["id"])
+                    especial = pedido.detalles.get(cost_modifiers=["stellantis"])
+                    self.assertEqual(especial.precio_final, precio_unitario * 2)
+                    self.assertEqual(pedido.monto_subtotal, 10400 * 2 + 13000)
+                    self.assertEqual(pedido.monto_total, precio_unitario * 2 + 20000)
+                    historial = client.get(f"/api/pedidos/{pedido.pk}/")
+                    for documento in (response.data, historial.data):
+                        detalle = next(d for d in documento["detalles"] if d["id"] == especial.pk)
+                        self.assertEqual(detalle["cost_modifiers"], ["stellantis"])
+                        self.assertEqual(detalle["precio_final"], precio_unitario * 2)
+                        self.assertEqual(documento["monto_total"], precio_unitario * 2 + 20000)
+
+    def test_convertir_cotizacion_preserva_descuento_stellantis(self):
+        client = auth_client(self.vendedor)
+        payload = self._item(es_cotizacion=True)
+        payload["items"][0].update(cost_modifiers=["stellantis"], cantidad=2)
+        response = client.post("/api/pedidos/", payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        detalle = response.data["detalles"][0]
+        response = client.post(
+            f"/api/pedidos/{response.data['id']}/convertir-a-pedido/",
+            {"detalle_ids": [detalle["id"]]}, format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["detalles"][0]["cost_modifiers"], ["stellantis"])
+        self.assertEqual(response.data["detalles"][0]["precio_final"], 33800)
+        self.assertEqual(response.data["monto_total"], 33800)
+
     def test_marcar_retiro_descuenta_stock_multi_cantidad(self):
         payload = self._item()
         payload["items"][0]["cantidad"] = 4

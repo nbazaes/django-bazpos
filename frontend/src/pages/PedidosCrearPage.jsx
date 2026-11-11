@@ -241,7 +241,7 @@ export default function PedidosCrearPage() {
         porcentaje_utilidad: it.porcentaje_utilidad,
         cantidad: it.cantidad || 1,
         sumar_envio: it.sumar_envio,
-        stellantis: it.stellantis,
+        cost_modifiers: it.stellantis ? ["stellantis"] : [],
       })),
       es_cotizacion: esCotizacion,
     };

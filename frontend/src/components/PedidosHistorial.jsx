@@ -566,7 +566,7 @@ export default function PedidosHistorial() {
                           <td>{d.porcentaje_utilidad}%</td>
                           <td>{d.cantidad || 1}</td>
                           <td>{d.sumar_envio ? "Sí" : "No"}</td>
-                          <td>{d.stellantis ? "Sí" : "No"}</td>
+                          <td>{d.cost_modifiers?.includes("stellantis") ? "Sí" : "No"}</td>
                           <td>${d.precio_final}</td>
                         </tr>
                       ))}
