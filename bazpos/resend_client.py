@@ -193,7 +193,7 @@ Ruta: {ticket_data.get('current_path', '-')}
 def send_ticket_email(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Envía el ticket de soporte o sugerencia a través del servicio Resend.
-    Si RESEND_API_KEY no está configurada, registra la solicitud en los logs (modo desarrollo).
+    Solo confirma el envío cuando Resend devuelve un identificador válido.
     """
     api_key = getattr(settings, "RESEND_API_KEY", "").strip()
     from_email = getattr(settings, "RESEND_FROM_EMAIL", "BazPos <onboarding@resend.dev>").strip()
@@ -214,17 +214,11 @@ def send_ticket_email(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
     text_content = generate_ticket_text(ticket_data)
 
     if not api_key:
-        logger.warning(
-            "[RESEND_MOCK] RESEND_API_KEY no configurada. Simulando envío de ticket para %s: %s",
-            ticket_data.get("usuario_username"),
-            subject,
+        logger.error("Envío de soporte no disponible: falta RESEND_API_KEY.")
+        raise ResendEmailError(
+            "El servicio de correo no está configurado. Contacta al administrador.",
+            status_code=503,
         )
-        return {
-            "id": "mock_ticket_dev",
-            "status": "mocked",
-            "message": "Ticket recibido correctamente (modo desarrollo sin RESEND_API_KEY)",
-            "subject": subject,
-        }
 
     url = "https://api.resend.com/emails"
     headers = {
@@ -253,22 +247,34 @@ def send_ticket_email(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
         )
         with urllib.request.urlopen(req, timeout=12) as response:
             res_data = json.loads(response.read().decode("utf-8"))
+            email_id = res_data.get("id") if isinstance(res_data, dict) else None
+            if not isinstance(email_id, str) or not email_id.strip():
+                logger.error("Resend respondió sin un identificador de correo válido.")
+                raise ResendEmailError("El servicio de correo no confirmó el envío del ticket.")
+            logger.info("Ticket aceptado por Resend: %s", email_id)
             return {
-                "id": res_data.get("id"),
+                "id": email_id,
                 "status": "sent",
                 "message": "Ticket enviado exitosamente a soporte",
             }
+    except ResendEmailError:
+        raise
     except urllib.error.HTTPError as err:
         try:
             error_body = json.loads(err.read().decode("utf-8"))
         except Exception:
             error_body = {"error": err.reason}
+        if not isinstance(error_body, dict):
+            error_body = {"message": "Respuesta de error inválida del servicio de correo."}
         logger.error("Error al enviar email vía Resend (HTTP %s): %s", err.code, error_body)
         raise ResendEmailError(
             f"Error al enviar email a Resend: {error_body.get('message', err.reason)}",
             status_code=502,
             response_data=error_body,
         ) from err
+    except (TimeoutError, json.JSONDecodeError, UnicodeDecodeError) as err:
+        logger.warning("Respuesta de correo inválida o fuera de plazo: %s", type(err).__name__)
+        raise ResendEmailError("El servicio de correo no confirmó el envío del ticket.") from err
     except urllib.error.URLError as err:
         logger.error("Error de conexión al contactar a Resend: %s", err.reason)
         raise ResendEmailError(
