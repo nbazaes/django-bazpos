@@ -334,6 +334,7 @@ def _ventas_cierre(fecha):
     return (
         Venta.objects.filter(fecha_venta__date=fecha, estado=Venta.Estado.COMPLETADA)
         .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=False)
+        .exclude(tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__estado=Pedido.Estado.CANCELADO)
     )
 
 

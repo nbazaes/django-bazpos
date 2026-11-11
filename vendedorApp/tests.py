@@ -1382,6 +1382,45 @@ class PedidoApiTest(BaseTest):
         self.assertEqual(pedido.monto_subtotal, 39000)
         self.assertEqual(pedido.monto_total, 60000)
 
+    def test_stellantis_preserva_descuento_en_pedido_cotizacion_e_historial(self):
+        client = auth_client(self.vendedor)
+        for es_cotizacion in (True, False):
+            for sumar_envio, precio_unitario in ((True, 16900), (False, 12400)):
+                with self.subTest(es_cotizacion=es_cotizacion, sumar_envio=sumar_envio):
+                    payload = self._item(es_cotizacion=es_cotizacion)
+                    item = payload["items"][0]
+                    payload["items"].append(dict(item))
+                    item.update(cost_modifiers=["stellantis"], cantidad=2, sumar_envio=sumar_envio)
+                    response = client.post("/api/pedidos/", payload, format="json")
+                    self.assertEqual(response.status_code, 201, response.data)
+                    pedido = Pedido.objects.get(pk=response.data["id"])
+                    especial = pedido.detalles.get(cost_modifiers=["stellantis"])
+                    self.assertEqual(especial.precio_final, precio_unitario * 2)
+                    self.assertEqual(pedido.monto_subtotal, 10400 * 2 + 13000)
+                    self.assertEqual(pedido.monto_total, precio_unitario * 2 + 20000)
+                    historial = client.get(f"/api/pedidos/{pedido.pk}/")
+                    for documento in (response.data, historial.data):
+                        detalle = next(d for d in documento["detalles"] if d["id"] == especial.pk)
+                        self.assertEqual(detalle["cost_modifiers"], ["stellantis"])
+                        self.assertEqual(detalle["precio_final"], precio_unitario * 2)
+                        self.assertEqual(documento["monto_total"], precio_unitario * 2 + 20000)
+
+    def test_convertir_cotizacion_preserva_descuento_stellantis(self):
+        client = auth_client(self.vendedor)
+        payload = self._item(es_cotizacion=True)
+        payload["items"][0].update(cost_modifiers=["stellantis"], cantidad=2)
+        response = client.post("/api/pedidos/", payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        detalle = response.data["detalles"][0]
+        response = client.post(
+            f"/api/pedidos/{response.data['id']}/convertir-a-pedido/",
+            {"detalle_ids": [detalle["id"]]}, format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["detalles"][0]["cost_modifiers"], ["stellantis"])
+        self.assertEqual(response.data["detalles"][0]["precio_final"], 33800)
+        self.assertEqual(response.data["monto_total"], 33800)
+
     def test_marcar_retiro_descuenta_stock_multi_cantidad(self):
         payload = self._item()
         payload["items"][0]["cantidad"] = 4
@@ -2653,6 +2692,95 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(stats["pagos"]["TR"], 15000)
         self.assertEqual(stats["pagos"]["CH"], 15000)
         self.assertEqual(stats["documentos"]["OT"], 30000)
+
+    def test_cancelar_pedido_lo_excluye_de_totales_y_detalles_cierre(self):
+        client = auth_client(self.gerente)
+        venta_id = self._crear_venta(
+            monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}], documento="BO"
+        )
+        vigente = self._crear_pedido_venta()
+        cancelado = self._crear_pedido_venta()
+        pedido = cancelado.pedido.get()
+
+        antes = client.get("/api/cierre-caja/")
+        self.assertEqual(antes.status_code, 200)
+        self.assertEqual(antes.data["total_vendido"], 48000)
+        for tipo, clave in (("pago", "EF"), ("documento", "BO")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertIn(cancelado.id, {row["id"] for row in detalle.data})
+
+        response = client.post(
+            f"/api/pedidos/{pedido.id}/cancelar/", {"motivo": "Cliente desistió"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        cancelado.refresh_from_db()
+        self.assertEqual(cancelado.estado, Venta.Estado.COMPLETADA)
+        despues = client.get("/api/cierre-caja/")
+        self.assertEqual(despues.status_code, 200)
+        for campo in ("total_vendido", "total_final"):
+            self.assertEqual(despues.data[campo], 33000)
+        self.assertEqual(despues.data["cantidad_ventas"], 2)
+        self.assertEqual(despues.data["pagos"]["EF"], 33000)
+        self.assertEqual(despues.data["documentos"]["BO"], 33000)
+        for tipo, clave in (("pago", "EF"), ("documento", "BO")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertEqual({row["id"] for row in detalle.data}, {venta_id, vigente.id})
+
+    def test_cierre_excluye_pedidos_ya_cancelados_e_inactivos(self):
+        for cambios in ({"estado": Pedido.Estado.CANCELADO}, {"activo": False}):
+            venta = self._crear_pedido_venta(metodo_pago="TJ", estado_documento="SB")
+            venta.pedido.update(**cambios)
+
+        client = auth_client(self.gerente)
+        response = client.get("/api/cierre-caja/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_vendido"], 0)
+        self.assertEqual(response.data["total_final"], 0)
+        self.assertEqual(response.data["cantidad_ventas"], 0)
+        self.assertEqual(response.data["pagos"]["TJ"], 0)
+        self.assertEqual(response.data["documentos"]["SIN"], 0)
+        for tipo, clave in (("pago", "TJ"), ("documento", "SIN")):
+            detalle = client.get("/api/cierre-caja/detalle/", {"tipo": tipo, "clave": clave})
+            self.assertEqual(detalle.status_code, 200)
+            self.assertEqual(detalle.data, [])
+
+    def test_cancelacion_posterior_conserva_cierre_guardado(self):
+        client = auth_client(self.gerente)
+        venta = self._crear_pedido_venta(metodo_pago="TR", estado_documento="FA")
+        fecha_venta = timezone.localdate() - timedelta(days=1)
+        Venta.objects.filter(pk=venta.pk).update(fecha_venta=timezone.now() - timedelta(days=1))
+        fecha = {"fecha": fecha_venta.isoformat()}
+        anterior = client.post("/api/cierre-caja/", fecha, format="json")
+        self.assertEqual(anterior.status_code, 201)
+        cierre = CierreCaja.objects.get(pk=anterior.data["cierre_guardado"]["id"])
+        valores_guardados = CierreCaja.objects.filter(pk=cierre.pk).values().get()
+        self.assertEqual(cierre.total_final, 15000)
+
+        response = client.post(
+            f"/api/pedidos/{venta.pedido.get().id}/cancelar/",
+            {"motivo": "Cancelado al día siguiente"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        recalculado = client.get("/api/cierre-caja/", fecha)
+        self.assertEqual(recalculado.status_code, 200)
+        self.assertEqual(recalculado.data["total_final"], 0)
+        nuevo = client.post("/api/cierre-caja/", fecha, format="json")
+        self.assertEqual(nuevo.status_code, 201)
+        nuevo_cierre = CierreCaja.objects.get(pk=nuevo.data["cierre_guardado"]["id"])
+        self.assertEqual(nuevo_cierre.total_vendido, 0)
+        self.assertEqual(nuevo_cierre.total_final, 0)
+        self.assertEqual(nuevo_cierre.cantidad_ventas, 0)
+        self.assertEqual(nuevo_cierre.desglose["pagos"]["TR"], 0)
+        self.assertEqual(nuevo_cierre.desglose["documentos"]["FA"], 0)
+        self.assertEqual(CierreCaja.objects.filter(pk=cierre.pk).values().get(), valores_guardados)
+        historial = client.get("/api/cierre-caja/historial/")
+        self.assertEqual(historial.status_code, 200)
+        previo = next(row for row in historial.data if row["id"] == cierre.pk)
+        self.assertEqual(previo["total_final"], 15000)
+        self.assertEqual(previo["pagos"]["TR"], 15000)
+        self.assertEqual(previo["documentos"]["FA"], 15000)
 
     def test_cierre_anulaciones_solo_informativas(self):
         self._crear_venta(monto=18000, pagos=[{"metodo_pago": "EF", "monto": 18000}])
