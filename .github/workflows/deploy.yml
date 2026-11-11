@@ -13,6 +13,9 @@ jobs:
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&
@@ -49,8 +52,8 @@ jobs:
       - name: Pull images and quick-swap on VPS
         uses: appleboy/ssh-action@v1.0.3
         env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
           COMPOSE_DIR: ${{ secrets.COMPOSE_DIR }}
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -64,10 +67,9 @@ jobs:
             chmod 700 .deploy
             chmod 600 .deploy/runtime-env.json
             command -v python3 >/dev/null || { echo "ERROR: instala Python 3 en el host del VPS." >&2; exit 1; }
-            python3 ops/deploy/runtime_env.py apply --target .env --input .deploy/runtime-env.json
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            cd "$COMPOSE_DIR"
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker compose -f compose.prod.yaml pull
+            python3 ops/deploy/runtime_env.py apply --target .env --input .deploy/runtime-env.json
             docker compose -f compose.prod.yaml up -d --wait
             docker compose -f compose.prod.yaml exec -T app python - < ops/deploy/check_ocr.py
             docker image prune -f
