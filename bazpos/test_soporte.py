@@ -2,13 +2,21 @@ import json
 from unittest.mock import MagicMock, patch
 import urllib.error
 
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from docker.test_utils import auth_client, create_business_groups, make_user
 
 
+@override_settings(RESEND_API_KEY="re_test_123456789")
 class SupportTicketApiTest(TestCase):
+    def setUp(self):
+        patcher = patch("bazpos.resend_client.urllib.request.urlopen")
+        self.mock_urlopen = patcher.start()
+        self.addCleanup(patcher.stop)
+        response = self.mock_urlopen.return_value.__enter__.return_value
+        response.read.return_value = b'{"id":"test-email-id"}'
+
     @classmethod
     def setUpTestData(cls):
         create_business_groups()
@@ -32,7 +40,7 @@ class SupportTicketApiTest(TestCase):
         resp = client.post("/api/soporte/tickets/", {"tipo": "soporte", "descripcion": "Problema con la caja"})
         self.assertEqual(resp.status_code, 401)
 
-    def test_vendedor_submit_ticket_mock_mode(self):
+    def test_vendedor_submit_ticket(self):
         client = auth_client(self.vendedor)
         payload = {
             "tipo": "soporte",
@@ -45,9 +53,10 @@ class SupportTicketApiTest(TestCase):
         resp = client.post("/api/soporte/tickets/", payload, format="json")
         self.assertEqual(resp.status_code, 201)
         data = resp.json()
-        self.assertEqual(data["status"], "mocked")
-        self.assertIn("BAZPOS", data["subject"])
-        self.assertIn("ALTA", data["subject"])
+        self.assertEqual(data["status"], "sent")
+        sent = json.loads(self.mock_urlopen.call_args.args[0].data)
+        self.assertIn("BAZPOS", sent["subject"])
+        self.assertIn("ALTA", sent["subject"])
 
     def test_gerente_submit_suggestion(self):
         client = auth_client(self.gerente)
@@ -62,8 +71,8 @@ class SupportTicketApiTest(TestCase):
         resp = client.post("/api/soporte/tickets/", payload, format="json")
         self.assertEqual(resp.status_code, 201)
         data = resp.json()
-        self.assertEqual(data["status"], "mocked")
-        self.assertIn("Sugerencia", data["subject"])
+        self.assertEqual(data["status"], "sent")
+        self.assertIn("Sugerencia", json.loads(self.mock_urlopen.call_args.args[0].data)["subject"])
 
     def test_validation_missing_description(self):
         client = auth_client(self.vendedor)
@@ -157,3 +166,49 @@ class SupportTicketApiTest(TestCase):
         )
         self.assertEqual(resp.status_code, 502)
         self.assertIn("API key invalid", resp.json()["error"])
+
+    @override_settings(RESEND_API_KEY="")
+    def test_missing_key_returns_unavailable(self):
+        response = auth_client(self.vendedor).post(
+            "/api/soporte/tickets/", {"descripcion": "Problema con la caja"}, format="json",
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("no está configurado", response.json()["error"])
+        self.mock_urlopen.assert_not_called()
+
+
+@override_settings(RESEND_API_KEY="re_test_123456789")
+class SupportEmailClientTest(SimpleTestCase):
+    @patch("bazpos.resend_client.urllib.request.urlopen")
+    def test_invalid_provider_responses_are_not_success(self, urlopen):
+        from bazpos.resend_client import ResendEmailError, send_ticket_email
+        response = urlopen.return_value.__enter__.return_value
+        for body in ({}, {"id": None}, {"id": " "}, {"id": 123}, [], None):
+            with self.subTest(body=body):
+                response.read.return_value = json.dumps(body).encode()
+                with self.assertRaises(ResendEmailError) as error:
+                    send_ticket_email({"descripcion": "Prueba de soporte"})
+                self.assertEqual(error.exception.status_code, 502)
+        response.read.return_value = b'not-json'
+        with self.assertRaises(ResendEmailError) as error:
+            send_ticket_email({"descripcion": "Prueba de soporte"})
+        self.assertEqual(error.exception.status_code, 502)
+
+    @patch("bazpos.resend_client.urllib.request.urlopen")
+    def test_connection_failures_are_not_success(self, urlopen):
+        from bazpos.resend_client import ResendEmailError, send_ticket_email
+        for failure in (TimeoutError(), urllib.error.URLError("connection refused")):
+            with self.subTest(failure=type(failure).__name__):
+                urlopen.side_effect = failure
+                with self.assertRaises(ResendEmailError) as error:
+                    send_ticket_email({"descripcion": "Prueba de soporte"})
+                self.assertEqual(error.exception.status_code, 502)
+
+    @override_settings(RESEND_API_KEY="  ")
+    @patch("bazpos.resend_client.urllib.request.urlopen")
+    def test_missing_key_never_calls_provider(self, urlopen):
+        from bazpos.resend_client import ResendEmailError, send_ticket_email
+        with self.assertRaises(ResendEmailError) as error:
+            send_ticket_email({"descripcion": "Prueba de soporte"})
+        self.assertEqual(error.exception.status_code, 503)
+        urlopen.assert_not_called()

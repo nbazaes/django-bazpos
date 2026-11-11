@@ -66,6 +66,22 @@ Los **flags de perfil vertical** (`feature_flags`) activan/ocultan las partes es
 
 Una instalación genérica arranca con todos los flags apagados; una instalación de autopartes los enciende vía migración.
 
+### Correo de soporte con Resend
+
+Los tickets de soporte requieren `RESEND_API_KEY`, `RESEND_FROM_EMAIL` y `SUPPORT_EMAIL` en el `.env` que carga Django. Configure un remitente autorizado en Resend y el destinatario de soporte de la instalación. Estas variables son privadas del backend; no se configuran en el `.env` del frontend ni con prefijos `VITE_`.
+
+Después de editar el `.env`, reinicie Django en desarrollo. En instalaciones con imágenes de producción, aplique las variables recreando únicamente la aplicación:
+
+```bash
+docker compose -f compose.prod.yaml up -d --wait --no-deps --force-recreate app
+```
+
+Un simple `docker compose restart` no actualiza las variables del contenedor. En staging local, el archivo persistente de origen es `ops/staging/.env.generated`; `deploy-stack.sh` lo copia a `/opt/bazpos/.env` en la VM. Mantenga ese origen actualizado para que un despliegue posterior conserve la configuración.
+
+El workflow de producción conserva la configuración de Resend del `.env` del servidor; actualmente no transfiere secretos de Resend desde GitHub Actions. Guardar la clave solo en GitHub Secrets no configura Django.
+
+`POST /api/soporte/tickets/` devuelve HTTP 503 si falta la clave y HTTP 502 si Resend rechaza el correo, no responde o devuelve una respuesta inválida. Solo devuelve HTTP 201 con `status: "sent"` e `id` cuando Resend acepta el correo. Ese identificador permite contrastar el envío en Resend; la aceptación no garantiza la entrega final al destinatario.
+
 ## 4. Respaldo
 
 El script de respaldo vive en [`ops/backup/`](../ops/backup/). Usa **restic** contra un bucket **Backblaze B2**:

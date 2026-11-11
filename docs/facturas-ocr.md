@@ -95,7 +95,7 @@ Para producción por GitHub Actions, configurar en **Settings → Secrets and va
 
 Configurar únicamente la clave del proveedor elegido. Estas variables no son argumentos de build ni variables del frontend: llegan a Django al desplegar el contenedor.
 
-Un push a `main` que pase CI construye imágenes y activa `deploy.yml`. El workflow transfiere un paquete temporal privado, actualiza solo OCR e imágenes en el `.env` del VPS y ejecuta Compose. Conserva los secretos de base de datos y las variables de OCR del servidor cuando GitHub no proporciona reemplazos. Un valor vacío o ausente de Actions no borra la configuración existente; para desactivar usar explícitamente `BAZPOS_OCR_ENABLED=False`. Para eliminar una clave del servidor, editar el `.env` remoto; para rotarla, actualizar el secret de Actions.
+Un push a `main` que pase CI construye imágenes y activa `deploy.yml`. El workflow transfiere un paquete temporal privado por el entorno SSH (base64 con valor derivado enmascarado), actualiza solo OCR e imágenes en el `.env` del VPS y ejecuta Compose. Conserva los secretos de base de datos y las variables de OCR del servidor cuando GitHub no proporciona reemplazos. Un valor vacío o ausente de Actions no borra la configuración existente; para desactivar usar explícitamente `BAZPOS_OCR_ENABLED=False`. Para eliminar una clave del servidor, editar el `.env` remoto; para rotarla, actualizar el secret de Actions.
 
 Las imágenes quedan persistidas en el `.env` del VPS para que un reinicio posterior mantenga la misma versión. Los despliegues de producción se serializan para no mezclar paquetes de configuración. El workflow verifica la salud del stack y la configuración efectiva de Django. No hace llamadas OCR pagadas como parte de cada deploy.
 

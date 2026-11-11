@@ -149,8 +149,14 @@ export async function me() {
 }
 
 export async function sendSupportTicket(ticketData) {
-  return apiRequest("/soporte/tickets/", {
+  const result = await apiRequest("/soporte/tickets/", {
     method: "POST",
     body: ticketData,
   });
+  if (result?.status !== "sent" || typeof result.id !== "string" || !result.id.trim()) {
+    throw new ApiError("El servidor no confirmó el envío del ticket. Contacta al administrador.", {
+      kind: "invalid_response",
+    });
+  }
+  return result;
 }
