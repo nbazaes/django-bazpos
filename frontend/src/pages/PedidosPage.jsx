@@ -311,7 +311,7 @@ export default function PedidosPage() {
                   type="text"
                   className="form-control"
                   style={{ maxWidth: 220 }}
-                  placeholder="Buscar por código..."
+                  placeholder="Buscar por código, nombre o RUT..."
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                 />
@@ -376,7 +376,7 @@ export default function PedidosPage() {
                       <td>{v.id}</td>
                       <td>{formatDateTime(v.fecha_venta)}</td>
                       <td>{v.usuario_nombre}</td>
-                      {tipoFiltro === "CO" && <td>{v.cliente_nombre || "—"}</td>}
+                      {tipoFiltro === "CO" && <td>{v.cliente_nombre || "—"}{v.cliente_rut && <div className="text-muted small">RUT: {v.cliente_rut}</div>}</td>}
                       <td>${v.monto_total}</td>
                       <td>{v.tipo_documento_display || v.tipo_documento}</td>
                       <td>

@@ -178,6 +178,44 @@ class VentaApiTest(BaseTest):
             producto=cls.producto, ubicacion=cls.ubicacion, cantidad=10
         )
 
+    def test_cotizacion_rut_opcional_busqueda_e_impresion(self):
+        client = auth_client(self.vendedor)
+        for datos in ({}, {"cliente_rut": ""}, {"cliente_nombre": "Ana <Comercial>", "cliente_rut": "12.345.678-5"}, {"cliente_rut": "12345678-5"}):
+            with self.subTest(datos=datos):
+                response = client.post("/api/ventas/", self._payload(tipo_documento="CO", **datos), format="json")
+                self.assertEqual(response.status_code, 201, response.data)
+                cotizacion = Venta.objects.get(pk=response.data["id"])
+                self.assertEqual(cotizacion.cliente_rut, datos.get("cliente_rut", ""))
+                self.assertEqual(response.data["cliente_rut"], cotizacion.cliente_rut)
+                documento = client.get(f"/api/ventas/{cotizacion.pk}/documento/")
+                self.assertEqual(documento.status_code, 200)
+                html = documento.content.decode()
+                if cotizacion.cliente_rut:
+                    self.assertIn(f"RUT: {cotizacion.cliente_rut}", html)
+                    for termino in ("12.345.678-5", "123456785", "12345678-5", "345678"):
+                        historial = client.get("/api/ventas/", {"codigo": termino, "tipo_documento": "CO"})
+                        self.assertIn(cotizacion.pk, [item["id"] for item in historial.data["results"]])
+                else:
+                    self.assertNotIn("RUT:", html)
+                if cotizacion.cliente_nombre:
+                    self.assertIn("Cliente: Ana &lt;Comercial&gt;", html)
+                else:
+                    self.assertNotIn("Cliente:", html)
+                self.assertEqual(client.get(f"/api/ventas/{cotizacion.pk}/documento/").content, documento.content)
+
+    def test_impresion_cotizacion_antigua_completa_cliente_sin_cambiar_contenido(self):
+        cotizacion = Venta.objects.create(
+            usuario=self.vendedor, monto_subtotal=1000, monto_total=1000,
+            tipo_documento="CO", cliente_nombre="Ana <Comercial>",
+            documento_html="<html><body><p>COTIZACION</p><hr /><p>Producto original: $1000</p></body></html>",
+        )
+        client = auth_client(self.vendedor)
+        response = client.get(f"/api/ventas/{cotizacion.pk}/documento/")
+        self.assertContains(response, "Cliente: Ana &lt;Comercial&gt;", html=False)
+        self.assertContains(response, "Producto original: $1000", html=False)
+        self.assertNotContains(response, "RUT:")
+        self.assertEqual(client.get(f"/api/ventas/{cotizacion.pk}/documento/").content, response.content)
+
     def _payload(self, cantidad=2, precio=None, total=None, **kwargs):
         precio = precio or self.producto.precio
         total = total if total is not None else precio * cantidad
@@ -1295,6 +1333,30 @@ class PedidoApiTest(BaseTest):
                 }
             ],
         }
+
+    def test_cotizacion_rut_opcional_busqueda_y_conversion(self):
+        client = auth_client(self.vendedor)
+        for rut in (None, "", "12.345.678-5", "12345678-5"):
+            with self.subTest(rut=rut):
+                payload = self._item(es_cotizacion=True)
+                if rut is not None:
+                    payload["rut_cliente"] = rut
+                response = client.post("/api/pedidos/", payload, format="json")
+                self.assertEqual(response.status_code, 201, response.data)
+                cotizacion = Pedido.objects.get(pk=response.data["id"])
+                self.assertEqual(cotizacion.rut_cliente, rut or "")
+                self.assertEqual(response.data["rut_cliente"], rut or "")
+                detalle = client.get(f"/api/pedidos/{cotizacion.pk}/")
+                self.assertEqual(detalle.data["rut_cliente"], rut or "")
+                if rut:
+                    for termino in ("12.345.678-5", "123456785", "12345678-5", "345678"):
+                        historial = client.get("/api/pedidos/", {"search": termino, "estado": "CO"})
+                        self.assertIn(cotizacion.pk, [item["id"] for item in historial.data["results"]])
+                convertido = client.post(f"/api/pedidos/{cotizacion.pk}/convertir-a-pedido/", {
+                    "detalle_ids": list(cotizacion.detalles.values_list("id", flat=True)),
+                }, format="json")
+                self.assertEqual(convertido.status_code, 201, convertido.data)
+                self.assertEqual(convertido.data["rut_cliente"], rut or "")
 
     def _item_multi(self, n=2):
         payload = self._item()

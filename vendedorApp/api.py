@@ -5,10 +5,11 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.db.models import Case, CharField, Count, F, Max, OuterRef, Prefetch, Q, Subquery, Sum, Value, When
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Replace
 from django.db import transaction
 from django.conf import settings
 from django.http import HttpResponse
+from django.utils.html import escape
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -61,6 +62,18 @@ from bazpos.permissions import (
     RoleActionPermission,
     has_any_role,
 )
+
+
+def filtrar_cliente(queryset, texto, nombre_field, rut_field):
+    rut = texto.replace(".", "").replace("-", "").replace(" ", "")
+    condicion = Q(id__startswith=texto) | Q(**{f"{nombre_field}__icontains": texto})
+    if rut:
+        expresion = F(rut_field)
+        for separador in (".", "-", " "):
+            expresion = Replace(expresion, Value(separador), Value(""))
+        queryset = queryset.alias(rut_busqueda=expresion)
+        condicion |= Q(rut_busqueda__icontains=rut)
+    return queryset.filter(condicion)
 
 
 class DashboardStatsView(APIView):
@@ -1044,9 +1057,7 @@ class VentaViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.ListM
         tipo_documento = self.request.query_params.get("tipo_documento", "").strip()
 
         if codigo:
-            queryset = queryset.filter(
-                Q(id__startswith=codigo) | Q(cliente_nombre__icontains=codigo)
-            )
+            queryset = filtrar_cliente(queryset, codigo, "cliente_nombre", "cliente_rut")
         if tipo_documento:
             queryset = queryset.filter(tipo_documento=tipo_documento)
 
@@ -1437,10 +1448,22 @@ class VentaViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.ListM
     def documento(self, request, pk=None):
         venta = self.get_object()
 
+        es_cotizacion = venta.tipo_documento == Venta.TipoDocumento.COTIZACION
+        cliente_html = ""
+        if venta.cliente_nombre:
+            cliente_html += f"<p>Cliente: {escape(venta.cliente_nombre)}</p>"
+        if venta.cliente_rut:
+            cliente_html += f"<p>RUT: {escape(venta.cliente_rut)}</p>"
+        if cliente_html:
+            cliente_html = f'<div class="documento-cliente">{cliente_html}</div>'
+
         if venta.documento_html:
+            # Completar impresiones antiguas sin alterar sus productos ni totales.
+            if es_cotizacion and cliente_html and 'class="documento-cliente"' not in venta.documento_html:
+                venta.documento_html = venta.documento_html.replace("<hr />", f"{cliente_html}\n<hr />", 1)
+                venta.save(update_fields=["documento_html"])
             return HttpResponse(venta.documento_html, content_type="text/html; charset=utf-8")
 
-        es_cotizacion = venta.tipo_documento == Venta.TipoDocumento.COTIZACION
         config = StoreConfig.current()
 
         detalles = venta.detalleventa_set.select_related("producto").all()
@@ -1530,6 +1553,7 @@ hr {{ border: none; border-top: 1px dashed #999; margin: 8px 0; }}
 <p class="subtitle">{titulo}</p>
 <p class="doc-number">#{venta.id}</p>
 <p class="date">{fecha_str}</p>
+{cliente_html}
 <hr />
 {items_html}
 {totales_html}
@@ -1628,9 +1652,7 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
         elif estado:
             queryset = queryset.filter(estado=estado, es_cotizacion=False)
         if search:
-            queryset = queryset.filter(
-                Q(id__startswith=search) | Q(nombre_cliente__icontains=search)
-            )
+            queryset = filtrar_cliente(queryset, search, "nombre_cliente", "rut_cliente")
         if fecha_desde:
             queryset = queryset.filter(fecha_creacion__date__gte=fecha_desde)
         if fecha_hasta:
@@ -1880,6 +1902,7 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
             nuevo_pedido = Pedido.objects.create(
                 usuario=request.user,
                 nombre_cliente=nombre_cliente,
+                rut_cliente=cotizacion.rut_cliente,
                 telefono_cliente=telefono_cliente,
                 monto_subtotal=monto_subtotal,
                 monto_total=monto_total,

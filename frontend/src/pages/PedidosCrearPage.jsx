@@ -1,3 +1,4 @@
+import { escapeHtml } from "../lib/html";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
 import PedidosHistorial from "../components/PedidosHistorial";
@@ -62,7 +63,7 @@ export default function PedidosCrearPage() {
   const createPedido = useCreatePedido();
   const proveedores = proveedoresData?.results ?? [];
 
-  const [cliente, setCliente] = useState({ nombre: "", telefono: "" });
+  const [cliente, setCliente] = useState({ nombre: "", telefono: "", rut: "" });
   const [producto, setProducto] = useState({ ...productoVacio });
   const [items, setItems] = useState([]);
   const [metodoPago, setMetodoPago] = useState("EF");
@@ -228,6 +229,7 @@ export default function PedidosCrearPage() {
 
     const payload = {
       nombre_cliente: cliente.nombre.trim(),
+      rut_cliente: cliente.rut.trim(),
       telefono_cliente: cliente.telefono.trim(),
       metodo_pago: metodoPago,
       estado_documento: estadoDocumento,
@@ -250,7 +252,7 @@ export default function PedidosCrearPage() {
       onSuccess: (data) => {
         addToast(esCotizacion ? "Cotización generada correctamente" : "Pedido generado correctamente", "success");
         imprimirDocumento(data, esCotizacion);
-        setCliente({ nombre: "", telefono: "" });
+        setCliente({ nombre: "", telefono: "", rut: "" });
         setItems([]);
         setMetodoPago("EF");
         limpiarProducto();
@@ -320,7 +322,8 @@ export default function PedidosCrearPage() {
         </div>
         <div class="info">
           <strong>Fecha:</strong> ${fecha}<br />
-          <strong>Cliente:</strong> ${documento.nombre_cliente}<br />
+          <strong>Cliente:</strong> ${escapeHtml(documento.nombre_cliente)}<br />
+          ${documento.rut_cliente ? `<strong>RUT:</strong> ${escapeHtml(documento.rut_cliente)}<br />` : ""}
           <strong>Teléfono:</strong> ${documento.telefono_cliente}<br />
           ${!esCotizacion ? `<strong>Estado:</strong> ${estado}<br />` : ""}
           ${!esCotizacion ? `<strong>Documento:</strong> ${documentoLabel}` : ""}
@@ -379,6 +382,20 @@ export default function PedidosCrearPage() {
                 value={cliente.nombre}
                 onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })}
                 placeholder="Nombre del cliente"
+              />
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="form-group">
+              <label htmlFor="pedido-cliente-rut">RUT cliente (opcional)</label>
+              <input
+                id="pedido-cliente-rut"
+                type="text"
+                className="form-control"
+                maxLength={20}
+                value={cliente.rut}
+                onChange={(e) => setCliente({ ...cliente, rut: e.target.value })}
+                placeholder="Ej.: 12.345.678-5"
               />
             </div>
           </div>

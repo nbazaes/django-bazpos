@@ -155,6 +155,7 @@ class Venta(models.Model):
         verbose_name='Venta origen',
     )
     cliente_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre del cliente")
+    cliente_rut = models.CharField(max_length=20, blank=True, default="", verbose_name="RUT del cliente")
     documento_html = models.TextField(blank=True, default="")
     documento = models.CharField(
         max_length=2,
@@ -348,6 +349,7 @@ class Pedido(models.Model):
 
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     nombre_cliente = models.CharField(max_length=200)
+    rut_cliente = models.CharField(max_length=20, blank=True, default="", verbose_name="RUT del cliente")
     telefono_cliente = models.CharField(max_length=50)
     monto_subtotal = models.IntegerField()
     monto_total = models.IntegerField()

@@ -1,3 +1,4 @@
+import { escapeHtml } from "../lib/html";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageCard from "../components/PageCard";
@@ -58,6 +59,7 @@ export default function VentaPage() {
   const [showConfirmVenta, setShowConfirmVenta] = useState(false);
   const [confirmMode, setConfirmMode] = useState("VE");
   const [clienteNombre, setClienteNombre] = useState("");
+  const [clienteRut, setClienteRut] = useState("");
   const [ocultarTotales, setOcultarTotales] = useState(false);
   const [medioPago, setMedioPago] = useState("");
   const [documentoFiscal, setDocumentoFiscal] = useState("");
@@ -328,6 +330,8 @@ export default function VentaPage() {
       telefono: config.telefono,
       direccion: config.direccion,
       tipo_documento: tipoDocumento,
+      cliente_nombre: clienteNombre.trim(),
+      cliente_rut: clienteRut.trim(),
       fecha: ahora.toLocaleString(),
       items: carro.map((item) => ({
         ...item,
@@ -397,6 +401,8 @@ export default function VentaPage() {
           <p class="subtitle">${esCotizacion ? "COTIZACION" : "COMPROBANTE DE VENTA"}</p>
           <p class="doc-number">#${documento.ventaId}</p>
           <p class="date">${documento.fecha}</p>
+          ${documento.cliente_nombre ? `<p>Cliente: ${escapeHtml(documento.cliente_nombre)}</p>` : ""}
+          ${documento.cliente_rut ? `<p>RUT: ${escapeHtml(documento.cliente_rut)}</p>` : ""}
           <hr />
           <table style="width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.8rem;">
             <thead>
@@ -503,6 +509,7 @@ export default function VentaPage() {
     idempotenciaRef.current = null;
     setShowConfirmVenta(false);
     setClienteNombre("");
+    setClienteRut("");
     setOcultarTotales(false);
     setMedioPago("");
     setDocumentoFiscal("");
@@ -552,6 +559,7 @@ export default function VentaPage() {
         idempotencia_key: clave,
         ...(tipoDocumento === "VE" ? { pagos, documento: documentoFiscal } : {}),
         ...(clienteNombre.trim() ? { cliente_nombre: clienteNombre.trim() } : {}),
+        ...(clienteRut.trim() ? { cliente_rut: clienteRut.trim() } : {}),
         ...(cotizacionOrigenId && tipoDocumento === "VE" ? { venta_origen: cotizacionOrigenId } : {}),
       };
 
@@ -1031,10 +1039,10 @@ export default function VentaPage() {
           {descuentoExcedido && <button type="button" className="btn btn-sm btn-outline" onClick={() => setDescuentoPorcentaje(maximoDescuento)}>Aplicar máximo permitido</button>}
         </div>
         <div className="btn-group">
-          <button className="btn btn-success" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
+          <button className="btn btn-success" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setClienteRut(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
-          <button className="btn btn-outline" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setShowConfirmVenta(true); }}>
+          <button className="btn btn-outline" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("CO"); setClienteNombre(""); setClienteRut(""); setShowConfirmVenta(true); }}>
             Generar cotización
           </button>
           <button className="btn btn-danger" disabled={!carro.length && !oem} onClick={limpiarVenta}>
@@ -1057,13 +1065,25 @@ export default function VentaPage() {
                 {descuentoBloqueado && <div className="alert alert-warning" role="alert">{maximoDescuento === null ? "No se pudo verificar tu límite de descuento. Cancela y vuelve a intentar." : `Tu máximo vigente es ${maximoDescuento}%. Cancela y corrige el descuento para guardar.`}</div>}
                 {confirmMode === "CO" && (
                   <div className="form-group mb-3">
-                    <label className="font-weight-bold">Nombre del cliente:</label>
+                    <label htmlFor="cotizacion-cliente-nombre" className="font-weight-bold">Nombre del cliente (opcional):</label>
                     <input
                       type="text"
                       className="form-control"
                       placeholder="Ingrese el nombre del cliente (opcional)"
+                      id="cotizacion-cliente-nombre"
+                      maxLength={200}
                       value={clienteNombre}
                       onChange={(e) => setClienteNombre(e.target.value)}
+                    />
+                    <label htmlFor="cotizacion-cliente-rut" className="font-weight-bold mt-2">RUT del cliente (opcional):</label>
+                    <input
+                      id="cotizacion-cliente-rut"
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej.: 12.345.678-5"
+                      maxLength={20}
+                      value={clienteRut}
+                      onChange={(e) => setClienteRut(e.target.value)}
                     />
                     <label className="checkbox-custom mt-2" style={{ cursor: "pointer" }}>
                       <input
@@ -1276,6 +1296,8 @@ export default function VentaPage() {
                   </div>
                   <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>#{lastDocumento.ventaId}</div>
                   <div className="mb-2 text-center" style={{ color: "#666", fontSize: "0.75rem" }}>{lastDocumento.fecha}</div>
+                  {lastDocumento.cliente_nombre && <div>Cliente: {lastDocumento.cliente_nombre}</div>}
+                  {lastDocumento.cliente_rut && <div>RUT: {lastDocumento.cliente_rut}</div>}
                   <hr />
                   <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: "0.8rem" }}>
                     <thead>
