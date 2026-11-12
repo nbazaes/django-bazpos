@@ -13,7 +13,14 @@ class StoreNameView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        return Response({"name": settings.STORE_NAME})
+        commercial = settings.BAZPOS_COMMERCIAL_BRANDING
+        return Response({
+            "name": settings.STORE_NAME,
+            "about": {
+                "company": "Bazaes Soluciones Digitales SpA" if commercial else "",
+                "contact": settings.BAZPOS_COMMERCIAL_CONTACT if commercial else "",
+            },
+        })
 
 
 class MeView(APIView):

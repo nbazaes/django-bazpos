@@ -190,6 +190,7 @@ class VentaSerializer(serializers.ModelSerializer):
             "convertido",
             "venta_derivada_id",
             "cliente_nombre",
+            "cliente_rut",
             "documento_html",
             "documento",
             "documento_display",
@@ -340,6 +341,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
     )
     venta_origen = serializers.IntegerField(required=False, allow_null=True)
     cliente_nombre = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    cliente_rut = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     documento = serializers.CharField(
         max_length=2,
         default=None,
@@ -486,6 +488,7 @@ class RegistrarVentaSerializer(serializers.Serializer):
             tipo_documento=tipo_documento,
             venta_origen_id=validated_data.get("venta_origen"),
             cliente_nombre=validated_data.get("cliente_nombre", "") or "",
+            cliente_rut=validated_data.get("cliente_rut", ""),
             documento=validated_data.get("documento"),
             idempotencia_key=idempotencia_key,
         )
@@ -758,6 +761,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "usuario",
             "usuario_nombre",
             "nombre_cliente",
+            "rut_cliente",
             "telefono_cliente",
             "monto_subtotal",
             "monto_total",
@@ -842,6 +846,7 @@ class PedidoDetalleInputSerializer(serializers.Serializer):
 
 class CrearPedidoSerializer(serializers.Serializer):
     nombre_cliente = serializers.CharField(max_length=200)
+    rut_cliente = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     telefono_cliente = serializers.CharField(max_length=50)
     metodo_pago = serializers.CharField(max_length=2)
     items = PedidoDetalleInputSerializer(many=True)
@@ -899,6 +904,7 @@ class CrearPedidoSerializer(serializers.Serializer):
         pedido = Pedido.objects.create(
             usuario=request.user,
             nombre_cliente=validated_data["nombre_cliente"],
+            rut_cliente=validated_data.get("rut_cliente", ""),
             telefono_cliente=validated_data["telefono_cliente"],
             monto_subtotal=monto_subtotal,
             monto_total=monto_total,

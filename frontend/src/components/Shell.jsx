@@ -5,6 +5,7 @@ import { toggleTheme, getStoredTheme } from "../lib/theme";
 import { useStoreName } from "../lib/storeName";
 import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
+import AboutModal from "./AboutModal";
 import ChatWidget from "./ChatWidget";
 import PageLoader from "./PageLoader";
 import SupportTicketModal from "./SupportTicketModal";
@@ -52,6 +53,7 @@ export default function Shell() {
   const [title, setTitle] = useState("Dashboard");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -236,9 +238,15 @@ export default function Shell() {
                 <span>Soporte</span>
               </button>
             </div>
-            <div>
-              {storeName} &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
-            </div>
+            <button
+              type="button"
+              className="sidebar-about-btn"
+              onClick={() => setShowAboutModal(true)}
+              title="Acerca de BazPOS"
+              aria-haspopup="dialog"
+            >
+              BazPOS &copy; {new Date().getFullYear()} v{import.meta.env.APP_VERSION}
+            </button>
           </div>
         </aside>
 
@@ -328,6 +336,8 @@ export default function Shell() {
       {showSupportModal && (
         <SupportTicketModal onClose={() => setShowSupportModal(false)} />
       )}
+
+      {showAboutModal && <AboutModal onClose={() => setShowAboutModal(false)} />}
 
       <ChatWidget />
     </TitleContext.Provider>

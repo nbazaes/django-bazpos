@@ -1,3 +1,4 @@
+import { escapeHtml } from "../lib/html";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatDateTime } from "../lib/format";
@@ -324,7 +325,8 @@ export default function PedidosHistorial() {
         </div>
         <div class="info">
           <strong>Fecha:</strong> ${fecha}<br />
-          <strong>Cliente:</strong> ${pedido.nombre_cliente}<br />
+          <strong>Cliente:</strong> ${escapeHtml(pedido.nombre_cliente)}<br />
+          ${pedido.rut_cliente ? `<strong>RUT:</strong> ${escapeHtml(pedido.rut_cliente)}<br />` : ""}
           <strong>Teléfono:</strong> ${pedido.telefono_cliente}<br />
           ${!esCotizacion ? `<strong>Estado:</strong> ${estado}<br />` : ""}
           ${pedido.fecha_retiro ? `<strong>Fecha retiro:</strong> ${fechaRetiro}<br />` : ""}
@@ -382,7 +384,7 @@ export default function PedidosHistorial() {
           type="text"
           className="form-control"
           style={{ maxWidth: 220 }}
-          placeholder="Buscar por nombre o ID..."
+          placeholder="Buscar por nombre, RUT o ID..."
           value={search}
           onChange={(e) => handleFilterChange("search", e.target.value)}
         />
@@ -442,7 +444,7 @@ export default function PedidosHistorial() {
                 <tr key={p.id}>
                   <td>P#{p.id}</td>
                   <td>{formatDateTime(p.fecha_creacion)}</td>
-                  <td>{p.nombre_cliente}</td>
+                  <td>{p.nombre_cliente}{p.rut_cliente && <div className="text-muted small">RUT: {p.rut_cliente}</div>}</td>
                   <td className="hide-mobile">{p.telefono_cliente}</td>
                   <td>
                     {esCotizacion ? (
@@ -521,6 +523,7 @@ export default function PedidosHistorial() {
                 <div className="row mb-4">
                   <div className="col-md-4"><strong>Fecha:</strong> {formatDateTime(detalleData.fecha_creacion)}</div>
                   <div className="col-md-4"><strong>Cliente:</strong> {detalleData.nombre_cliente}</div>
+                  {detalleData.rut_cliente && <div className="col-md-4"><strong>RUT:</strong> {detalleData.rut_cliente}</div>}
                   <div className="col-md-4"><strong>Teléfono:</strong> {detalleData.telefono_cliente}</div>
                 </div>
                 <div className="row mb-4">

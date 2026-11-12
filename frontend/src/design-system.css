@@ -1007,6 +1007,46 @@ textarea.form-control, textarea.input {
   opacity: 1;
 }
 
+.sidebar-version:focus-within {
+  opacity: 1;
+}
+
+.sidebar-about-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar-about-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.about-dialog {
+  width: calc(100% - 2rem);
+  max-width: 480px;
+  max-height: calc(100% - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  overflow-y: auto;
+}
+
+.about-dialog::backdrop {
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(4px);
+}
+
+.about-company {
+  overflow-wrap: anywhere;
+}
+
 .sidebar-version-actions {
   display: flex;
   align-items: center;
