@@ -350,7 +350,7 @@ Base: `/api/`. Prefijo en producción servido por nginx. Formato JSON. La API es
 | `POST` | `/api/auth/token/` | Body `{"username", "password"}` → `{"access", "refresh"}` |
 | `POST` | `/api/auth/token/refresh/` | Body `{"refresh"}` → `{"access"}` (rota y blacklistea el refresh) |
 | `GET` | `/api/auth/me/` | Devuelve el usuario actual, grupos y `descuento_maximo_porcentaje` efectivo (0–100) |
-| `GET` | `/api/store-name/` | **Público (sin auth)** → `{"name": settings.STORE_NAME}` |
+| `GET` | `/api/store-name/` | **Público (sin auth)** → `{"name": settings.STORE_NAME, "about": {"company": "…", "contact": "…"}}`; empresa y contacto vacíos si la atribución comercial está desactivada |
 
 **Parámetros de SimpleJWT** (`settings.py`): `ACCESS_TOKEN_LIFETIME=1h`, `REFRESH_TOKEN_LIFETIME=7d`, `ROTATE_REFRESH_TOKENS=True`, `BLACKLIST_AFTER_ROTATION=True`.
 
@@ -633,9 +633,13 @@ Django reconoce HTTPS detrás de nginx mediante `SECURE_PROXY_SSL_HEADER = ("HTT
 | `ADMIN_USER` / `ADMIN_EMAIL` / `ADMIN_PASS` | Superusuario inicial (`create_admin`) | `admin` / ... / ... | Sí |
 | `MYSQL_ROOT_PASSWORD` / `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD` | Bootstrap del contenedor MariaDB | ... | Sí |
 | `STORE_NAME` | Nombre de tienda en runtime (sirve `/api/store-name/`) | `BAZPOS` | Recomendado |
+| `BAZPOS_COMMERCIAL_BRANDING` | Mostrar «Bazaes Soluciones Digitales SpA» en «Acerca de BazPOS» | `False` | Opcional |
+| `BAZPOS_COMMERCIAL_CONTACT` | Correo o URL público; visible solo con atribución comercial activada | Vacío | Opcional |
 | `VITE_STORE_NAME` | Nombre build-time (fallback frontend) | `BAZPOS` | Opcional |
 
 > Para cambiar el nombre de la tienda en producción: editar `.env` (`STORE_NAME`) y `docker compose up -d` (sin rebuild de nginx).
+
+El footer del sidebar muestra siempre `BazPOS © {año actual} v{versión}` y abre «Acerca de BazPOS», con una descripción y la versión del programa. El nombre de la tienda se mantiene en la cabecera del sidebar. Para incluir la atribución comercial, establecer `BAZPOS_COMMERCIAL_BRANDING=True` y, opcionalmente, `BAZPOS_COMMERCIAL_CONTACT` en `.env`. Estos datos son públicos: no incluir información privada. Aplicar cambios con `docker compose up -d --no-deps --force-recreate app`; no se requiere recompilar nginx para cambiar estas variables. Por defecto no se muestra empresa ni contacto. Esta opción visual no cambia la licencia del proyecto.
 
 ### 5.5 Salud y monitoreo
 

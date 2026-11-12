@@ -36,6 +36,8 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-default-key-fo
 
 STORE_NAME = os.environ.get("STORE_NAME", "BAZPOS")
 STORE_LOCALE = os.environ.get("STORE_LOCALE", "es-CL")
+BAZPOS_COMMERCIAL_BRANDING = os.environ.get("BAZPOS_COMMERCIAL_BRANDING", "False").strip().lower() == "true"
+BAZPOS_COMMERCIAL_CONTACT = os.environ.get("BAZPOS_COMMERCIAL_CONTACT", "").strip()
 
 # Support & Resend Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
