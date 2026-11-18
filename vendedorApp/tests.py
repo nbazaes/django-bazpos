@@ -3211,6 +3211,13 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]["monto"], 3000)
         self.assertEqual(resp.data[0]["cliente"], "Cliente D")
+        self.assertEqual(resp.data[0]["motivo"], "Motivo devolución")
+
+        resp = self._get_detalle(fecha, "anulacion")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["monto"], 9000)
+        self.assertEqual(resp.data[0]["motivo"], "Motivo anulación")
 
     def test_cierre_caja_pedido_con_abono_y_retiro_en_dias_distintos(self):
         from vendedorApp.models import PagoVenta
@@ -3272,13 +3279,6 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(cierre_hoy.data["total_vendido"], 12000)
         self.assertEqual(cierre_hoy.data["pagos"]["EF"], 0)
         self.assertEqual(cierre_hoy.data["pagos"]["TJ"], 12000)
-        self.assertEqual(resp.data[0]["motivo"], "Motivo devolución")
-
-        resp = self._get_detalle(fecha, "anulacion")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 1)
-        self.assertEqual(resp.data[0]["monto"], 9000)
-        self.assertEqual(resp.data[0]["motivo"], "Motivo anulación")
 
     def test_detalle_cierre_validaciones_y_permisos(self):
         resp = self._get_detalle("2026-01-01", "pago", "ZZ")
