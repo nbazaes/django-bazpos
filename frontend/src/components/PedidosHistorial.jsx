@@ -19,6 +19,8 @@ import { useToast } from "../lib/useToast";
 import { getUser, isGerente } from "../lib/auth";
 import Pagination from "./Pagination";
 import PageSizeSelector from "./PageSizeSelector";
+import PagoMixtoSelector from "./PagoMixtoSelector";
+import { PAGOS_MIXTOS_VACIO, resolverPagosPedido } from "../lib/pagos";
 
 const DOCUMENTO_OPCIONES = [
   { value: "SB", label: "Sin boletear" },
@@ -55,6 +57,9 @@ export default function PedidosHistorial() {
   const [retiroPersona, setRetiroPersona] = useState("");
   const [retiroMismoUsuario, setRetiroMismoUsuario] = useState(false);
   const [retiroDocumento, setRetiroDocumento] = useState("");
+  const [retiroMetodoPago, setRetiroMetodoPago] = useState("EF");
+  const [retiroEsMixto, setRetiroEsMixto] = useState(false);
+  const [retiroPagosMixtos, setRetiroPagosMixtos] = useState({ ...PAGOS_MIXTOS_VACIO });
   const [cancelarId, setCancelarId] = useState(null);
   const [cancelarMotivo, setCancelarMotivo] = useState("");
   const [devolverId, setDevolverId] = useState(null);
@@ -68,6 +73,10 @@ export default function PedidosHistorial() {
   const [convertirNombre, setConvertirNombre] = useState("");
   const [convertirTelefono, setConvertirTelefono] = useState("");
   const [convertirMetodoPago, setConvertirMetodoPago] = useState("EF");
+  const [convertirEsMixto, setConvertirEsMixto] = useState(false);
+  const [convertirPagosMixtos, setConvertirPagosMixtos] = useState({ ...PAGOS_MIXTOS_VACIO });
+  const [convertirEsAbono, setConvertirEsAbono] = useState(false);
+  const [convertirMontoAbonoSimple, setConvertirMontoAbonoSimple] = useState(0);
   const [convertirDocumento, setConvertirDocumento] = useState("SB");
 
   const addToast = useToast();
@@ -110,23 +119,51 @@ export default function PedidosHistorial() {
     setPage(1);
   }
 
+  const retiroSaldoPendiente = retiroData?.saldo_pendiente ?? 0;
+  const estadoPagosRetiro = useMemo(
+    () =>
+      resolverPagosPedido({
+        montoObjetivo: retiroSaldoPendiente,
+        metodoPago: retiroMetodoPago,
+        esMixto: retiroEsMixto,
+        pagosMixtos: retiroPagosMixtos,
+        esAbono: false,
+      }),
+    [retiroSaldoPendiente, retiroMetodoPago, retiroEsMixto, retiroPagosMixtos],
+  );
+  const retiroPagosValidos = retiroSaldoPendiente === 0 || estadoPagosRetiro.valido;
+
   function abrirRetiro(pedido) {
     setRetiroId(pedido.id);
     setRetiroPersona("");
     setRetiroMismoUsuario(false);
     setRetiroDocumento(pedido.estado_documento === "SB" ? "BO" : "");
+    setRetiroMetodoPago(pedido.metodo_pago || "EF");
+    setRetiroEsMixto(false);
+    setRetiroPagosMixtos({ ...PAGOS_MIXTOS_VACIO });
   }
 
   function confirmarRetiro() {
     const persona = retiroPersona.trim() || (retiroMismoUsuario ? retiroData?.usuario_nombre : "");
-    if (!persona) return;
+    if (!persona || !retiroPagosValidos) return;
     const body = { pedidoId: retiroId, persona_retiro: persona };
     if (retiroDocumento) {
       body.estado_documento = retiroDocumento;
     }
+    if (retiroSaldoPendiente > 0) {
+      body.pagos = estadoPagosRetiro.pagos;
+    }
     marcarRetiro.mutate(
       body,
-      { onSuccess: () => setRetiroId(null) },
+      {
+        onSuccess: () => {
+          addToast("Pedido marcado como retirado", "success");
+          setRetiroId(null);
+        },
+        onError: (err) => {
+          addToast(err.message || "Error al confirmar el retiro", "danger");
+        },
+      },
     );
   }
 
@@ -138,19 +175,33 @@ export default function PedidosHistorial() {
     );
   }
 
+  const devolverMaxReembolsable = useMemo(() => {
+    if (!devolverData) return 0;
+    const pagado = devolverData.monto_pagado ?? devolverData.monto_total ?? 0;
+    const yaDevuelto = devolverData.monto_devuelto ?? 0;
+    return Math.max(0, pagado - yaDevuelto);
+  }, [devolverData]);
+
   useEffect(() => {
     if (!devolverData?.detalles?.length) return;
     const sel = {};
     const montos = {};
     const rep = {};
     const ubi = {};
+    let disponible = Math.max(
+      0,
+      (devolverData.monto_pagado ?? devolverData.monto_total ?? 0) -
+        (devolverData.monto_devuelto ?? 0),
+    );
     for (const d of devolverData.detalles) {
       if (d.devuelto) {
         sel[d.id] = false;
         continue;
       }
       sel[d.id] = true;
-      montos[d.id] = d.precio_final;
+      const asignado = Math.min(d.precio_final, disponible);
+      disponible = Math.max(0, disponible - asignado);
+      montos[d.id] = asignado;
       rep[d.id] = true;
       ubi[d.id] = String(defaultUbicacionId ?? ubicacionesList[0]?.id ?? "");
     }
@@ -216,11 +267,43 @@ export default function PedidosHistorial() {
     );
   }
 
+  const convertirTotalSeleccionado = useMemo(() => {
+    if (!convertirData?.detalles?.length) return 0;
+    return convertirData.detalles.reduce(
+      (sum, d) => (convertirSeleccion[d.id] ? sum + (Number(d.precio_final) || 0) : sum),
+      0,
+    );
+  }, [convertirData, convertirSeleccion]);
+
+  const estadoPagosConvertir = useMemo(
+    () =>
+      resolverPagosPedido({
+        montoObjetivo: convertirTotalSeleccionado,
+        metodoPago: convertirMetodoPago,
+        esMixto: convertirEsMixto,
+        pagosMixtos: convertirPagosMixtos,
+        esAbono: convertirEsAbono,
+        montoAbonoSimple: convertirMontoAbonoSimple,
+      }),
+    [
+      convertirTotalSeleccionado,
+      convertirMetodoPago,
+      convertirEsMixto,
+      convertirPagosMixtos,
+      convertirEsAbono,
+      convertirMontoAbonoSimple,
+    ],
+  );
+
   function abrirConvertir(pedido) {
     setConvertirId(pedido.id);
     setConvertirNombre(pedido.nombre_cliente || "");
     setConvertirTelefono(pedido.telefono_cliente || "");
     setConvertirMetodoPago(pedido.metodo_pago || "EF");
+    setConvertirEsMixto(false);
+    setConvertirPagosMixtos({ ...PAGOS_MIXTOS_VACIO });
+    setConvertirEsAbono(false);
+    setConvertirMontoAbonoSimple(0);
     setConvertirDocumento("SB");
     const sel = {};
     (pedido.detalles || []).forEach((d) => {
@@ -241,13 +324,19 @@ export default function PedidosHistorial() {
       addToast("Selecciona al menos un producto", "danger");
       return;
     }
+    if (!estadoPagosConvertir.valido) {
+      addToast("Verifica los montos y medios de pago", "danger");
+      return;
+    }
     convertirCotizacion.mutate(
       {
         pedidoId: convertirId,
         detalle_ids: ids,
         nombre_cliente: convertirNombre.trim(),
         telefono_cliente: convertirTelefono.trim(),
-        metodo_pago: convertirMetodoPago,
+        metodo_pago: estadoPagosConvertir.metodoPrincipal,
+        pagos: estadoPagosConvertir.pagos,
+        es_abono: convertirEsAbono,
         estado_documento: convertirDocumento,
       },
       {
@@ -290,7 +379,15 @@ export default function PedidosHistorial() {
 
     const fecha = formatDateTime(pedido.fecha_creacion);
     const fechaRetiro = formatDateTime(pedido.fecha_retiro);
-    const metodo = (METODO_PAGO_OPCIONES.find((m) => m.value === pedido.metodo_pago) || {}).label || pedido.metodo_pago;
+    const pagosDoc = pedido.pagos || [];
+    const metodo =
+      pagosDoc.length > 0
+        ? pagosDoc.map((p) => `${p.metodo_pago_display || p.metodo_pago} ($${p.monto})`).join(", ")
+        : pedido.es_abono
+          ? "Sin abono inicial ($0)"
+          : (METODO_PAGO_OPCIONES.find((m) => m.value === pedido.metodo_pago) || {}).label || pedido.metodo_pago;
+    const montoPagado = pedido.monto_pagado ?? pedido.monto_total;
+    const saldoPendiente = pedido.saldo_pendiente ?? 0;
     const estadoDoc = pedido.estado_documento_display || pedido.estado_documento;
     const estado = pedido.estado_display || pedido.estado;
 
@@ -340,9 +437,12 @@ export default function PedidosHistorial() {
           <tbody>${filas}</tbody>
         </table>
         <div class="total">Total: $${pedido.monto_total}</div>
+        ${!esCotizacion ? `
         <div class="check-row">
-          <strong>Método de pago:</strong> ${metodo}
-        </div>
+          <strong>Pagos:</strong> ${metodo}<br />
+          <strong>Total pagado:</strong> $${montoPagado}
+          ${saldoPendiente > 0 ? `<br /><strong>Saldo pendiente:</strong> $${saldoPendiente}` : ""}
+        </div>` : ""}
         ${disclaimer}
         <script>
           window.onload = function() { window.print(); };
@@ -475,7 +575,15 @@ export default function PedidosHistorial() {
                   </td>
                   <td className="hide-mobile">{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
                   <td className="hide-mobile">{formatDateTime(p.fecha_retiro)}</td>
-                  <td>${p.monto_total}</td>
+                  <td>
+                    <div>${p.monto_total}</div>
+                    {!esCotizacion && (p.saldo_pendiente ?? 0) > 0 && p.estado !== "CA" && (
+                      <div className="small text-muted">
+                        Abono: ${p.monto_pagado ?? 0} ·{" "}
+                        <span className="text-warning font-bold">Debe: ${p.saldo_pendiente}</span>
+                      </div>
+                    )}
+                  </td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>
                     {esCotizacion && !yaConvertido && (
@@ -487,7 +595,7 @@ export default function PedidosHistorial() {
                     {!esCotizacion && p.estado === "PR" && (
                       <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
                     )}
-                    {!esCotizacion && esAdmin && (p.estado === "RE" || p.estado === "PR") && (
+                    {!esCotizacion && esAdmin && (p.estado === "RE" || p.estado === "PR") && (p.monto_pagado ?? p.monto_total) > 0 && (
                       <button className="btn btn-sm btn-warning me-1" onClick={() => abrirDevolver(p)}>Devolver</button>
                     )}
                     {(esCotizacion || (p.estado !== "DE" && p.estado !== "CA")) && (
@@ -577,6 +685,33 @@ export default function PedidosHistorial() {
                   </table>
                 </div>
                 <div className="text-right mt-4 text-lg font-bold">Total: ${detalleData.monto_total}</div>
+                {!detalleData.es_cotizacion && (
+                  <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border-color, #dee2e6)" }}>
+                    <strong>Pagos registrados:</strong>
+                    {(detalleData.pagos || []).length > 0 ? (
+                      <ul className="mb-2 mt-1">
+                        {(detalleData.pagos || []).map((pg, idx) => (
+                          <li key={pg.id ?? idx}>
+                            {pg.metodo_pago_display || pg.metodo_pago}: <strong>${pg.monto}</strong>
+                            {pg.fecha_pago ? ` (${formatDateTime(pg.fecha_pago)})` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-muted mt-1 mb-2">Sin abonos registrados ($0)</div>
+                    )}
+                    <div className="flex flex-wrap gap-4">
+                      <div>
+                        <strong>Total pagado:</strong> ${detalleData.monto_pagado ?? detalleData.monto_total}
+                      </div>
+                      {(detalleData.saldo_pendiente ?? 0) > 0 && (
+                        <div className="text-warning font-bold">
+                          <strong>Saldo pendiente:</strong> ${detalleData.saldo_pendiente}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDetalleId(null)}>Cerrar</button>
@@ -589,7 +724,7 @@ export default function PedidosHistorial() {
 
       {retiroId && retiroData && createPortal(
         <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setRetiroId(null)}>
-          <div className="modal-dialog" style={{ maxWidth: 420 }}>
+          <div className="modal-dialog" style={{ maxWidth: retiroSaldoPendiente > 0 ? 640 : 420 }}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Retiro de pedido #{retiroData.id}</h5>
@@ -635,6 +770,36 @@ export default function PedidosHistorial() {
                     </select>
                   </div>
                 )}
+
+                <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border-color, #dee2e6)" }}>
+                  <div className="flex flex-wrap justify-between gap-2 mb-2">
+                    <span><strong>Total pedido:</strong> ${retiroData.monto_total}</span>
+                    <span><strong>Pagado:</strong> ${retiroData.monto_pagado ?? retiroData.monto_total}</span>
+                  </div>
+                  {retiroSaldoPendiente > 0 ? (
+                    <>
+                      <div className="alert alert-warning mb-3">
+                        <strong>Saldo pendiente por conciliar: ${retiroSaldoPendiente}</strong>
+                        <div className="small">Para retirar el pedido debe registrar el pago del saldo pendiente.</div>
+                      </div>
+                      <PagoMixtoSelector
+                        montoObjetivo={retiroSaldoPendiente}
+                        labelObjetivo="saldo pendiente"
+                        metodoPago={retiroMetodoPago}
+                        onChangeMetodoPago={setRetiroMetodoPago}
+                        esMixto={retiroEsMixto}
+                        onChangeEsMixto={setRetiroEsMixto}
+                        pagosMixtos={retiroPagosMixtos}
+                        onChangePagosMixtos={setRetiroPagosMixtos}
+                        permiteAbono={false}
+                      />
+                    </>
+                  ) : (
+                    <div className="text-success font-bold">
+                      Pedido pagado en su totalidad.
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setRetiroId(null)}>Cancelar</button>
@@ -642,7 +807,7 @@ export default function PedidosHistorial() {
                   type="button"
                   className="btn btn-success"
                   onClick={confirmarRetiro}
-                  disabled={marcarRetiro.isPending || !retiroPersona.trim()}
+                  disabled={marcarRetiro.isPending || !retiroPersona.trim() || !retiroPagosValidos}
                 >
                   {marcarRetiro.isPending ? "Guardando..." : "Confirmar retiro"}
                 </button>
@@ -763,8 +928,16 @@ export default function PedidosHistorial() {
                   </table>
                   {devolverTotalCalculado > 0 && (
                     <div className="text-right mt-2 mb-3">
+                      <div className="text-muted small mb-1">
+                        Monto pagado disponible para devolución: <strong>${devolverMaxReembolsable}</strong>
+                      </div>
                       <span className="font-weight-bold">Total a devolver: </span>
                       <span className="text-danger font-weight-bold" style={{ fontSize: "1.1rem" }}>${devolverTotalCalculado}</span>
+                      {devolverTotalCalculado > devolverMaxReembolsable && (
+                        <div className="text-danger small mt-1">
+                          El monto a devolver no puede superar el monto pagado disponible (${devolverMaxReembolsable}).
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -786,7 +959,12 @@ export default function PedidosHistorial() {
                   type="button"
                   className="btn btn-warning"
                   onClick={confirmarDevolver}
-                  disabled={devolverPedido.isPending || !devolverMotivo.trim() || devolverTotalCalculado <= 0}
+                  disabled={
+                    devolverPedido.isPending ||
+                    !devolverMotivo.trim() ||
+                    devolverTotalCalculado <= 0 ||
+                    devolverTotalCalculado > devolverMaxReembolsable
+                  }
                 >
                   {devolverPedido.isPending ? "Registrando..." : "Confirmar devolución"}
                 </button>
@@ -904,20 +1082,6 @@ export default function PedidosHistorial() {
                 <div className="row mt-3">
                   <div className="col-md-6">
                     <div className="form-group">
-                      <label>Medio de pago</label>
-<select
-                          className="form-control"
-                          value={convertirMetodoPago}
-                          onChange={(e) => setConvertirMetodoPago(e.target.value)}
-                        >
-                          {METODO_PAGO_OPCIONES.map((op) => (
-                            <option key={op.value} value={op.value}>{op.label}</option>
-                          ))}
-                        </select>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="form-group">
                       <label>Documento</label>
                       <select
                         className="form-control"
@@ -930,6 +1094,28 @@ export default function PedidosHistorial() {
                       </select>
                     </div>
                   </div>
+                  <div className="col-md-6 flex items-center justify-end">
+                    <div className="text-lg font-bold">
+                      Total seleccionado: ${convertirTotalSeleccionado}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <PagoMixtoSelector
+                    montoObjetivo={convertirTotalSeleccionado}
+                    labelObjetivo="total del pedido"
+                    metodoPago={convertirMetodoPago}
+                    onChangeMetodoPago={setConvertirMetodoPago}
+                    esMixto={convertirEsMixto}
+                    onChangeEsMixto={setConvertirEsMixto}
+                    pagosMixtos={convertirPagosMixtos}
+                    onChangePagosMixtos={setConvertirPagosMixtos}
+                    permiteAbono={true}
+                    esAbono={convertirEsAbono}
+                    onChangeEsAbono={setConvertirEsAbono}
+                    montoAbonoSimple={convertirMontoAbonoSimple}
+                    onChangeMontoAbonoSimple={setConvertirMontoAbonoSimple}
+                  />
                 </div>
               </div>
               <div className="modal-footer">
@@ -938,7 +1124,7 @@ export default function PedidosHistorial() {
                   type="button"
                   className="btn btn-primary"
                   onClick={confirmarConvertir}
-                  disabled={convertirCotizacion.isPending || !algunaSeleccionada}
+                  disabled={convertirCotizacion.isPending || !algunaSeleccionada || !estadoPagosConvertir.valido}
                 >
                   {convertirCotizacion.isPending ? "Convirtiendo..." : "Convertir a pedido"}
                 </button>

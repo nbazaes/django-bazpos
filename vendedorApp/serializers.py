@@ -152,7 +152,7 @@ class PagoVentaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PagoVenta
-        fields = ["id", "metodo_pago", "metodo_pago_display", "monto"]
+        fields = ["id", "metodo_pago", "metodo_pago_display", "monto", "fecha_pago"]
 
 
 class VentaSerializer(serializers.ModelSerializer):
@@ -210,12 +210,15 @@ class VentaSerializer(serializers.ModelSerializer):
         if obj.tipo_documento == Venta.TipoDocumento.PEDIDO:
             pedido = obj.pedido.first()
             if pedido:
+                if pedido.es_abono:
+                    return []
                 return [
                     {
                         "id": None,
                         "metodo_pago": pedido.metodo_pago,
                         "metodo_pago_display": pedido.get_metodo_pago_display(),
                         "monto": obj.monto_total,
+                        "fecha_pago": obj.fecha_venta,
                     }
                 ]
         return []
@@ -739,6 +742,69 @@ class PedidoDetalleSerializer(serializers.ModelSerializer):
         return sum(dd.precio_unitario for dd in obj.devoluciones.all())
 
 
+def obtener_pagos_pedido(pedido):
+    """Retorna (pagos_data, monto_pagado, saldo_pendiente) para un Pedido."""
+    if pedido.es_cotizacion:
+        return [], 0, 0
+    if pedido.venta_id:
+        pagos_qs = list(pedido.venta.pagos.all())
+        if pagos_qs:
+            data = PagoVentaSerializer(pagos_qs, many=True).data
+            pagado = sum(p.monto for p in pagos_qs)
+            return data, pagado, max(0, pedido.monto_total - pagado)
+    if pedido.es_abono:
+        return [], 0, pedido.monto_total
+    fallback = [
+        {
+            "id": None,
+            "metodo_pago": pedido.metodo_pago,
+            "metodo_pago_display": pedido.get_metodo_pago_display(),
+            "monto": pedido.monto_total,
+            "fecha_pago": pedido.fecha_creacion,
+        }
+    ]
+    return fallback, pedido.monto_total, 0
+
+
+def validar_pagos_pedido(monto_total, metodo_pago=None, pagos=None, es_abono=False, es_cotizacion=False):
+    config = StoreConfig.current()
+    metodos_validos = {m["code"] for m in config.active_payment_methods()}
+    if metodo_pago and metodo_pago not in metodos_validos:
+        raise serializers.ValidationError({
+            "metodo_pago": f"Medio de pago no configurado: {metodo_pago}"
+        })
+    if pagos is not None:
+        invalidos = [p["metodo_pago"] for p in pagos if p["metodo_pago"] not in metodos_validos]
+        if invalidos:
+            raise serializers.ValidationError({
+                "pagos": f"Medios de pago no configurados: {', '.join(invalidos)}"
+            })
+        if not es_cotizacion:
+            suma = sum(p["monto"] for p in pagos)
+            if es_abono:
+                if suma < 0:
+                    raise serializers.ValidationError({
+                        "pagos": "El abono no puede ser negativo."
+                    })
+                if suma >= monto_total:
+                    raise serializers.ValidationError({
+                        "pagos": f"El abono (${suma}) debe ser menor al total del pedido (${monto_total})."
+                    })
+            else:
+                if suma != monto_total:
+                    diferencia = monto_total - suma
+                    signo = "faltan" if diferencia > 0 else "sobran"
+                    raise serializers.ValidationError({
+                        "pagos": f"La suma de los pagos (${suma}) no coincide con el total (${monto_total}). "
+                                 f"{signo.capitalize()} ${abs(diferencia)}."
+                    })
+
+
+class PagoPedidoInputSerializer(serializers.Serializer):
+    metodo_pago = serializers.CharField(max_length=2)
+    monto = serializers.IntegerField(min_value=0)
+
+
 class PedidoSerializer(serializers.ModelSerializer):
     detalles = PedidoDetalleSerializer(many=True, read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
@@ -746,6 +812,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     estado_display = serializers.CharField(source="get_estado_display", read_only=True)
     estado_documento_display = serializers.CharField(source="get_estado_documento_display", read_only=True)
     es_cotizacion = serializers.BooleanField(read_only=True)
+    es_abono = serializers.BooleanField(read_only=True)
     pedido_origen = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
     convertido = serializers.SerializerMethodField()
     pedido_derivado_id = serializers.SerializerMethodField()
@@ -753,6 +820,9 @@ class PedidoSerializer(serializers.ModelSerializer):
     lineas_total = serializers.SerializerMethodField()
     devuelto_parcial = serializers.SerializerMethodField()
     monto_devuelto = serializers.SerializerMethodField()
+    pagos = serializers.SerializerMethodField()
+    monto_pagado = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
 
     class Meta:
         model = Pedido
@@ -778,6 +848,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "activo",
             "venta",
             "es_cotizacion",
+            "es_abono",
             "pedido_origen",
             "convertido",
             "pedido_derivado_id",
@@ -787,8 +858,20 @@ class PedidoSerializer(serializers.ModelSerializer):
             "lineas_total",
             "devuelto_parcial",
             "monto_devuelto",
+            "pagos",
+            "monto_pagado",
+            "saldo_pendiente",
             "detalles",
         ]
+
+    def get_pagos(self, obj):
+        return obtener_pagos_pedido(obj)[0]
+
+    def get_monto_pagado(self, obj):
+        return obtener_pagos_pedido(obj)[1]
+
+    def get_saldo_pendiente(self, obj):
+        return obtener_pagos_pedido(obj)[2]
 
     def get_convertido(self, obj):
         if not obj.es_cotizacion:
@@ -848,7 +931,9 @@ class CrearPedidoSerializer(serializers.Serializer):
     nombre_cliente = serializers.CharField(max_length=200)
     rut_cliente = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     telefono_cliente = serializers.CharField(max_length=50)
-    metodo_pago = serializers.CharField(max_length=2)
+    metodo_pago = serializers.CharField(max_length=2, required=False, allow_blank=True, default="EF")
+    pagos = PagoPedidoInputSerializer(many=True, required=False)
+    es_abono = serializers.BooleanField(default=False, required=False)
     items = PedidoDetalleInputSerializer(many=True)
     es_cotizacion = serializers.BooleanField(default=False)
     estado_documento = serializers.ChoiceField(
@@ -872,12 +957,41 @@ class CrearPedidoSerializer(serializers.Serializer):
         return int(base.to_integral_value(rounding=ROUND_HALF_UP)), item_total
 
     def validate(self, data):
-        config = StoreConfig.current()
-        metodos_validos = {m["code"] for m in config.active_payment_methods()}
-        if data.get("metodo_pago") not in metodos_validos:
-            raise serializers.ValidationError({
-                "metodo_pago": f"Medio de pago no configurado: {data.get('metodo_pago')}"
-            })
+        costo_envio = StoreConfig.current().default_shipping_cost
+        monto_total = 0
+        for item in data.get("items", []):
+            cantidad = item.get("cantidad", 1)
+            _, item_total = self._calcular_item(
+                item["precio_costo"],
+                item["porcentaje_utilidad"],
+                costo_envio,
+                sumar_envio=item.get("sumar_envio", True),
+                cost_modifiers=item.get("cost_modifiers", []),
+            )
+            monto_total += item_total * cantidad
+
+        pagos = data.get("pagos")
+        metodo_pago = data.get("metodo_pago") or "EF"
+        es_abono = data.get("es_abono", False)
+        es_cotizacion = data.get("es_cotizacion", False)
+
+        validar_pagos_pedido(
+            monto_total=monto_total,
+            metodo_pago=metodo_pago if pagos is None else None,
+            pagos=pagos,
+            es_abono=es_abono,
+            es_cotizacion=es_cotizacion,
+        )
+
+        if pagos:
+            metodo_principal = next(
+                (p["metodo_pago"] for p in pagos if p["monto"] > 0),
+                pagos[0]["metodo_pago"],
+            )
+            data["metodo_pago"] = metodo_principal
+        else:
+            data["metodo_pago"] = metodo_pago
+
         return data
 
     @transaction.atomic
@@ -886,6 +1000,8 @@ class CrearPedidoSerializer(serializers.Serializer):
         items = validated_data["items"]
         costo_envio = StoreConfig.current().default_shipping_cost
         es_cotizacion = validated_data.get("es_cotizacion", False)
+        es_abono = validated_data.get("es_abono", False) if not es_cotizacion else False
+        pagos = validated_data.get("pagos")
 
         monto_subtotal = 0
         monto_total = 0
@@ -913,6 +1029,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             estado=Pedido.Estado.PENDIENTE_RETIRAR,
             estado_documento=validated_data.get("estado_documento", Pedido.EstadoDocumento.SIN_BOLETEAR),
             es_cotizacion=es_cotizacion,
+            es_abono=es_abono,
         )
 
         for item in items:
@@ -990,6 +1107,20 @@ class CrearPedidoSerializer(serializers.Serializer):
             )
             pedido.venta = venta
             pedido.save(update_fields=["venta"])
+            if pagos is not None:
+                for p in pagos:
+                    if p["monto"] > 0:
+                        PagoVenta.objects.create(
+                            venta=venta,
+                            metodo_pago=p["metodo_pago"],
+                            monto=p["monto"],
+                        )
+            elif not es_abono and monto_total > 0:
+                PagoVenta.objects.create(
+                    venta=venta,
+                    metodo_pago=pedido.metodo_pago,
+                    monto=monto_total,
+                )
             log_cruce(venta, actor=request.user)
 
         return pedido

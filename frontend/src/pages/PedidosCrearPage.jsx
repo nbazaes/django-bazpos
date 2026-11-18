@@ -1,8 +1,10 @@
 import { escapeHtml } from "../lib/html";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageCard from "../components/PageCard";
+import PagoMixtoSelector from "../components/PagoMixtoSelector";
 import PedidosHistorial from "../components/PedidosHistorial";
 import StepperInput from "../components/StepperInput";
+import { PAGOS_MIXTOS_VACIO, resolverPagosPedido } from "../lib/pagos";
 import { usePageTitle } from "../lib/usePageTitle";
 import { useCreatePedido, useProductos, useProveedores } from "../lib/queries";
 import { formatDateTime } from "../lib/format";
@@ -67,6 +69,10 @@ export default function PedidosCrearPage() {
   const [producto, setProducto] = useState({ ...productoVacio });
   const [items, setItems] = useState([]);
   const [metodoPago, setMetodoPago] = useState("EF");
+  const [esMixto, setEsMixto] = useState(false);
+  const [pagosMixtos, setPagosMixtos] = useState({ ...PAGOS_MIXTOS_VACIO });
+  const [esAbono, setEsAbono] = useState(false);
+  const [montoAbonoSimple, setMontoAbonoSimple] = useState(0);
   const [estadoDocumento, setEstadoDocumento] = useState("SB");
   const [productoTexto, setProductoTexto] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -217,6 +223,19 @@ export default function PedidosCrearPage() {
     guardarPedido(true);
   }
 
+  const estadoPagos = useMemo(
+    () =>
+      resolverPagosPedido({
+        montoObjetivo: totales.total,
+        metodoPago,
+        esMixto,
+        pagosMixtos,
+        esAbono,
+        montoAbonoSimple,
+      }),
+    [totales.total, metodoPago, esMixto, pagosMixtos, esAbono, montoAbonoSimple],
+  );
+
   function guardarPedido(esCotizacion) {
     if (!cliente.nombre.trim() || !cliente.telefono.trim()) {
       addToast("Ingresa nombre y teléfono del cliente", "danger");
@@ -226,12 +245,22 @@ export default function PedidosCrearPage() {
       addToast("Agrega al menos un producto al pedido", "danger");
       return;
     }
+    if (!esCotizacion && !estadoPagos.valido) {
+      addToast("Verifica los montos y medios de pago antes de generar el pedido", "danger");
+      return;
+    }
 
     const payload = {
       nombre_cliente: cliente.nombre.trim(),
       rut_cliente: cliente.rut.trim(),
       telefono_cliente: cliente.telefono.trim(),
-      metodo_pago: metodoPago,
+      metodo_pago: estadoPagos.metodoPrincipal,
+      ...(!esCotizacion
+        ? {
+            pagos: estadoPagos.pagos,
+            es_abono: esAbono,
+          }
+        : {}),
       estado_documento: estadoDocumento,
       items: items.map((it) => ({
         producto_id: it.producto_id,
@@ -255,6 +284,10 @@ export default function PedidosCrearPage() {
         setCliente({ nombre: "", telefono: "", rut: "" });
         setItems([]);
         setMetodoPago("EF");
+        setEsMixto(false);
+        setPagosMixtos({ ...PAGOS_MIXTOS_VACIO });
+        setEsAbono(false);
+        setMontoAbonoSimple(0);
         limpiarProducto();
       },
       onError: (err) => {
@@ -278,7 +311,15 @@ export default function PedidosCrearPage() {
     `).join("");
 
     const fecha = formatDateTime(documento.fecha_creacion);
-    const metodo = (METODO_PAGO_OPCIONES.find((m) => m.value === documento.metodo_pago) || {}).label || documento.metodo_pago;
+    const pagosDoc = documento.pagos || [];
+    const metodo =
+      pagosDoc.length > 0
+        ? pagosDoc.map((p) => `${p.metodo_pago_display || p.metodo_pago} ($${p.monto})`).join(", ")
+        : documento.es_abono
+          ? "Sin abono inicial ($0)"
+          : (METODO_PAGO_OPCIONES.find((m) => m.value === documento.metodo_pago) || {}).label || documento.metodo_pago;
+    const montoPagado = documento.monto_pagado ?? documento.monto_total;
+    const saldoPendiente = documento.saldo_pendiente ?? 0;
     const estado = documento.estado_display || documento.estado;
     const documentoLabel = documento.estado_documento_display || documento.estado_documento;
 
@@ -335,9 +376,12 @@ export default function PedidosCrearPage() {
           <tbody>${filas}</tbody>
         </table>
         <div class="total">Total: $${documento.monto_total}</div>
+        ${!esCotizacion ? `
         <div class="check-row">
-          <strong>Método de pago:</strong> ${metodo}
-        </div>
+          <strong>Pagos:</strong> ${metodo}<br />
+          <strong>Total pagado:</strong> $${montoPagado}
+          ${saldoPendiente > 0 ? `<br /><strong>Saldo pendiente al retirar:</strong> $${saldoPendiente}` : ""}
+        </div>` : ""}
         ${disclaimer}
         <script>
           window.onload = function() { window.print(); };
@@ -643,20 +687,12 @@ export default function PedidosCrearPage() {
 
         <div className="card mb-4">
           <div className="card-body">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="text-right">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+              <div>
                 <div className="text-secondary">Subtotal: ${totales.subtotal}</div>
                 <div className="text-xl font-bold mt-1">Total: ${totales.total}</div>
               </div>
-              <div className="form-group mb-0">
-                <label>Método de pago</label>
-                <select className="form-control" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                  {METODO_PAGO_OPCIONES.map((op) => (
-                    <option key={op.value} value={op.value}>{op.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group mb-0">
+              <div className="form-group mb-0" style={{ minWidth: 180 }}>
                 <label>Documento</label>
                 <select className="form-control" value={estadoDocumento} onChange={(e) => setEstadoDocumento(e.target.value)}>
                   {DOCUMENTO_OPCIONES.map((op) => (
@@ -665,6 +701,21 @@ export default function PedidosCrearPage() {
                 </select>
               </div>
             </div>
+            <PagoMixtoSelector
+              montoObjetivo={totales.total}
+              labelObjetivo="total del pedido"
+              metodoPago={metodoPago}
+              onChangeMetodoPago={setMetodoPago}
+              esMixto={esMixto}
+              onChangeEsMixto={setEsMixto}
+              pagosMixtos={pagosMixtos}
+              onChangePagosMixtos={setPagosMixtos}
+              permiteAbono={true}
+              esAbono={esAbono}
+              onChangeEsAbono={setEsAbono}
+              montoAbonoSimple={montoAbonoSimple}
+              onChangeMontoAbonoSimple={setMontoAbonoSimple}
+            />
           </div>
         </div>
 
@@ -681,7 +732,7 @@ export default function PedidosCrearPage() {
             type="button"
             className="btn btn-success btn-lg"
             onClick={generarPedido}
-            disabled={createPedido.isPending || items.length === 0}
+            disabled={createPedido.isPending || items.length === 0 || !estadoPagos.valido}
           >
             {createPedido.isPending ? "Generando..." : "Generar pedido"}
           </button>

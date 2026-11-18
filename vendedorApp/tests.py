@@ -2108,6 +2108,187 @@ class PedidoApiTest(BaseTest):
             pedido.venta.monto_total - detalle.precio_final,
         )
 
+    def test_crear_pedido_pago_mixto_total_valido_e_invalido(self):
+        client = auth_client(self.vendedor)
+        # Item default: precio_costo=10000, utilidad=30 -> base=13000 -> con IVA=15470 + 4500=19970 -> round=20000
+        bad_payload = self._item(
+            pagos=[
+                {"metodo_pago": "EF", "monto": 10000},
+                {"metodo_pago": "TJ", "monto": 5000},
+            ],
+            es_abono=False,
+        )
+        resp = client.post("/api/pedidos/", bad_payload, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("pagos", resp.data)
+
+        ok_payload = self._item(
+            pagos=[
+                {"metodo_pago": "EF", "monto": 12000},
+                {"metodo_pago": "TJ", "monto": 8000},
+            ],
+            es_abono=False,
+        )
+        resp = client.post("/api/pedidos/", ok_payload, format="json")
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data["monto_total"], 20000)
+        self.assertEqual(resp.data["monto_pagado"], 20000)
+        self.assertEqual(resp.data["saldo_pendiente"], 0)
+        self.assertEqual(len(resp.data["pagos"]), 2)
+
+    def test_crear_pedido_abono_parcial_y_conciliacion_al_retirar(self):
+        client = auth_client(self.vendedor)
+        # Abono >= total debe fallar
+        resp_exceso = client.post(
+            "/api/pedidos/",
+            self._item(pagos=[{"metodo_pago": "EF", "monto": 20000}], es_abono=True),
+            format="json",
+        )
+        self.assertEqual(resp_exceso.status_code, 400)
+
+        # Abono parcial de $7000 sobre $20000
+        resp = client.post(
+            "/api/pedidos/",
+            self._item(pagos=[{"metodo_pago": "EF", "monto": 7000}], es_abono=True),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        pedido_id = resp.data["id"]
+        self.assertTrue(resp.data["es_abono"])
+        self.assertEqual(resp.data["monto_pagado"], 7000)
+        self.assertEqual(resp.data["saldo_pendiente"], 13000)
+
+        # Intentar cambiar estado a RE sin conciliar debe fallar
+        resp_cambio = client.post(
+            f"/api/pedidos/{pedido_id}/cambiar-estado/",
+            {"estado": "RE"},
+            format="json",
+        )
+        self.assertEqual(resp_cambio.status_code, 400)
+
+        # Intentar marcar retiro sin pagos o con monto distinto al saldo pendiente debe fallar
+        resp_retiro_sin_pago = client.post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {"persona_retiro": "Juan Perez"},
+            format="json",
+        )
+        self.assertEqual(resp_retiro_sin_pago.status_code, 400)
+
+        resp_retiro_incompleto = client.post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {
+                "persona_retiro": "Juan Perez",
+                "pagos": [{"metodo_pago": "TJ", "monto": 5000}],
+            },
+            format="json",
+        )
+        self.assertEqual(resp_retiro_incompleto.status_code, 400)
+
+        # Retirar conciliando el saldo pendiente ($13000) con pago mixto
+        resp_retiro_ok = client.post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {
+                "persona_retiro": "Juan Perez",
+                "pagos": [
+                    {"metodo_pago": "TJ", "monto": 10000},
+                    {"metodo_pago": "TR", "monto": 3000},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp_retiro_ok.status_code, 200, resp_retiro_ok.data)
+        self.assertEqual(resp_retiro_ok.data["estado"], Pedido.Estado.RETIRADO)
+        self.assertEqual(resp_retiro_ok.data["monto_pagado"], 20000)
+        self.assertEqual(resp_retiro_ok.data["saldo_pendiente"], 0)
+        self.assertEqual(len(resp_retiro_ok.data["pagos"]), 3)
+
+    def test_crear_pedido_abono_cero_y_retiro_pago_mixto(self):
+        client = auth_client(self.vendedor)
+        resp = client.post(
+            "/api/pedidos/",
+            self._item(pagos=[], es_abono=True),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        pedido_id = resp.data["id"]
+        self.assertEqual(resp.data["monto_pagado"], 0)
+        self.assertEqual(resp.data["saldo_pendiente"], 20000)
+        self.assertEqual(resp.data["pagos"], [])
+
+        # Devolver sin pagos registrados debe fallar
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido_id)
+        resp_dev = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido_id}/devolver/",
+            self._devolver_payload(detalle, monto=1000),
+            format="json",
+        )
+        self.assertEqual(resp_dev.status_code, 400)
+
+        # Retirar pagando el 100% al retiro
+        resp_ret = client.post(
+            f"/api/pedidos/{pedido_id}/marcar-retiro/",
+            {
+                "persona_retiro": "Cliente Cero",
+                "pagos": [{"metodo_pago": "TR", "monto": 20000}],
+            },
+            format="json",
+        )
+        self.assertEqual(resp_ret.status_code, 200, resp_ret.data)
+        self.assertEqual(resp_ret.data["monto_pagado"], 20000)
+        self.assertEqual(resp_ret.data["saldo_pendiente"], 0)
+
+    def test_devolver_pedido_limitado_a_monto_pagado(self):
+        client = auth_client(self.vendedor)
+        resp = client.post(
+            "/api/pedidos/",
+            self._item(pagos=[{"metodo_pago": "EF", "monto": 6000}], es_abono=True),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        pedido_id = resp.data["id"]
+        detalle = PedidoDetalle.objects.get(pedido_id=pedido_id)
+
+        # Intentar devolver $20000 cuando solo pagó $6000 debe fallar
+        resp_exceso = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido_id}/devolver/",
+            self._devolver_payload(detalle, monto=20000),
+            format="json",
+        )
+        self.assertEqual(resp_exceso.status_code, 400)
+
+        # Devolver hasta $6000 funciona
+        resp_ok = auth_client(self.gerente).post(
+            f"/api/pedidos/{pedido_id}/devolver/",
+            self._devolver_payload(detalle, monto=6000),
+            format="json",
+        )
+        self.assertEqual(resp_ok.status_code, 201, resp_ok.data)
+        self.assertEqual(resp_ok.data["monto_devuelto"], 6000)
+
+    def test_convertir_cotizacion_con_abono_y_retiro(self):
+        client = auth_client(self.vendedor)
+        resp_cot = client.post(
+            "/api/pedidos/",
+            self._item(es_cotizacion=True),
+            format="json",
+        )
+        self.assertEqual(resp_cot.status_code, 201)
+        cot_id = resp_cot.data["id"]
+        det_id = resp_cot.data["detalles"][0]["id"]
+
+        resp_conv = client.post(
+            f"/api/pedidos/{cot_id}/convertir-a-pedido/",
+            {
+                "detalle_ids": [det_id],
+                "pagos": [{"metodo_pago": "EF", "monto": 5000}],
+                "es_abono": True,
+            },
+            format="json",
+        )
+        self.assertEqual(resp_conv.status_code, 201, resp_conv.data)
+        self.assertEqual(resp_conv.data["monto_pagado"], 5000)
+        self.assertEqual(resp_conv.data["saldo_pendiente"], 15000)
+
 
 class PedidoProveedorTest(BaseTest):
     @classmethod
@@ -3028,6 +3209,67 @@ class CierreCajaTest(BaseTest):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]["monto"], 3000)
         self.assertEqual(resp.data[0]["cliente"], "Cliente D")
+
+    def test_cierre_caja_pedido_con_abono_y_retiro_en_dias_distintos(self):
+        from vendedorApp.models import PagoVenta
+
+        client_v = auth_client(self.vendedor)
+        client_g = auth_client(self.gerente)
+        prov = Proveedor.objects.create(nombre="Prov Cierre Pedido")
+
+        resp = client_v.post(
+            "/api/pedidos/",
+            {
+                "nombre_cliente": "Cliente Abono",
+                "telefono_cliente": "+56911112222",
+                "pagos": [{"metodo_pago": "EF", "monto": 8000}],
+                "es_abono": True,
+                "estado_documento": "BO",
+                "items": [
+                    {
+                        "codigo_proveedor": "CP-ABONO",
+                        "proveedor_id": prov.proveedor_id,
+                        "oem": "OEM-ABONO",
+                        "nombre": "Repuesto Abono",
+                        "precio_costo": 10000,
+                        "porcentaje_utilidad": "30.00",
+                        "sumar_envio": True,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.data)
+        pedido = Pedido.objects.get(pk=resp.data["id"])
+        ayer = timezone.now() - timedelta(days=1)
+        Venta.objects.filter(pk=pedido.venta_id).update(fecha_venta=ayer)
+        PagoVenta.objects.filter(venta_id=pedido.venta_id).update(fecha_pago=ayer)
+
+        # Hoy se retira pagando el saldo pendiente ($12000) con Tarjeta
+        resp_ret = client_v.post(
+            f"/api/pedidos/{pedido.id}/marcar-retiro/",
+            {
+                "persona_retiro": "Cliente Abono",
+                "pagos": [{"metodo_pago": "TJ", "monto": 12000}],
+            },
+            format="json",
+        )
+        self.assertEqual(resp_ret.status_code, 200, resp_ret.data)
+
+        fecha_ayer = timezone.localtime(ayer).date().isoformat()
+        fecha_hoy = timezone.localdate().isoformat()
+
+        cierre_ayer = client_g.get("/api/cierre-caja/", {"fecha": fecha_ayer})
+        self.assertEqual(cierre_ayer.status_code, 200)
+        self.assertEqual(cierre_ayer.data["total_vendido"], 8000)
+        self.assertEqual(cierre_ayer.data["pagos"]["EF"], 8000)
+        self.assertEqual(cierre_ayer.data["pagos"]["TJ"], 0)
+
+        cierre_hoy = client_g.get("/api/cierre-caja/", {"fecha": fecha_hoy})
+        self.assertEqual(cierre_hoy.status_code, 200)
+        self.assertEqual(cierre_hoy.data["total_vendido"], 12000)
+        self.assertEqual(cierre_hoy.data["pagos"]["EF"], 0)
+        self.assertEqual(cierre_hoy.data["pagos"]["TJ"], 12000)
         self.assertEqual(resp.data[0]["motivo"], "Motivo devolución")
 
         resp = self._get_detalle(fecha, "anulacion")

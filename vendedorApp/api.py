@@ -30,6 +30,8 @@ from vendedorApp.serializers import (
     DevolucionInputSerializer,
     DevolucionSerializer,
     DevolverPedidoInputSerializer,
+    PagoPedidoInputSerializer,
+    PagoVentaInputSerializer,
     PedidoProveedorDiaSerializer,
     PedidoProveedorDiaHistorialSerializer,
     PedidoSerializer,
@@ -37,6 +39,8 @@ from vendedorApp.serializers import (
     ProductoSerializer,
     RegistrarVentaSerializer,
     VentaSerializer,
+    obtener_pagos_pedido,
+    validar_pagos_pedido,
 )
 from vendedorApp.pagination import (
     DefaultPagination,
@@ -374,24 +378,58 @@ def _documento_label_map():
     return labels
 
 
+def _pagos_pedido_cierre_dia(fecha):
+    """Pagos (PagoVenta) realizados en `fecha` sobre pedidos activos y no cancelados."""
+    return (
+        PagoVenta.objects.filter(
+            fecha_pago__date=fecha,
+            venta__tipo_documento=Venta.TipoDocumento.PEDIDO,
+            venta__estado=Venta.Estado.COMPLETADA,
+            venta__pedido__activo=True,
+        )
+        .exclude(venta__pedido__estado=Pedido.Estado.CANCELADO)
+    )
+
+
+def _ventas_pedido_legacy_cierre_dia(ventas_pedido):
+    """Pedidos legacy del día: sin filas en PagoVenta y con es_abono=False."""
+    con_pagos_ids = set(
+        PagoVenta.objects.filter(
+            venta__tipo_documento=Venta.TipoDocumento.PEDIDO
+        ).values_list("venta_id", flat=True)
+    )
+    return ventas_pedido.filter(pedido__es_abono=False).exclude(pk__in=con_pagos_ids)
+
+
 def calcular_cierre(fecha):
     ventas_hoy = _ventas_cierre(fecha)
 
     devoluciones_hoy = Devolucion.objects.filter(fecha_devolucion__date=fecha)
     anulaciones_hoy = Anulacion.objects.filter(fecha_anulacion__date=fecha)
 
-    total_vendido = ventas_hoy.aggregate(total=Sum("monto_total"))["total"] or 0
+    # ── Desglose por medio de pago y totales ──
+    ventas_ve = ventas_hoy.exclude(tipo_documento=Venta.TipoDocumento.PEDIDO)
+    ventas_pedido = ventas_hoy.filter(
+        tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=True
+    )
+    ventas_pedido_legacy = _ventas_pedido_legacy_cierre_dia(ventas_pedido)
+    pagos_pedido_dia = _pagos_pedido_cierre_dia(fecha)
+
+    total_ve = ventas_ve.aggregate(total=Sum("monto_total"))["total"] or 0
+    total_pedido_legacy = ventas_pedido_legacy.aggregate(total=Sum("monto_total"))["total"] or 0
+    total_pedido_pagos = pagos_pedido_dia.aggregate(total=Sum("monto"))["total"] or 0
+
+    total_vendido = total_ve + total_pedido_legacy + total_pedido_pagos
     total_devoluciones = devoluciones_hoy.aggregate(total=Sum("monto_devuelto"))["total"] or 0
     # Informativo: la venta anulada ya queda excluida del total_vendido
     # (estado CANCELADA) y no debe descontarse de nuevo del total_final.
     total_anulaciones = anulaciones_hoy.aggregate(total=Sum("venta__monto_total"))["total"] or 0
     total_final = total_vendido - total_devoluciones
-    cantidad_ventas = ventas_hoy.count()
-
-    # ── Desglose por medio de pago ──
-    ventas_ve = ventas_hoy.exclude(tipo_documento=Venta.TipoDocumento.PEDIDO)
-    ventas_pedido = ventas_hoy.filter(
-        tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=True
+    pedido_ventas_con_pago_ids = set(pagos_pedido_dia.values_list("venta_id", flat=True))
+    cantidad_ventas = (
+        ventas_ve.count()
+        + ventas_pedido_legacy.count()
+        + len(pedido_ventas_con_pago_ids)
     )
 
     pagos_ve = (
@@ -407,11 +445,17 @@ def calcular_cierre(fecha):
         ventas_ve.exclude(pk__in=ve_ids_con_pagos).aggregate(total=Sum("monto_total"))["total"] or 0
     )
 
-    pagos_pedido = (
-        ventas_pedido.values("pedido__metodo_pago")
+    pagos_pedido_legacy = (
+        ventas_pedido_legacy.values("pedido__metodo_pago")
         .annotate(total=Sum("monto_total"))
     )
-    pagos_pedido_map = {p["pedido__metodo_pago"]: p["total"] for p in pagos_pedido}
+    pagos_pedido_legacy_map = {p["pedido__metodo_pago"]: p["total"] for p in pagos_pedido_legacy}
+
+    pagos_pedido_actual = (
+        pagos_pedido_dia.values("metodo_pago")
+        .annotate(total=Sum("monto"))
+    )
+    pagos_pedido_actual_map = {p["metodo_pago"]: p["total"] for p in pagos_pedido_actual}
 
     config = StoreConfig.current()
     payment_methods = config.active_payment_methods()
@@ -420,7 +464,11 @@ def calcular_cierre(fecha):
     pagos = {}
     for pm in payment_methods:
         code = pm["code"]
-        pagos[code] = pagos_ve_map.get(code, 0) + pagos_pedido_map.get(code, 0)
+        pagos[code] = (
+            pagos_ve_map.get(code, 0)
+            + pagos_pedido_legacy_map.get(code, 0)
+            + pagos_pedido_actual_map.get(code, 0)
+        )
     pagos["SIN"] = sin_clasificar_pago
 
     # ── Desglose por documento ──
@@ -429,21 +477,33 @@ def calcular_cierre(fecha):
         .annotate(total=Sum("monto_total"))
     )
     docs_ve_map = {d["documento"]: d["total"] for d in docs_ve}
-    docs_pedido = (
-        ventas_pedido.values("pedido__estado_documento")
+    docs_pedido_legacy = (
+        ventas_pedido_legacy.values("pedido__estado_documento")
         .annotate(total=Sum("monto_total"))
     )
-    docs_pedido_map = {d["pedido__estado_documento"]: d["total"] for d in docs_pedido}
+    docs_pedido_legacy_map = {d["pedido__estado_documento"]: d["total"] for d in docs_pedido_legacy}
+    docs_pedido_actual = (
+        pagos_pedido_dia.values("venta__pedido__estado_documento")
+        .annotate(total=Sum("monto"))
+    )
+    docs_pedido_actual_map = {
+        d["venta__pedido__estado_documento"]: d["total"] for d in docs_pedido_actual
+    }
 
     doc_sin_clasificar = (
         docs_ve_map.get(None, 0)
-        + docs_pedido_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
+        + docs_pedido_legacy_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
+        + docs_pedido_actual_map.get(Pedido.EstadoDocumento.SIN_BOLETEAR, 0)
     )
 
     documentos = {}
     for dt in document_types:
         code = dt["code"]
-        documentos[code] = docs_ve_map.get(code, 0) + docs_pedido_map.get(code, 0)
+        documentos[code] = (
+            docs_ve_map.get(code, 0)
+            + docs_pedido_legacy_map.get(code, 0)
+            + docs_pedido_actual_map.get(code, 0)
+        )
     documentos["SIN"] = doc_sin_clasificar
 
     pagos_labels = {m["code"]: m["label"] for m in payment_methods}
@@ -503,6 +563,8 @@ def detalle_cierre(fecha, tipo, clave):
     ventas_pedido = ventas_hoy.filter(
         tipo_documento=Venta.TipoDocumento.PEDIDO, pedido__activo=True
     )
+    ventas_pedido_legacy = _ventas_pedido_legacy_cierre_dia(ventas_pedido)
+    pagos_pedido_dia = _pagos_pedido_cierre_dia(fecha)
 
     if tipo == "pago":
         if clave == "SIN":
@@ -542,8 +604,8 @@ def detalle_cierre(fecha, tipo, clave):
                 }
                 for v in records
             ]
-            pedidos = (
-                Pedido.objects.filter(venta__in=ventas_pedido, activo=True, metodo_pago=clave)
+            pedidos_legacy = (
+                Pedido.objects.filter(venta__in=ventas_pedido_legacy, activo=True, metodo_pago=clave)
                 .select_related("venta", "venta__usuario")
             )
             result.extend(
@@ -556,7 +618,29 @@ def detalle_cierre(fecha, tipo, clave):
                     "monto": p.monto_total,
                     "usuario": p.venta.usuario.username if p.venta.usuario else None,
                 }
-                for p in pedidos
+                for p in pedidos_legacy
+            )
+            pagos_ped = (
+                pagos_pedido_dia.filter(metodo_pago=clave)
+                .values("venta_id")
+                .annotate(monto=Sum("monto"), fecha_pago=Max("fecha_pago"))
+            )
+            pagos_ped_map = {p["venta_id"]: (p["monto"], p["fecha_pago"]) for p in pagos_ped}
+            pedidos_actual = (
+                Pedido.objects.filter(venta_id__in=pagos_ped_map, activo=True)
+                .select_related("venta", "venta__usuario")
+            )
+            result.extend(
+                {
+                    "id": p.venta_id,
+                    "fecha": pagos_ped_map[p.venta_id][1] or p.venta.fecha_venta,
+                    "cliente": p.venta.cliente_nombre or p.nombre_cliente,
+                    "tipo": "pedido",
+                    "documento": p.get_estado_documento_display(),
+                    "monto": pagos_ped_map[p.venta_id][0],
+                    "usuario": p.venta.usuario.username if p.venta.usuario else None,
+                }
+                for p in pedidos_actual
             )
         return sorted(result, key=lambda r: r["fecha"])
 
@@ -581,8 +665,8 @@ def detalle_cierre(fecha, tipo, clave):
             }
             for v in ve_records
         ]
-        pedidos = (
-            Pedido.objects.filter(venta__in=ventas_pedido, activo=True, estado_documento=estado_pedido)
+        pedidos_legacy = (
+            Pedido.objects.filter(venta__in=ventas_pedido_legacy, activo=True, estado_documento=estado_pedido)
             .select_related("venta", "venta__usuario")
         )
         result.extend(
@@ -595,8 +679,45 @@ def detalle_cierre(fecha, tipo, clave):
                 "monto": p.monto_total,
                 "usuario": p.venta.usuario.username if p.venta.usuario else None,
             }
-            for p in pedidos
+            for p in pedidos_legacy
         )
+        pagos_ped_doc = list(
+            pagos_pedido_dia.filter(venta__pedido__estado_documento=estado_pedido)
+            .select_related("venta", "venta__usuario")
+            .order_by("id")
+        )
+        por_venta = {}
+        for pv in pagos_ped_doc:
+            entry = por_venta.setdefault(
+                pv.venta_id,
+                {"monto": 0, "metodos": [], "fecha": pv.fecha_pago, "venta": pv.venta},
+            )
+            entry["monto"] += pv.monto
+            label = _medio_pago_label_map().get(pv.metodo_pago, pv.metodo_pago)
+            if label not in entry["metodos"]:
+                entry["metodos"].append(label)
+            if pv.fecha_pago and (not entry["fecha"] or pv.fecha_pago > entry["fecha"]):
+                entry["fecha"] = pv.fecha_pago
+        if por_venta:
+            pedidos_map = {
+                p.venta_id: p
+                for p in Pedido.objects.filter(venta_id__in=por_venta, activo=True)
+            }
+            for v_id, info in por_venta.items():
+                p = pedidos_map.get(v_id)
+                if not p:
+                    continue
+                result.append(
+                    {
+                        "id": p.venta_id,
+                        "fecha": info["fecha"] or info["venta"].fecha_venta,
+                        "cliente": info["venta"].cliente_nombre or p.nombre_cliente,
+                        "tipo": "pedido",
+                        "medio_pago": ", ".join(info["metodos"]) or _medio_pago_label_map().get(p.metodo_pago, p.metodo_pago),
+                        "monto": info["monto"],
+                        "usuario": info["venta"].usuario.username if info["venta"].usuario else None,
+                    }
+                )
         return sorted(result, key=lambda r: r["fecha"])
 
     if tipo == "devolucion":
@@ -1596,6 +1717,7 @@ class MarcarRetiroSerializer(serializers.Serializer):
     estado_documento = serializers.ChoiceField(
         choices=Pedido.EstadoDocumento.choices, required=False
     )
+    pagos = PagoVentaInputSerializer(many=True, required=False)
 
 
 class ConvertirCotizacionSerializer(serializers.Serializer):
@@ -1605,11 +1727,14 @@ class ConvertirCotizacionSerializer(serializers.Serializer):
     )
     nombre_cliente = serializers.CharField(max_length=200, required=False, default="")
     telefono_cliente = serializers.CharField(max_length=50, required=False, default="")
-    metodo_pago = serializers.ChoiceField(
-        choices=Pedido._meta.get_field("metodo_pago").choices,
+    metodo_pago = serializers.CharField(
+        max_length=2,
         required=False,
+        allow_blank=True,
         default=Venta.MetodoPago.EFECTIVO,
     )
+    pagos = PagoPedidoInputSerializer(many=True, required=False)
+    es_abono = serializers.BooleanField(default=False, required=False)
     estado_documento = serializers.ChoiceField(
         choices=Pedido.EstadoDocumento.choices,
         required=False,
@@ -1639,7 +1764,7 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
 
     def get_queryset(self):
         queryset = Pedido.objects.filter(activo=True).select_related("usuario", "venta").prefetch_related(
-            "detalles__proveedor", "detalles__producto", "detalles__devoluciones"
+            "detalles__proveedor", "detalles__producto", "detalles__devoluciones", "venta__pagos"
         ).order_by("-fecha_creacion")
 
         estado = self.request.query_params.get("estado", "").strip()
@@ -1692,6 +1817,14 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        if data.get("estado") == Pedido.Estado.RETIRADO:
+            _, _, saldo_pendiente = obtener_pagos_pedido(pedido)
+            if saldo_pendiente > 0:
+                return Response(
+                    {"error": f"El pedido tiene un saldo pendiente de ${saldo_pendiente}. Debe conciliar el pago total al retirar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         with transaction.atomic():
             if "estado" in data:
                 pedido.estado = data["estado"]
@@ -1712,8 +1845,44 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
         serializer = MarcarRetiroSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         persona_retiro = serializer.validated_data["persona_retiro"]
+        pagos = serializer.validated_data.get("pagos")
+
+        _, _, saldo_pendiente = obtener_pagos_pedido(pedido)
+        if saldo_pendiente > 0:
+            if not pagos:
+                return Response(
+                    {"pagos": f"El pedido tiene un saldo pendiente de ${saldo_pendiente}. Debe conciliar el pago total para retirar."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            config = StoreConfig.current()
+            metodos_validos = {m["code"] for m in config.active_payment_methods()}
+            invalidos = [p["metodo_pago"] for p in pagos if p["metodo_pago"] not in metodos_validos]
+            if invalidos:
+                return Response(
+                    {"pagos": f"Medios de pago no configurados: {', '.join(invalidos)}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            suma = sum(p["monto"] for p in pagos)
+            if suma != saldo_pendiente:
+                diferencia = saldo_pendiente - suma
+                signo = "faltan" if diferencia > 0 else "sobran"
+                return Response(
+                    {
+                        "pagos": f"La suma de los pagos (${suma}) no coincide con el saldo pendiente (${saldo_pendiente}). "
+                                 f"{signo.capitalize()} ${abs(diferencia)}."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         with transaction.atomic():
+            if saldo_pendiente > 0 and pedido.venta_id:
+                for p in pagos:
+                    if p["monto"] > 0:
+                        PagoVenta.objects.create(
+                            venta=pedido.venta,
+                            metodo_pago=p["metodo_pago"],
+                            monto=p["monto"],
+                        )
             pedido.estado = Pedido.Estado.RETIRADO
             pedido.persona_retiro = persona_retiro
             pedido.fecha_retiro = timezone.now()
@@ -1723,6 +1892,7 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
                 pedido.estado_documento = serializer.validated_data["estado_documento"]
             pedido.save(update_fields=["estado", "persona_retiro", "fecha_retiro", "stock_descontado", "estado_documento"])
 
+        pedido.refresh_from_db()
         return Response(PedidoSerializer(pedido, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="cancelar")
@@ -1745,6 +1915,15 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
             return Response({"error": "No se puede devolver un pedido cancelado"}, status=400)
         if pedido.venta is None:
             return Response({"error": "Este pedido no tiene venta asociada"}, status=400)
+
+        _, monto_pagado, _ = obtener_pagos_pedido(pedido)
+        if monto_pagado <= 0:
+            return Response({"error": "No se puede devolver un pedido sin pagos registrados"}, status=400)
+
+        ya_devuelto_monto = (
+            Devolucion.objects.filter(venta=pedido.venta).aggregate(total=Sum("monto_devuelto"))["total"] or 0
+        )
+        max_reembolsable = max(0, monto_pagado - ya_devuelto_monto)
 
         serializer = DevolverPedidoInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1804,6 +1983,14 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
                     )
 
             lineas.append((pedido_detalle, monto, reponer, item.get("ubicacion_id")))
+
+        if monto_devuelto > max_reembolsable:
+            return Response(
+                {
+                    "error": f"El monto a devolver (${monto_devuelto}) no puede superar el monto pagado disponible (${max_reembolsable})"
+                },
+                status=400,
+            )
 
         with transaction.atomic():
             devolucion = Devolucion.objects.create(
@@ -1871,6 +2058,8 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
         nombre_cliente = serializer.validated_data.get("nombre_cliente") or cotizacion.nombre_cliente
         telefono_cliente = serializer.validated_data.get("telefono_cliente") or cotizacion.telefono_cliente
         metodo_pago = serializer.validated_data.get("metodo_pago") or cotizacion.metodo_pago or "EF"
+        pagos = serializer.validated_data.get("pagos")
+        es_abono = serializer.validated_data.get("es_abono", False)
         estado_documento = serializer.validated_data.get("estado_documento") or "SB"
 
         detalles_originales = cotizacion.detalles.filter(id__in=detalle_ids)
@@ -1898,6 +2087,19 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
                 "cantidad": detalle.cantidad,
             })
 
+        validar_pagos_pedido(
+            monto_total=monto_total,
+            metodo_pago=metodo_pago if pagos is None else None,
+            pagos=pagos,
+            es_abono=es_abono,
+            es_cotizacion=False,
+        )
+        if pagos:
+            metodo_pago = next(
+                (p["metodo_pago"] for p in pagos if p["monto"] > 0),
+                pagos[0]["metodo_pago"],
+            )
+
         with transaction.atomic():
             nuevo_pedido = Pedido.objects.create(
                 usuario=request.user,
@@ -1911,6 +2113,7 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
                 estado=Pedido.Estado.PENDIENTE_RETIRAR,
                 estado_documento=estado_documento,
                 es_cotizacion=False,
+                es_abono=es_abono,
                 pedido_origen=cotizacion,
             )
 
@@ -1967,6 +2170,20 @@ class PedidoViewSet(HistorialVendedorMixin, mixins.CreateModelMixin, mixins.List
             )
             nuevo_pedido.venta = venta
             nuevo_pedido.save(update_fields=["venta"])
+            if pagos is not None:
+                for p in pagos:
+                    if p["monto"] > 0:
+                        PagoVenta.objects.create(
+                            venta=venta,
+                            metodo_pago=p["metodo_pago"],
+                            monto=p["monto"],
+                        )
+            elif not es_abono and monto_total > 0:
+                PagoVenta.objects.create(
+                    venta=venta,
+                    metodo_pago=metodo_pago,
+                    monto=monto_total,
+                )
 
         return Response(
             PedidoSerializer(nuevo_pedido, context={"request": request}).data,

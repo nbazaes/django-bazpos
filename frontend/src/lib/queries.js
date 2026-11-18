@@ -311,10 +311,14 @@ export function useCambiarEstadoPedido() {
 export function useMarcarRetiro() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, persona_retiro, estado_documento }) =>
+    mutationFn: ({ pedidoId, persona_retiro, estado_documento, pagos }) =>
       apiRequest(`/pedidos/${pedidoId}/marcar-retiro/`, {
         method: "POST",
-        body: { persona_retiro, estado_documento },
+        body: {
+          persona_retiro,
+          ...(estado_documento ? { estado_documento } : {}),
+          ...(pagos ? { pagos } : {}),
+        },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });
@@ -358,10 +362,18 @@ export function useDevolverPedido() {
 export function useConvertirCotizacion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ pedidoId, detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento }) =>
+    mutationFn: ({ pedidoId, detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento, pagos, es_abono }) =>
       apiRequest(`/pedidos/${pedidoId}/convertir-a-pedido/`, {
         method: "POST",
-        body: { detalle_ids, nombre_cliente, telefono_cliente, metodo_pago, estado_documento },
+        body: {
+          detalle_ids,
+          nombre_cliente,
+          telefono_cliente,
+          metodo_pago,
+          estado_documento,
+          ...(pagos ? { pagos } : {}),
+          ...(es_abono !== undefined ? { es_abono } : {}),
+        },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pedidos.all });

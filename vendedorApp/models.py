@@ -191,6 +191,7 @@ class PagoVenta(models.Model):
         db_index=True,
     )
     monto = models.IntegerField()
+    fecha_pago = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
         db_table = "pagos_ventas"
@@ -382,6 +383,7 @@ class Pedido(models.Model):
         related_name="pedido",
     )
     es_cotizacion = models.BooleanField(default=False, verbose_name="Es cotización")
+    es_abono = models.BooleanField(default=False, verbose_name="Pago parcializado (abono)")
     pedido_origen = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
