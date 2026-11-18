@@ -1314,8 +1314,8 @@ class PedidoApiTest(BaseTest):
             producto=cls.producto, ubicacion=cls.ubicacion, cantidad=10
         )
 
-    def _item(self, es_cotizacion=False):
-        return {
+    def _item(self, es_cotizacion=False, **extra):
+        payload = {
             "nombre_cliente": "Cliente Uno",
             "telefono_cliente": "912345678",
             "metodo_pago": "EF",
@@ -1333,6 +1333,8 @@ class PedidoApiTest(BaseTest):
                 }
             ],
         }
+        payload.update(extra)
+        return payload
 
     def test_cotizacion_rut_opcional_busqueda_y_conversion(self):
         client = auth_client(self.vendedor)
