@@ -4,6 +4,11 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.10.0] - 2026-11-18
+
+### Agregado
+
+- Ahora puedes registrar pagos mixtos y abonos en los pedidos, y conciliarlos al momento de retirar.
 ## [2.9.0] - 2026-11-12
 
 ### Agregado
