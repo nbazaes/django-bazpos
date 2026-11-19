@@ -4,6 +4,11 @@ All notable changes to BAZPOS are documented in this file. The format is based o
 
 Entries are shown to users in the app via the "Ver novedades" modal on each new release.
 
+## [2.11.0] - 2026-11-19
+
+### Cambiado
+
+- Mejoramos la experiencia en dispositivos móviles en toda la app, manteniendo intacto el diseño de escritorio.
 ## [2.10.0] - 2026-11-18
 
 ### Agregado
