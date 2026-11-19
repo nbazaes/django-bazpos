@@ -224,7 +224,7 @@ export default function FacturaPhotoInput({ controller, header, items, pending, 
         <div className="modal-body" style={{ maxHeight: "75vh", overflowY: "auto" }}>
           {!creating ? <>
             <label>Buscar por código o descripción<input className="form-control" value={search} onChange={(e) => lookup(e.target.value)} /></label>
-            {(matches.length ? matches : selectedLine.candidatos || []).map((p) => <div key={p.producto_id} className="mt-2"><button type="button" className="btn btn-sm btn-secondary" onClick={() => link(p)}>{p.codigo_producto} — {p.nombre}</button></div>)}
+            {(matches.length ? matches : selectedLine.candidatos || []).map((p) => <div key={p.producto_id} className="mt-2"><button type="button" className="btn btn-sm btn-secondary factura-candidate-btn" onClick={() => link(p)}>{p.codigo_producto} — {p.nombre}</button></div>)}
             <button type="button" className="btn btn-primary mt-3" disabled={!header.proveedor_id} onClick={() => setCreating(true)}>Crear producto con estos datos</button>
             {!header.proveedor_id && <p>Selecciona primero el proveedor en el formulario.</p>}
           </> : <ProductoForm initialProveedor={String(header.proveedor_id)} initialValues={{ codigo_proveedor: selectedLine.codigo || "", nombre: (selectedLine.descripcion || "").slice(0, 100), descripcion: selectedLine.descripcion || "", precio_costo: Math.round(Number(selectedLine.costo_neto) || 0) }} onSaved={link} />}

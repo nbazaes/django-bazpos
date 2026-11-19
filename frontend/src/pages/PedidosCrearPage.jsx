@@ -460,7 +460,7 @@ export default function PedidosCrearPage() {
         <div className="card mb-4">
           <div className="card-header">Producto</div>
           <div className="card-body">
-            <div className="form-group mb-3" ref={productosRef}>
+            <div className="form-group mb-3 relative" ref={productosRef}>
               <label>Buscar producto existente (opcional)</label>
               <input
                 type="text"
@@ -634,7 +634,7 @@ export default function PedidosCrearPage() {
         </div>
 
         <div className="table-responsive mb-4">
-          <table className="table table-sm table-bordered">
+          <table className="table table-sm table-bordered table-mobile-cards">
             <thead>
               <tr>
                 <th>Cód. Prov.</th>
@@ -651,13 +651,13 @@ export default function PedidosCrearPage() {
             <tbody>
               {items.map((it, idx) => (
                 <tr key={idx}>
-                  <td>{it.codigo_proveedor}</td>
-                  <td>{proveedores.find((p) => p.proveedor_id === it.proveedor_id)?.nombre || "—"}</td>
-                  <td>{it.oem}</td>
-                  <td>{it.nombre}</td>
-                  <td>${it.precio_costo}</td>
-                  <td>{it.porcentaje_utilidad}%</td>
-                  <td>
+                  <td data-label="Cód. Prov.">{it.codigo_proveedor}</td>
+                  <td data-label="Proveedor">{proveedores.find((p) => p.proveedor_id === it.proveedor_id)?.nombre || "—"}</td>
+                  <td data-label="OEM">{it.oem}</td>
+                  <td data-label="Nombre" data-cell="primary">{it.nombre}</td>
+                  <td data-label="Precio costo">${it.precio_costo}</td>
+                  <td data-label="% Utilidad">{it.porcentaje_utilidad}%</td>
+                  <td data-label="Cantidad">
                     <StepperInput
                       value={it.cantidad || 1}
                       onChange={(val) => actualizarCantidadItem(idx, val)}
@@ -668,8 +668,8 @@ export default function PedidosCrearPage() {
                       incrementLabel={`Aumentar cantidad de ${it.nombre}`}
                     />
                   </td>
-                  <td>${it.precio_final}</td>
-                  <td>
+                  <td data-label="Total">${it.precio_final}</td>
+                  <td data-cell="actions">
                     <button className="btn btn-sm btn-danger" onClick={() => eliminarItem(idx)} title="Eliminar">
                       ✕
                     </button>

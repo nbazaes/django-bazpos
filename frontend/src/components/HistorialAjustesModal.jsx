@@ -16,7 +16,7 @@ export default function HistorialAjustesModal({ producto, onClose }) {
           </div>
           <div className="modal-body">
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm table-bordered table-mobile-cards">
                 <thead>
                   <tr>
                     <th>Fecha</th>
@@ -42,16 +42,16 @@ export default function HistorialAjustesModal({ producto, onClose }) {
                   ) : (
                     ajustes.map((a) => (
                       <tr key={a.id}>
-                        <td className="text-nowrap">{formatDateTime(a.fecha_ajuste)}</td>
-                        <td>{a.ubicacion_nombre}</td>
-                        <td className="text-center">{a.cantidad_anterior}</td>
-                        <td className="text-center">{a.cantidad_nueva}</td>
-                        <td className="text-center">
+                        <td className="text-nowrap" data-label="Fecha" data-cell="primary">{formatDateTime(a.fecha_ajuste)}</td>
+                        <td data-label="Ubicación">{a.ubicacion_nombre}</td>
+                        <td className="text-center" data-label="Stock anterior">{a.cantidad_anterior}</td>
+                        <td className="text-center" data-label="Stock nuevo">{a.cantidad_nueva}</td>
+                        <td className="text-center" data-label="Diferencia">
                           {a.cantidad_nueva - a.cantidad_anterior > 0 ? "+" : ""}
                           {a.cantidad_nueva - a.cantidad_anterior}
                         </td>
-                        <td className="hide-mobile">{a.usuario_nombre}</td>
-                        <td className="hide-mobile">{a.motivo}</td>
+                        <td className="hide-mobile" data-label="Usuario">{a.usuario_nombre}</td>
+                        <td className="hide-mobile" data-label="Motivo">{a.motivo}</td>
                       </tr>
                     ))
                   )}

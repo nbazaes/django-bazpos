@@ -61,7 +61,7 @@ export default function MultiSelect({
               placeholder="Buscar..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
+              autoFocus={typeof window !== "undefined" && !window.matchMedia("(pointer: coarse)").matches}
             />
           )}
           <div className="multiselect-options">

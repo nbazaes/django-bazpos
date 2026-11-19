@@ -10,11 +10,15 @@ export default function CrudTable({ columns, rows, onEdit, onDelete, onView }) {
 
   return (
     <div className="table-responsive">
-      <table className="table table-bordered table-sm">
+      <table className="table table-bordered table-sm table-mobile-cards">
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+              <th
+                key={col.key}
+                className={col.className}
+                style={col.width ? { width: col.width } : undefined}
+              >
                 {col.label}
               </th>
             ))}
@@ -26,11 +30,18 @@ export default function CrudTable({ columns, rows, onEdit, onDelete, onView }) {
             <tr
               key={row.id || row.producto_id || row.proveedor_id || row.numero_factura || row.username}
             >
-              {columns.map((col) => (
-                <td key={col.key}>{col.render ? col.render(row) : (row[col.key] ?? "")}</td>
+              {columns.map((col, idx) => (
+                <td
+                  key={col.key}
+                  className={col.className}
+                  data-label={col.label}
+                  data-cell={idx === 0 ? "primary" : undefined}
+                >
+                  {col.render ? col.render(row) : (row[col.key] ?? "")}
+                </td>
               ))}
               {(onView || onEdit || onDelete) && (
-                <td>
+                <td data-cell="actions">
                   <div className="btn-group">
                     {onView && (
                       <button className="btn btn-sm btn-info" onClick={() => onView(row)}>

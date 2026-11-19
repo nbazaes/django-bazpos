@@ -88,7 +88,7 @@ export default function InventarioPage() {
           </button>
         </div>
         <div className="table-responsive">
-          <table className="table table-sm table-bordered">
+          <table className="table table-sm table-bordered table-mobile-cards">
             <thead>
               <tr>
                 <th style={{ width: "1px" }}>Código</th>
@@ -112,32 +112,34 @@ export default function InventarioPage() {
               ) : (
                 productos.map((p) => (
                   <tr key={p.producto_id}>
-                    <td className="text-nowrap">{p.codigo_producto}</td>
-                    <td className="hide-mobile text-nowrap">{p.oem}</td>
-                    <td className="hide-mobile text-nowrap">{p.codigo_proveedor}</td>
-                    <td>{p.nombre}</td>
-                    <td>{p.marca}</td>
-                    <td className="hide-mobile text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
-                    <td>{p.stock_actual}</td>
-                    <td><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
-                    <td>{p.stock_minimo}</td>
-                    <td className="hide-mobile">{p.stock_maximo}</td>
+                    <td className="text-nowrap" data-label="Código">{p.codigo_producto}</td>
+                    <td className="hide-mobile text-nowrap" data-label="OEM">{p.oem}</td>
+                    <td className="hide-mobile text-nowrap" data-label="Cód. Proveedor">{p.codigo_proveedor}</td>
+                    <td data-label="Nombre" data-cell="primary">{p.nombre}</td>
+                    <td data-label="Marca">{p.marca}</td>
+                    <td className="hide-mobile text-truncate" style={{ maxWidth: 200 }} data-label="Descripción">{p.descripcion}</td>
+                    <td data-label="Stock actual">{p.stock_actual}</td>
+                    <td data-label="Ubicación"><UbicacionCell ubicaciones={p.ubicaciones_stock} /></td>
+                    <td data-label="Stock min">{p.stock_minimo}</td>
+                    <td className="hide-mobile" data-label="Stock max">{p.stock_maximo}</td>
                     {puedeAjustar && (
-                      <td className="text-nowrap">
-                        <button
-                          className="btn btn-sm btn-outline mr-1"
-                          title="Ajustar stock"
-                          onClick={() => setAjusteProducto(p)}
-                        >
-                          Ajustar
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline"
-                          title="Ver historial"
-                          onClick={() => setHistorialProducto(p)}
-                        >
-                          Historial
-                        </button>
+                      <td className="text-nowrap" data-cell="actions">
+                        <div className="btn-group">
+                          <button
+                            className="btn btn-sm btn-outline"
+                            title="Ajustar stock"
+                            onClick={() => setAjusteProducto(p)}
+                          >
+                            Ajustar
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline"
+                            title="Ver historial"
+                            onClick={() => setHistorialProducto(p)}
+                          >
+                            Historial
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>

@@ -569,7 +569,7 @@ export default function FacturaFormPage() {
 
         {searchResults.length > 0 && (
           <div className="table-responsive mt-2 mb-3">
-            <table className="table table-sm table-bordered">
+            <table className="table table-sm table-bordered table-mobile-cards">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -584,11 +584,11 @@ export default function FacturaFormPage() {
                   const alreadyAdded = items.some((it) => it.producto_id === p.producto_id);
                   return (
                     <tr key={p.producto_id}>
-                      <td style={{ whiteSpace: "nowrap" }}>{p.codigo_producto}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>{p.codigo_proveedor || "—"}</td>
-                      <td>{p.proveedor_nombre || "—"}</td>
-                      <td>{p.nombre}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>
+                      <td style={{ whiteSpace: "nowrap" }} data-label="Código">{p.codigo_producto}</td>
+                      <td style={{ whiteSpace: "nowrap" }} data-label="Cód. Proveedor">{p.codigo_proveedor || "—"}</td>
+                      <td data-label="Proveedor">{p.proveedor_nombre || "—"}</td>
+                      <td data-label="Nombre" data-cell="primary">{p.nombre}</td>
+                      <td style={{ whiteSpace: "nowrap" }} data-cell="actions">
                         {alreadyAdded ? (
                           <span className="badge" style={{ background: "var(--gray-200)", color: "var(--gray-600)" }}>Agregado</span>
                         ) : (
@@ -620,7 +620,7 @@ export default function FacturaFormPage() {
 
         {items.length > 0 && (
           <div className="table-responsive mt-3">
-            <table className="table table-sm table-bordered">
+            <table className="table table-sm table-bordered table-mobile-cards">
               <thead>
                 <tr>
                   <th>Código</th>
@@ -641,7 +641,7 @@ export default function FacturaFormPage() {
                   const rowInvalida = esUbicacionInvalida(it);
                   return (
                   <tr key={`${it.producto_id}-${idx}`} style={rowInvalida ? { background: "var(--danger-soft)" } : undefined}>
-                    <td style={{ whiteSpace: "nowrap" }}>
+                    <td style={{ whiteSpace: "nowrap" }} data-label="Código">
                       {it.codigo_producto}
                       <i
                         className="bi bi-pencil"
@@ -651,12 +651,12 @@ export default function FacturaFormPage() {
                         onClick={() => abrirEditarProducto(idx)}
                       ></i>
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>{it.codigo_proveedor || "—"}</td>
-                    <td>{it.proveedor_nombre || "—"}</td>
-                    <td>{it.nombre}</td>
-                    <td><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
-                    <td>${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
-                    <td>
+                    <td style={{ whiteSpace: "nowrap" }} className="hide-mobile" data-label="Cód. Proveedor">{it.codigo_proveedor || "—"}</td>
+                    <td className="hide-mobile" data-label="Proveedor">{it.proveedor_nombre || "—"}</td>
+                    <td data-label="Nombre" data-cell="primary">{it.nombre}</td>
+                    <td data-label="Precio costo"><input className="form-control form-control-sm" type="number" value={it.precio} onChange={(e) => { const next = [...items]; next[idx].precio = e.target.value; setItems(next); }} /></td>
+                    <td data-label="Precio con IVA">${Math.round(Number(it.precio || 0) * (1 + taxPercent / 100))}</td>
+                    <td data-label="Cantidad">
                       <StepperInput
                         value={it.cantidad}
                         onChange={(val) => {
@@ -672,9 +672,9 @@ export default function FacturaFormPage() {
                         incrementLabel={`Aumentar cantidad de ${it.nombre}`}
                       />
                     </td>
-                    <td><input className="form-control form-control-sm" type="number" step="0.01" style={{ width: 80 }} value={it.margen_utilidad} onChange={(e) => { const next = [...items]; next[idx].margen_utilidad = e.target.value; setItems(next); }} /></td>
-                    <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, whiteSpace: "nowrap" }}>${calcularPrecioVenta(it.precio, it.margen_utilidad).toLocaleString()}</td>
-                    <td>
+                    <td data-label="Margen (%)"><input className="form-control form-control-sm" type="number" step="0.01" style={{ width: 80 }} value={it.margen_utilidad} onChange={(e) => { const next = [...items]; next[idx].margen_utilidad = e.target.value; setItems(next); }} /></td>
+                    <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, whiteSpace: "nowrap" }} data-label="Precio venta">${calcularPrecioVenta(it.precio, it.margen_utilidad).toLocaleString()}</td>
+                    <td data-label="Ubicación">
                       <button
                         type="button"
                         className={`btn btn-sm ${rowInvalida ? "btn-outline-danger" : "btn-outline-secondary"}`}
@@ -690,7 +690,7 @@ export default function FacturaFormPage() {
                         </div>
                       )}
                     </td>
-                    <td><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => {
+                    <td data-cell="actions"><i className="bi bi-trash" style={{ cursor: "pointer", color: "var(--danger)", fontSize: "1.1rem" }} onClick={() => {
                       if (it.ocr_line != null) {
                         if (!window.confirm("¿Excluir esta línea leída de la factura?")) return;
                         setExcluded((prev) => [...prev, it.ocr_line]);
@@ -724,7 +724,7 @@ export default function FacturaFormPage() {
           <label className="d-block"><input type="checkbox" checked={reviewed} onChange={(e) => setReviewedSnapshot(e.target.checked ? reviewSignature : "")} /> Revisé los datos de la factura</label>
           {draftController.draft?.ocr?.lineas && <label className="d-block"><input type="checkbox" checked={acceptedWarnings} onChange={(e) => setAcceptedSnapshot(e.target.checked ? reviewSignature : "")} /> Revisé las advertencias, descuentos y diferencias con los totales impresos</label>}
         </div>}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!isEdit && (
             <button type="button" className="btn btn-secondary" onClick={volver}>
               Volver

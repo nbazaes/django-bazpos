@@ -7,6 +7,7 @@ import TitleContext from "../lib/usePageTitle";
 import ChangelogModal from "./ChangelogModal";
 import AboutModal from "./AboutModal";
 import ChatWidget from "./ChatWidget";
+import MobileBottomNav from "./MobileBottomNav";
 import PageLoader from "./PageLoader";
 import SupportTicketModal from "./SupportTicketModal";
 import { getUnseenChangelog, getFullChangelog, markChangelogSeen } from "../lib/changelog";
@@ -103,6 +104,15 @@ export default function Shell() {
     if (sidebarOpen && !isDesktop) {
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
+      const onKeyDown = (e) => {
+        if (e.key === "Escape") setSidebarOpen(false);
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => {
+        document.body.style.overflow = "";
+        document.body.style.touchAction = "";
+        document.removeEventListener("keydown", onKeyDown);
+      };
     } else {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
@@ -338,6 +348,11 @@ export default function Shell() {
       )}
 
       {showAboutModal && <AboutModal onClose={() => setShowAboutModal(false)} />}
+
+      <MobileBottomNav
+        menuOpen={sidebarOpen}
+        onOpenMenu={() => setSidebarOpen((value) => !value)}
+      />
 
       <ChatWidget />
     </TitleContext.Provider>

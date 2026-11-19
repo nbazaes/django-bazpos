@@ -151,7 +151,8 @@ function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
 
               <div className="form-group mt-3">
                 <label>Ubicaciones</label>
-                <table className="table table-sm table-bordered">
+                <div className="table-responsive">
+                <table className="table table-sm table-bordered table-mobile-cards">
                   <thead>
                     <tr>
                       <th>Ubicación</th>
@@ -170,7 +171,7 @@ function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
                     ) : (
                       rows.map((r) => (
                         <tr key={r.rowKey}>
-                          <td>
+                          <td data-label="Ubicación" data-cell="primary">
                             {r.ubicacion_id === null ? (
                               <select
                                 className="form-control form-control-sm"
@@ -200,8 +201,8 @@ function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
                               r.nombre
                             )}
                           </td>
-                          <td className="text-center">{r.cantidad_actual}</td>
-                          <td>
+                          <td className="text-center" data-label="Stock actual">{r.cantidad_actual}</td>
+                          <td data-label="Nuevo stock">
                             <StepperInput
                               value={r.cantidad_nueva}
                               onChange={(val) => updateCantidad(r.rowKey, val)}
@@ -211,7 +212,7 @@ function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
                               incrementLabel={`Aumentar stock en ${r.nombre}`}
                             />
                           </td>
-                          <td className="text-center">
+                          <td className="text-center" data-cell="actions">
                             {r.cantidad_actual === 0 && (
                               <button
                                 type="button"
@@ -228,6 +229,7 @@ function AjusteStockModalContent({ producto, onClose, todasUbicaciones }) {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {ubicacionesDisponibles.length > 0 && (

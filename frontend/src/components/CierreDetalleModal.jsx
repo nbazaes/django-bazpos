@@ -46,21 +46,28 @@ function renderFila(tipo, r) {
     },
   }[tipo];
 
+  const extraLabel = {
+    pago: "Documento",
+    documento: "Medio de pago",
+    devolucion: "Motivo",
+    anulacion: "Motivo",
+  }[tipo];
+
   return (
     <tr key={`${tipo}-${base.id}`}>
       {tipo === "devolucion" || tipo === "anulacion" ? (
         <>
-          <td className="text-center">{base.id}</td>
-          <td className="text-center">{base.ref}</td>
+          <td className="text-center" data-label={tipo === "devolucion" ? "Devolución" : "Anulación"} data-cell="primary">{base.id}</td>
+          <td className="text-center" data-label="Venta">{base.ref}</td>
         </>
       ) : (
-        <td className="text-center">{base.ref}</td>
+        <td className="text-center" data-label="Venta" data-cell="primary">{base.ref}</td>
       )}
-      <td className="text-nowrap">{formatDateTime(base.fecha)}</td>
-      <td>{r.cliente || "—"}</td>
-      <td>{base.extra}</td>
-      <td>{fmtMoney(base.monto)}</td>
-      <td className="hide-mobile">{base.usuario || "—"}</td>
+      <td className="text-nowrap" data-label="Fecha">{formatDateTime(base.fecha)}</td>
+      <td data-label="Cliente">{r.cliente || "—"}</td>
+      <td data-label={extraLabel}>{base.extra}</td>
+      <td data-label="Monto">{fmtMoney(base.monto)}</td>
+      <td className="hide-mobile" data-label="Vendedor">{base.usuario || "—"}</td>
     </tr>
   );
 }
@@ -80,7 +87,7 @@ export default function CierreDetalleModal({ fecha, tipo, clave, titulo, onClose
           </div>
           <div className="modal-body">
             <div className="table-responsive">
-              <table className="table table-sm">
+              <table className="table table-sm table-mobile-cards">
                 <thead>
                   <tr>
                     {columnas.map((c) => (
@@ -113,7 +120,7 @@ export default function CierreDetalleModal({ fecha, tipo, clave, titulo, onClose
                       <td colSpan={columnas.length - 1}>
                         <strong>Total ({data.length} registros)</strong>
                       </td>
-                      <td className="hide-mobile">
+                      <td>
                         <strong>{fmtMoney(total)}</strong>
                       </td>
                     </tr>

@@ -38,7 +38,7 @@ function AnulacionesDelDia({ fecha }) {
           anulada no se cuenta como venta).
         </p>
         <div className="table-responsive">
-          <table className="table table-sm">
+          <table className="table table-sm table-mobile-cards">
             <thead>
               <tr>
                 <th>Nº</th>
@@ -53,13 +53,13 @@ function AnulacionesDelDia({ fecha }) {
             <tbody>
               {data.map((r) => (
                 <tr key={r.id}>
-                  <td className="text-center">{r.id}</td>
-                  <td className="text-center">{r.venta_id}</td>
-                  <td className="text-nowrap">{formatDateTime(r.fecha)}</td>
-                  <td>{r.cliente || "—"}</td>
-                  <td>{r.motivo || "—"}</td>
-                  <td>{fmtMoney(r.monto)}</td>
-                  <td className="hide-mobile">{r.usuario || "—"}</td>
+                  <td className="text-center" data-label="Nº" data-cell="primary">{r.id}</td>
+                  <td className="text-center" data-label="Venta">{r.venta_id}</td>
+                  <td className="text-nowrap" data-label="Fecha">{formatDateTime(r.fecha)}</td>
+                  <td data-label="Cliente">{r.cliente || "—"}</td>
+                  <td data-label="Motivo">{r.motivo || "—"}</td>
+                  <td data-label="Monto">{fmtMoney(r.monto)}</td>
+                  <td className="hide-mobile" data-label="Vendedor">{r.usuario || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -68,7 +68,7 @@ function AnulacionesDelDia({ fecha }) {
                 <td colSpan={5}>
                   <strong>Total ({data.length} registros)</strong>
                 </td>
-                <td colSpan={2} className="hide-mobile">
+                <td colSpan={2}>
                   <strong>{fmtMoney(total)}</strong>
                 </td>
               </tr>
@@ -203,14 +203,14 @@ export default function CierreCajaPage() {
 
       {data && (
         <>
-          <div className="row mb-4">
-            <div className="col-3">
+          <div className="row mb-4 cierre-kpi-row">
+            <div className="col-md-3">
               <div className="stat-card stat-card-success">
                 <div className="stat-label">Total vendido</div>
                 <div className="stat-value">{fmtMoney(data.total_vendido)}</div>
               </div>
             </div>
-            <div className="col-3">
+            <div className="col-md-3">
               <div
                 className="stat-card stat-card-info"
                 onClick={() => abrirDetalle("devolucion", "", "Devoluciones", data.total_devoluciones)}
@@ -220,7 +220,7 @@ export default function CierreCajaPage() {
                 <div className="stat-value">{fmtMoney(data.total_devoluciones)}</div>
               </div>
             </div>
-            <div className="col-3">
+            <div className="col-md-3">
               <div
                 className="stat-card stat-card-danger"
                 onClick={() => abrirDetalle("anulacion", "", "Anulaciones", data.total_anulaciones)}
@@ -230,7 +230,7 @@ export default function CierreCajaPage() {
                 <div className="stat-value">{fmtMoney(data.total_anulaciones)}</div>
               </div>
             </div>
-            <div className="col-3">
+            <div className="col-md-3">
               <div className="stat-card stat-card-purple">
                 <div className="stat-label">Total del día</div>
                 <div className="stat-value">{fmtMoney(data.total_final)}</div>
@@ -303,7 +303,7 @@ export default function CierreCajaPage() {
         <PageCard title={`Historial de cierres de la fecha ${fmtFecha(fecha)}`}>
           {historialFiltered.length > 0 ? (
             <div className="table-responsive">
-              <table className="table table-sm">
+              <table className="table table-sm table-mobile-cards">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -318,13 +318,13 @@ export default function CierreCajaPage() {
                 <tbody>
                   {historialFiltered.map((c, i) => (
                     <tr key={c.id}>
-                      <td>{historialFiltered.length - i}</td>
-                      <td>{fmtFechaHora(c.created_at)}</td>
-                      <td>{c.usuario || "—"}</td>
-                      <td>{fmtMoney(c.total_vendido)}</td>
-                      <td>{fmtMoney(c.total_devoluciones)}</td>
-                      <td>{fmtMoney(c.total_anulaciones)}</td>
-                      <td><strong>{fmtMoney(c.total_final)}</strong></td>
+                      <td data-label="#" data-cell="primary">#{historialFiltered.length - i}</td>
+                      <td data-label="Guardado">{fmtFechaHora(c.created_at)}</td>
+                      <td data-label="Usuario">{c.usuario || "—"}</td>
+                      <td data-label="Total vendido">{fmtMoney(c.total_vendido)}</td>
+                      <td data-label="Devoluciones">{fmtMoney(c.total_devoluciones)}</td>
+                      <td data-label="Anulaciones">{fmtMoney(c.total_anulaciones)}</td>
+                      <td data-label="Total del día"><strong>{fmtMoney(c.total_final)}</strong></td>
                     </tr>
                   ))}
                 </tbody>

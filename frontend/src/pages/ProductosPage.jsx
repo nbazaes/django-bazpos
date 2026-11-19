@@ -23,20 +23,21 @@ function renderUbicacion(row) {
     </span>
   ));
 
-  const mobile = ubicaciones.length === 1
-    ? `${ubicaciones[0].nombre} (${ubicaciones[0].cantidad})`
+  const mobile = ubicaciones.length <= 2
+    ? desktop
     : (
-      <span className="stock-hover">
-        Múltiples
-        <span className="stock-popover">
+      <details>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+          {ubicaciones.length} ubicaciones
+        </summary>
+        <div className="mt-1">
           {ubicaciones.map((u, i) => (
-            <div key={u.ubicacion_id ?? `null-${i}`} className="popover-row">
-              <span>{u.nombre}</span>
-              <strong>{u.cantidad}</strong>
+            <div key={u.ubicacion_id ?? `null-${i}`}>
+              {u.nombre}: <strong>{u.cantidad}</strong>
             </div>
           ))}
-        </span>
-      </span>
+        </div>
+      </details>
     );
 
   return (

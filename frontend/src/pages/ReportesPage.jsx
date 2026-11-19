@@ -153,7 +153,7 @@ export default function ReportesPage() {
       {data && tab === "ventas-diarias" && (
         <PageCard title="Historial de ventas diarias">
           {chartData && (data.ventas_diarias || []).length > 0 ? (
-            <div style={{ height: 400 }}>
+            <div className="report-chart-box">
               <Line data={chartData} options={chartOptions} />
             </div>
           ) : (
@@ -166,7 +166,7 @@ export default function ReportesPage() {
         <PageCard title="Top 10 productos más vendidos del mes">
           {(data.top_productos_mes || []).length > 0 ? (
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm table-bordered table-mobile-cards">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -179,11 +179,11 @@ export default function ReportesPage() {
                 <tbody>
                   {data.top_productos_mes.map((p, i) => (
                     <tr key={p.producto__producto_id || i}>
-                      <td>{i + 1}</td>
-                      <td>{p.producto__codigo_producto}</td>
-                      <td>{p.producto__nombre}</td>
-                      <td>{p.total_vendido}</td>
-                      <td>{formatCLP(p.monto_total)}</td>
+                      <td data-label="#">{i + 1}</td>
+                      <td data-label="Código">{p.producto__codigo_producto}</td>
+                      <td data-label="Producto" data-cell="primary">{p.producto__nombre}</td>
+                      <td data-label="Cantidad vendida">{p.total_vendido}</td>
+                      <td data-label="Monto total">{formatCLP(p.monto_total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -199,7 +199,7 @@ export default function ReportesPage() {
         <PageCard title="Stock crítico">
           {(data.stock_critico || []).length > 0 ? (
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm table-bordered table-mobile-cards">
                 <thead>
                   <tr>
                     <th>Nombre</th>
@@ -213,12 +213,12 @@ export default function ReportesPage() {
                 <tbody>
                   {data.stock_critico.map((p) => (
                     <tr key={p.producto_id}>
-                      <td>{p.nombre}</td>
-                      <td>{p.codigo_producto}</td>
-                      <td>{p.oem}</td>
-                      <td>{p.proveedor_nombre}</td>
-                      <td style={{ color: "var(--danger)" }}>{p.stock_actual}</td>
-                      <td>{p.stock_minimo}</td>
+                      <td data-label="Nombre" data-cell="primary">{p.nombre}</td>
+                      <td data-label="Código">{p.codigo_producto}</td>
+                      <td data-label="OEM">{p.oem}</td>
+                      <td data-label="Proveedor">{p.proveedor_nombre}</td>
+                      <td style={{ color: "var(--danger)" }} data-label="Stock actual">{p.stock_actual}</td>
+                      <td data-label="Stock mínimo">{p.stock_minimo}</td>
                     </tr>
                   ))}
                 </tbody>

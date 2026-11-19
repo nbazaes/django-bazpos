@@ -193,23 +193,17 @@ export default function ProductoForm({
           </div>
         </div>
 
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          width: "100%",
-          marginTop: "1.2rem",
-          paddingTop: "0.6rem",
-          borderTop: "2px solid var(--border-default)",
-        }}>
+        <div
+          className="producto-precio-resumen"
+          style={{
+            width: "100%",
+            marginTop: "1.2rem",
+            paddingTop: "0.6rem",
+            borderTop: "2px solid var(--border-default)",
+          }}
+        >
           <span style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>Precio de venta</span>
-          <span style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "2.1rem",
-            fontWeight: 800,
-            color: "var(--text-primary)",
-            letterSpacing: "-0.02em",
-          }}>
+          <span className="producto-precio-valor" style={{ color: "var(--text-primary)" }}>
             ${precioVenta.toLocaleString()}
           </span>
         </div>

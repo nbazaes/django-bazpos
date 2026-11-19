@@ -500,7 +500,7 @@ export default function PedidosHistorial() {
             <option key={vendedor.value} value={vendedor.value}>{vendedor.label}</option>
           ))}
         </select>
-        <div className="flex items-center gap-2">
+        <div className="date-range-group">
           <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>
           <input
             type="date"
@@ -520,7 +520,7 @@ export default function PedidosHistorial() {
         </div>
       </div>
       <div className="table-responsive">
-        <table className="table table-sm table-bordered">
+        <table className="table table-sm table-bordered table-mobile-cards">
           <thead>
             <tr>
               <th>ID</th>
@@ -542,11 +542,11 @@ export default function PedidosHistorial() {
               const yaConvertido = esCotizacion && p.convertido;
               return (
                 <tr key={p.id}>
-                  <td>P#{p.id}</td>
-                  <td>{formatDateTime(p.fecha_creacion)}</td>
-                  <td>{p.nombre_cliente}{p.rut_cliente && <div className="text-muted small">RUT: {p.rut_cliente}</div>}</td>
-                  <td className="hide-mobile">{p.telefono_cliente}</td>
-                  <td>
+                  <td data-label="ID" data-cell="primary">P#{p.id}</td>
+                  <td data-label="Fecha">{formatDateTime(p.fecha_creacion)}</td>
+                  <td data-label="Cliente">{p.nombre_cliente}{p.rut_cliente && <div className="text-muted small">RUT: {p.rut_cliente}</div>}</td>
+                  <td className="hide-mobile" data-label="Teléfono">{p.telefono_cliente}</td>
+                  <td data-label="Estado">
                     {esCotizacion ? (
                       <>
                         <span className="badge badge-info">Cotización</span>
@@ -566,16 +566,16 @@ export default function PedidosHistorial() {
                       </>
                     )}
                   </td>
-                  <td className="hide-mobile">
+                  <td className="hide-mobile" data-label="Documento">
                     {esCotizacion ? (
                       <span className="text-muted">—</span>
                     ) : (
                       <span className="badge badge-secondary">{p.estado_documento_display || p.estado_documento}</span>
                     )}
                   </td>
-                  <td className="hide-mobile">{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
-                  <td className="hide-mobile">{formatDateTime(p.fecha_retiro)}</td>
-                  <td>
+                  <td className="hide-mobile" data-label="Persona que retiró">{p.persona_retiro || (p.estado === "RE" ? "—" : "")}</td>
+                  <td className="hide-mobile" data-label="Fecha retiro">{formatDateTime(p.fecha_retiro)}</td>
+                  <td data-label="Total">
                     <div>${p.monto_total}</div>
                     {!esCotizacion && (p.saldo_pendiente ?? 0) > 0 && p.estado !== "CA" && (
                       <div className="small text-muted">
@@ -584,23 +584,25 @@ export default function PedidosHistorial() {
                       </div>
                     )}
                   </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleId(p.id)}>Ver</button>
-                    {esCotizacion && !yaConvertido && (
-                      <button className="btn btn-sm btn-warning me-1" onClick={() => abrirConvertir(p)}>Convertir a pedido</button>
-                    )}
-                    {esCotizacion && yaConvertido && p.pedido_derivado_id && (
-                      <button className="btn btn-sm btn-success me-1" onClick={() => setDetalleId(p.pedido_derivado_id)}>Pedido #{p.pedido_derivado_id}</button>
-                    )}
-                    {!esCotizacion && p.estado === "PR" && (
-                      <button className="btn btn-sm btn-success me-1" onClick={() => abrirRetiro(p)}>Retiro</button>
-                    )}
-                    {!esCotizacion && esAdmin && (p.estado === "RE" || p.estado === "PR") && (p.monto_pagado ?? p.monto_total) > 0 && (
-                      <button className="btn btn-sm btn-warning me-1" onClick={() => abrirDevolver(p)}>Devolver</button>
-                    )}
-                    {(esCotizacion || (p.estado !== "DE" && p.estado !== "CA")) && (
-                      <button className="btn btn-sm btn-danger" onClick={() => setCancelarId(p.id)}>Cancelar pedido</button>
-                    )}
+                  <td style={{ whiteSpace: "nowrap" }} data-cell="actions">
+                    <div className="btn-group">
+                      <button className="btn btn-sm btn-info" onClick={() => setDetalleId(p.id)}>Ver</button>
+                      {esCotizacion && !yaConvertido && (
+                        <button className="btn btn-sm btn-warning" onClick={() => abrirConvertir(p)}>Convertir a pedido</button>
+                      )}
+                      {esCotizacion && yaConvertido && p.pedido_derivado_id && (
+                        <button className="btn btn-sm btn-success" onClick={() => setDetalleId(p.pedido_derivado_id)}>Pedido #{p.pedido_derivado_id}</button>
+                      )}
+                      {!esCotizacion && p.estado === "PR" && (
+                        <button className="btn btn-sm btn-success" onClick={() => abrirRetiro(p)}>Retiro</button>
+                      )}
+                      {!esCotizacion && esAdmin && (p.estado === "RE" || p.estado === "PR") && (p.monto_pagado ?? p.monto_total) > 0 && (
+                        <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(p)}>Devolver</button>
+                      )}
+                      {(esCotizacion || (p.estado !== "DE" && p.estado !== "CA")) && (
+                        <button className="btn btn-sm btn-danger" onClick={() => setCancelarId(p.id)}>Cancelar pedido</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

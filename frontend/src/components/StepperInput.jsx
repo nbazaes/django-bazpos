@@ -167,6 +167,7 @@ export default function StepperInput({
 
   return (
     <div
+      className="stepper-wrapper"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -179,6 +180,7 @@ export default function StepperInput({
       </StepperButton>
       <input
         type="number"
+        className="stepper-input"
         inputMode={allowDecimals || !Number.isInteger(step) ? "decimal" : "numeric"}
         style={{
           width: inputStyle.width ?? 60,

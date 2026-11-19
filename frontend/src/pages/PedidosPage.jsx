@@ -341,7 +341,7 @@ export default function PedidosPage() {
                     <option key={vendedor.value} value={vendedor.value}>{vendedor.label}</option>
                   ))}
                 </select>
-                <div className="flex items-center gap-2">
+                <div className="date-range-group">
                   <span className="text-muted" style={{ fontSize: "0.875rem" }}>Desde:</span>
                   <input
                     type="date"
@@ -362,7 +362,7 @@ export default function PedidosPage() {
               </div>
             )}
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm table-bordered table-mobile-cards">
                 <thead>
                   <tr>
                     <th>ID</th><th>Fecha</th><th>Usuario</th>
@@ -373,13 +373,13 @@ export default function PedidosPage() {
                 <tbody>
                   {tab === "ventas" && rows.map((v) => (
                     <tr key={v.id}>
-                      <td>{v.id}</td>
-                      <td>{formatDateTime(v.fecha_venta)}</td>
-                      <td>{v.usuario_nombre}</td>
-                      {tipoFiltro === "CO" && <td>{v.cliente_nombre || "—"}{v.cliente_rut && <div className="text-muted small">RUT: {v.cliente_rut}</div>}</td>}
-                      <td>${v.monto_total}</td>
-                      <td>{v.tipo_documento_display || v.tipo_documento}</td>
-                      <td>
+                      <td data-label="ID" data-cell="primary">#{v.id}</td>
+                      <td data-label="Fecha">{formatDateTime(v.fecha_venta)}</td>
+                      <td data-label="Usuario">{v.usuario_nombre}</td>
+                      {tipoFiltro === "CO" && <td data-label="Cliente">{v.cliente_nombre || "—"}{v.cliente_rut && <div className="text-muted small">RUT: {v.cliente_rut}</div>}</td>}
+                      <td data-label="Total">${v.monto_total}</td>
+                      <td data-label="Tipo">{v.tipo_documento_display || v.tipo_documento}</td>
+                      <td data-label="Estado">
                         {v.estado_display || v.estado}
                         {v.monto_devuelto > 0 && (
                           <span
@@ -390,34 +390,36 @@ export default function PedidosPage() {
                           </span>
                         )}
                       </td>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        <button className="btn btn-sm btn-info me-1" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
-                        {v.tipo_documento === "CO" && !v.convertido && v.estado === "PE" && (
-                          <button className="btn btn-sm btn-success me-1" onClick={() => navigate(`/ventas?cotizacion=${v.id}`)}>Convertir a venta</button>
-                        )}
-                        {v.tipo_documento === "CO" && v.convertido && v.venta_derivada_id && (
-                          <button className="btn btn-sm btn-success me-1" onClick={() => setDetalleVentaId(v.venta_derivada_id)}>Venta #{v.venta_derivada_id}</button>
-                        )}
-                        {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
-                          <>
-                            {esVentaDeHoy(v.fecha_venta) && (
-                              <button className="btn btn-sm btn-danger me-1" onClick={() => abrirAnular(v)}>Anular</button>
-                            )}
-                            <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
-                          </>
-                        )}
+                      <td style={{ whiteSpace: "nowrap" }} data-cell="actions">
+                        <div className="btn-group">
+                          <button className="btn btn-sm btn-info" onClick={() => setDetalleVentaId(v.id)}>Ver</button>
+                          {v.tipo_documento === "CO" && !v.convertido && v.estado === "PE" && (
+                            <button className="btn btn-sm btn-success" onClick={() => navigate(`/ventas?cotizacion=${v.id}`)}>Convertir a venta</button>
+                          )}
+                          {v.tipo_documento === "CO" && v.convertido && v.venta_derivada_id && (
+                            <button className="btn btn-sm btn-success" onClick={() => setDetalleVentaId(v.venta_derivada_id)}>Venta #{v.venta_derivada_id}</button>
+                          )}
+                          {esAdmin && v.estado === "CO" && v.tipo_documento === "VE" && (
+                            <>
+                              {esVentaDeHoy(v.fecha_venta) && (
+                                <button className="btn btn-sm btn-danger" onClick={() => abrirAnular(v)}>Anular</button>
+                              )}
+                              <button className="btn btn-sm btn-warning" onClick={() => abrirDevolver(v)}>Devolver</button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {tab === "devoluciones" && rows.map((d) => (
                     <tr key={d.id} className="table-warning">
-                      <td>D#{d.id}</td>
-                      <td>{formatDateTime(d.fecha_devolucion)}</td>
-                      <td>{d.usuario_nombre}</td>
-                      <td style={{ color: "var(--danger)" }}>-${d.monto_devuelto}</td>
-                      <td><span className="badge badge-warning">Devolución</span></td>
-                      <td>—</td>
-                      <td style={{ whiteSpace: "nowrap" }}>
+                      <td data-label="ID" data-cell="primary">D#{d.id}</td>
+                      <td data-label="Fecha">{formatDateTime(d.fecha_devolucion)}</td>
+                      <td data-label="Usuario">{d.usuario_nombre}</td>
+                      <td style={{ color: "var(--danger)" }} data-label="Total">-${d.monto_devuelto}</td>
+                      <td data-label="Tipo"><span className="badge badge-warning">Devolución</span></td>
+                      <td data-label="Estado">—</td>
+                      <td style={{ whiteSpace: "nowrap" }} data-cell="actions">
                         <button className="btn btn-sm btn-info" onClick={() => setDetalleDevolucionId(d.id)}>Ver</button>
                       </td>
                     </tr>

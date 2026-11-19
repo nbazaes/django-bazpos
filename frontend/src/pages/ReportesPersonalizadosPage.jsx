@@ -202,7 +202,7 @@ export default function ReportesPersonalizadosPage() {
           </div>
 
           <div className="card mb-3">
-            <div className="card-header d-flex justify-content-between align-items-center">
+            <div className="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
               <h6 className="card-title">Columnas a mostrar</h6>
               <button
                 type="button"

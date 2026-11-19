@@ -10,6 +10,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import './index.css'
 import './styles.css'
 import './design-system.css'
+import './mobile.css'
 
 initTheme()
 initStoreName()

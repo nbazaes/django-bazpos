@@ -12,7 +12,7 @@ export default function Pagination({ page, totalPages, onPageChange, count, page
       <div className="btn-group">
         <button
           type="button"
-          className="btn btn-sm btn-secondary"
+          className="btn btn-sm btn-secondary pagination-edge"
           onClick={() => onPageChange(1)}
           disabled={page <= 1}
         >
@@ -39,7 +39,7 @@ export default function Pagination({ page, totalPages, onPageChange, count, page
         </button>
         <button
           type="button"
-          className="btn btn-sm btn-secondary"
+          className="btn btn-sm btn-secondary pagination-edge"
           onClick={() => onPageChange(totalPages)}
           disabled={page >= totalPages}
         >

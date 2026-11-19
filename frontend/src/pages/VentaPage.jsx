@@ -647,7 +647,7 @@ export default function VentaPage() {
         </div>
       )}
       {pendienteVerificacion && !isSaving && (
-        <div className="alert alert-warning" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="alert alert-warning venta-banner-flex">
           <span>No pudimos confirmar la venta. Puede que se haya registrado sin respuesta.</span>
           <button className="btn btn-sm btn-primary" onClick={verificarVentaPendiente} disabled={verificando}>
             {verificando ? "Verificando…" : "Verificar venta"}
@@ -655,7 +655,7 @@ export default function VentaPage() {
         </div>
       )}
       {error && (
-        <div className="alert alert-danger" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="alert alert-danger venta-banner-flex">
           <span>{error}</span>
           <button className="btn btn-sm btn-outline" onClick={() => setError("")} style={{ border: "none", fontSize: "1.2rem", lineHeight: 1, padding: "0 0.25rem" }}>
             ×
@@ -663,7 +663,7 @@ export default function VentaPage() {
         </div>
       )}
       {cotizacionOrigenId && (
-        <div className="alert alert-info" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="alert alert-info venta-banner-flex">
           <span>Convirtiendo cotización <strong>#{cotizacionOrigenId}</strong> a venta — los productos se han cargado en el carrito.</span>
           <button className="btn btn-sm btn-outline" onClick={() => {
             setSearchParams((prev) => { prev.delete("cotizacion"); return prev; }, { replace: true });
@@ -742,7 +742,7 @@ export default function VentaPage() {
               </div>
             )}
             <div className="table-responsive">
-              <table className="table table-sm table-bordered">
+              <table className="table table-sm table-bordered table-mobile-cards">
                 <thead>
                   <tr>
                     <th style={{ width: "1px" }}>Código</th>
@@ -760,12 +760,12 @@ export default function VentaPage() {
                 <tbody>
                   {productosEncontrados.map((p) => (
                     <tr key={p.producto_id}>
-                      <td className="text-nowrap">{p.codigo_producto}</td>
-                      <td className="text-nowrap">{p.oem}</td>
-                      <td>{p.nombre}</td>
-                      <td>{p.marca}</td>
-                      <td className="text-truncate" style={{ maxWidth: 200 }}>{p.descripcion}</td>
-                      <td>
+                      <td className="text-nowrap" data-label="Código">{p.codigo_producto}</td>
+                      <td className="text-nowrap" data-label="OEM">{p.oem}</td>
+                      <td data-label="Nombre" data-cell="primary">{p.nombre}</td>
+                      <td data-label="Marca">{p.marca}</td>
+                      <td className="text-truncate hide-mobile" style={{ maxWidth: 200 }} data-label="Descripción">{p.descripcion}</td>
+                      <td data-label="Stock">
                         {esGerente ? (
                           <button
                             className="btn btn-link p-0 stock-clickable"
@@ -808,8 +808,8 @@ export default function VentaPage() {
                           </>
                         )}
                       </td>
-                      <td className="text-nowrap">{p.ultima_fecha_llegada || "—"}</td>
-                      <td>
+                      <td className="text-nowrap hide-mobile" data-label="Última llegada">{p.ultima_fecha_llegada || "—"}</td>
+                      <td data-label="Precio">
                         {preciosModificados[p.producto_id] ? (
                           <span
                             style={{ color: "var(--accent)", fontWeight: 700 }}
@@ -825,7 +825,7 @@ export default function VentaPage() {
                         )}
                       </td>
                       {esGerente && (
-                        <td>
+                        <td data-label="Precio costo">
                           <button
                             className="btn btn-link p-0"
                             onClick={() => setQuickPrecioCostoProducto(p)}
@@ -841,7 +841,7 @@ export default function VentaPage() {
                           </button>
                         </td>
                       )}
-                      <td>
+                      <td data-cell="actions">
                         <button
                           className="btn btn-sm btn-success"
                           onClick={() => agregar(p)}
@@ -860,7 +860,7 @@ export default function VentaPage() {
       </PageCard>
       <PageCard title="Carrito">
         <div className="table-responsive">
-          <table className="table table-sm table-bordered">
+          <table className="table table-sm table-bordered table-mobile-cards">
             <thead>
               <tr>
                 <th style={{ width: "1px" }}>Código</th>
@@ -876,11 +876,11 @@ export default function VentaPage() {
             <tbody>
               {carro.map((i) => (
                 <tr key={i.producto_id}>
-                  <td className="text-nowrap">{i.codigo_producto}</td>
-                  <td className="text-nowrap">{i.oem}</td>
-                  <td>{i.nombre}</td>
-                  <td className="text-nowrap">{i.marca}</td>
-                  <td>
+                  <td className="text-nowrap" data-label="Código">{i.codigo_producto}</td>
+                  <td className="text-nowrap hide-mobile" data-label="OEM">{i.oem}</td>
+                  <td data-label="Nombre" data-cell="primary">{i.nombre}</td>
+                  <td className="text-nowrap" data-label="Marca">{i.marca}</td>
+                  <td data-label="Cantidad">
                     <StepperInput
                       value={i.cantidad}
                       onChange={(val) => {
@@ -900,9 +900,9 @@ export default function VentaPage() {
                       incrementLabel={`Aumentar cantidad de ${i.nombre}`}
                     />
                   </td>
-                  <td>${netoFromBruto(i.precio * i.cantidad)}</td>
-                  <td>${i.precio * i.cantidad}</td>
-                  <td>
+                  <td data-label="Subtotal neto">${netoFromBruto(i.precio * i.cantidad)}</td>
+                  <td data-label="Subtotal">${i.precio * i.cantidad}</td>
+                  <td data-cell="actions">
                     <button
                       className="btn btn-sm btn-danger"
                       onClick={() => setCarro(carro.filter((x) => x.producto_id !== i.producto_id))}
@@ -916,7 +916,7 @@ export default function VentaPage() {
           </table>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.5rem" }}>
-          <div style={{
+          <div className="venta-totales-box" style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "stretch",
@@ -1021,7 +1021,7 @@ export default function VentaPage() {
               borderTop: `2px solid ${discount > 0 ? "var(--accent)" : "var(--border-default)"}`,
             }}>
               <span style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>Total</span>
-              <span style={{
+              <span className="venta-total-valor" style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: "2.1rem",
                 fontWeight: 800,
@@ -1038,7 +1038,7 @@ export default function VentaPage() {
           {maximoDescuento === null && <button type="button" className="btn btn-sm btn-outline" onClick={actualizarLimite}>Reintentar</button>}
           {descuentoExcedido && <button type="button" className="btn btn-sm btn-outline" onClick={() => setDescuentoPorcentaje(maximoDescuento)}>Aplicar máximo permitido</button>}
         </div>
-        <div className="btn-group">
+        <div className="btn-group venta-acciones-bar">
           <button className="btn btn-success" disabled={!carro.length || descuentoBloqueado} onClick={() => { setConfirmMode("VE"); setClienteNombre(""); setClienteRut(""); setMedioPago(""); setDocumentoFiscal(""); setEsMixto(false); setPagosMixtos({ EF: 0, TJ: 0, TR: 0, CH: 0 }); setShowConfirmVenta(true); }}>
             Confirmar venta
           </button>
@@ -1299,6 +1299,7 @@ export default function VentaPage() {
                   {lastDocumento.cliente_nombre && <div>Cliente: {lastDocumento.cliente_nombre}</div>}
                   {lastDocumento.cliente_rut && <div>RUT: {lastDocumento.cliente_rut}</div>}
                   <hr />
+                  <div className="table-responsive">
                   <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: "0.8rem" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px dashed #999", color: "#1a1a1a" }}>
@@ -1325,6 +1326,7 @@ export default function VentaPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                   {!lastDocumento.ocultarTotales && (
                   <>
                   <hr />

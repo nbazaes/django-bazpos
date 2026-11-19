@@ -293,7 +293,7 @@ export default function PedidosProveedoresPage() {
             <p className="text-muted">No hay pedidos registrados.</p>
           ) : (
             <div className="table-wrapper">
-              <table className="table">
+              <table className="table table-mobile-cards">
                 <thead>
                   <tr>
                     <th>Fecha</th>
@@ -306,17 +306,17 @@ export default function PedidosProveedoresPage() {
                 <tbody>
                   {dias.map((dia) => (
                     <tr key={dia.id}>
-                      <td>{formatFecha(dia.fecha)}</td>
-                      <td>{dia.total_items}</td>
-                      <td>{dia.total_pedidos}/{dia.total_items}</td>
-                      <td>
+                      <td data-label="Fecha" data-cell="primary">{formatFecha(dia.fecha)}</td>
+                      <td data-label="Items">{dia.total_items}</td>
+                      <td data-label="Pedidos">{dia.total_pedidos}/{dia.total_items}</td>
+                      <td data-label="Estado">
                         {dia.finalizado ? (
                           <span className="badge badge-success">Finalizado</span>
                         ) : (
                           <span className="badge badge-warning">Pendiente</span>
                         )}
                       </td>
-                      <td>
+                      <td data-cell="actions">
                         <button
                           className="btn btn-sm btn-outline"
                           onClick={() => verDetalleDia(dia.id)}

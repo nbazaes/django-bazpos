@@ -189,7 +189,7 @@ export default function FacturasPage() {
                   </div>
                 </div>
                 <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
+                  <table className="table table-sm table-bordered table-mobile-cards">
                     <thead>
                       <tr><th>Código</th><th>Nombre</th><th>Marca</th><th>Cantidad</th><th>Costo neto</th><th>Costo con IVA</th><th>Subtotal neto</th><th>Subtotal con IVA</th></tr>
                     </thead>
@@ -200,14 +200,14 @@ export default function FacturasPage() {
                         const subtotalConIva = applyTax(subtotalNeto, taxPercent);
                         return (
                           <tr key={d.id}>
-                            <td>{d.codigo_producto}</td>
-                            <td>{d.nombre}</td>
-                            <td>{d.marca}</td>
-                            <td>{d.cantidad}</td>
-                            <td>${d.costo_compra}</td>
-                            <td>${costoConIva}</td>
-                            <td>${subtotalNeto}</td>
-                            <td>${subtotalConIva}</td>
+                            <td data-label="Código">{d.codigo_producto}</td>
+                            <td data-label="Nombre" data-cell="primary">{d.nombre}</td>
+                            <td data-label="Marca">{d.marca}</td>
+                            <td data-label="Cantidad">{d.cantidad}</td>
+                            <td data-label="Costo neto">${d.costo_compra}</td>
+                            <td data-label="Costo con IVA">${costoConIva}</td>
+                            <td data-label="Subtotal neto">${subtotalNeto}</td>
+                            <td data-label="Subtotal con IVA">${subtotalConIva}</td>
                           </tr>
                         );
                       })}

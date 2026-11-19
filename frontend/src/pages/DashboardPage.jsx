@@ -64,11 +64,14 @@ export default function DashboardPage() {
     const handleEscape = (e) => {
       if (e.key === "Escape") setPopoverAbierto(null);
     };
+    const handleScroll = () => setPopoverAbierto(null);
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("scroll", handleScroll, true);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [popoverAbierto]);
 
@@ -205,15 +208,15 @@ export default function DashboardPage() {
             <div className="mb-4">
               <PageCard title={data.es_gerente ? "Ventas por vendedor" : "Mis ventas de hoy"}>
                 <div className="table-responsive">
-                  <table className="table table-sm table-bordered">
+                  <table className="table table-sm table-bordered table-mobile-cards">
                     <thead>
                       <tr><th>Vendedor</th><th>Total ($)</th><th>Cantidad</th></tr>
                     </thead>
                     <tbody>
                       {data.ventas_dia.desglose.map((row, i) => (
                         <tr key={i}>
-                          <td>{row.vendedor}</td>
-                          <td>
+                          <td data-label="Vendedor" data-cell="primary">{row.vendedor}</td>
+                          <td data-label="Total ($)">
                             <strong>{fmtMoney(row.total)}</strong>
                             <div className="stat-breakdown">
                               {fmtMoney(row.total_vendido)} vendido
@@ -222,7 +225,7 @@ export default function DashboardPage() {
                                 : null}
                             </div>
                           </td>
-                          <td>{row.cantidad}</td>
+                          <td data-label="Cantidad">{row.cantidad}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -255,7 +258,7 @@ export default function DashboardPage() {
                   {stockFetching && <div className="text-muted" role="status">Actualizando productos...</div>}
                   <fieldset disabled={isPlaceholderData} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
                   <div className="table-responsive">
-                    <table className="table table-sm table-bordered">
+                    <table className="table table-sm table-bordered table-mobile-cards">
                       <thead>
                         <tr>
                           <th style={{ width: "40px" }}></th>
@@ -280,7 +283,7 @@ export default function DashboardPage() {
 
                           return (
                             <tr key={p.producto_id}>
-                              <td className="text-center">
+                              <td className="text-center" data-label="OEM alterno">
                                 {p.oem_productos && p.oem_productos.length > 0 && (
                                   <button
                                     type="button"
@@ -291,7 +294,7 @@ export default function DashboardPage() {
                                       } else {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const approxHeight = 160;
-                                        const popoverWidth = 300;
+                                        const popoverWidth = Math.min(300, window.innerWidth - 16);
                                         const spaceBelow = window.innerHeight - rect.bottom;
                                         const showAbove =
                                           spaceBelow < approxHeight && rect.top > approxHeight;
@@ -314,11 +317,11 @@ export default function DashboardPage() {
                                   </button>
                                 )}
                               </td>
-                              <td>{p.nombre}</td>
-                              <td>{p.codigo_producto}</td>
-                              <td className="hide-mobile">{p.oem}</td>
-                              <td className="hide-mobile">{p.proveedor_nombre}</td>
-                              <td>
+                              <td data-label="Nombre" data-cell="primary">{p.nombre}</td>
+                              <td data-label="Código">{p.codigo_producto}</td>
+                              <td className="hide-mobile" data-label="OEM">{p.oem}</td>
+                              <td className="hide-mobile" data-label="Proveedor">{p.proveedor_nombre}</td>
+                              <td data-label="Stock actual">
                                 {puedeAjustar ? (
                                   <button
                                     type="button"
@@ -340,8 +343,8 @@ export default function DashboardPage() {
                                   </span>
                                 )}
                               </td>
-                              <td>{p.stock_minimo}</td>
-                              <td>
+                              <td data-label="Stock mínimo">{p.stock_minimo}</td>
+                              <td data-cell="actions">
                                 <div className="btn-group" role="group" aria-label="Acciones de producto">
                                   <button
                                     type="button"

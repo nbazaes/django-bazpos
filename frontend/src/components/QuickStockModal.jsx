@@ -152,39 +152,41 @@ export default function QuickStockModal({ producto, onClose }) {
             <div className="modal-body">
               {error && <div className="alert alert-danger">{error}</div>}
 
-              <table className="table table-sm table-bordered">
-                <thead>
-                  <tr>
-                    <th>Ubicación</th>
-                    <th style={{ width: 130 }}>Stock</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered table-mobile-cards">
+                  <thead>
                     <tr>
-                      <td colSpan={2} className="text-center text-muted">
-                        Sin ubicaciones
-                      </td>
+                      <th>Ubicación</th>
+                      <th style={{ width: 130 }}>Stock</th>
                     </tr>
-                  ) : (
-                    rows.map((r) => (
-                      <tr key={r.rowKey}>
-                        <td>{r.nombre}</td>
-                        <td>
-                          <StepperInput
-                            value={r.cantidad_nueva}
-                            onChange={(val) => updateCantidad(r.rowKey, val)}
-                            min={0}
-                            inputStyle={{ width: 70, fontSize: "0.85rem" }}
-                            decrementLabel={`Disminuir stock en ${r.nombre}`}
-                            incrementLabel={`Aumentar stock en ${r.nombre}`}
-                          />
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="text-center text-muted">
+                          Sin ubicaciones
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      rows.map((r) => (
+                        <tr key={r.rowKey}>
+                          <td data-label="Ubicación" data-cell="primary">{r.nombre}</td>
+                          <td data-label="Stock">
+                            <StepperInput
+                              value={r.cantidad_nueva}
+                              onChange={(val) => updateCantidad(r.rowKey, val)}
+                              min={0}
+                              inputStyle={{ width: 70, fontSize: "0.85rem" }}
+                              decrementLabel={`Disminuir stock en ${r.nombre}`}
+                              incrementLabel={`Aumentar stock en ${r.nombre}`}
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
               {ubicacionesDisponibles.length > 0 && (
                 <div className="form-row align-items-end">
